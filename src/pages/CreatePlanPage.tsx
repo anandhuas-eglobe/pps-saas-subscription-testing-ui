@@ -2,25 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
-import Card from '@mui/material/Card'
-import CardContent from '@mui/material/CardContent'
-import Chip from '@mui/material/Chip'
 import CircularProgress from '@mui/material/CircularProgress'
-import Divider from '@mui/material/Divider'
-import FormControl from '@mui/material/FormControl'
-import FormControlLabel from '@mui/material/FormControlLabel'
-import Grid from '@mui/material/Grid'
-import InputLabel from '@mui/material/InputLabel'
-import MenuItem from '@mui/material/MenuItem'
-import Select from '@mui/material/Select'
 import Snackbar from '@mui/material/Snackbar'
 import Stack from '@mui/material/Stack'
-import Switch from '@mui/material/Switch'
-import TextField from '@mui/material/TextField'
-import Typography from '@mui/material/Typography'
 import AddCircleOutlineOutlinedIcon from '@mui/icons-material/AddCircleOutlineOutlined'
-import CategoryIcon from '@mui/icons-material/Category'
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import ListAltIcon from '@mui/icons-material/ListAlt'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import { Link as RouterLink } from 'react-router-dom'
@@ -29,32 +14,26 @@ import { createPlan } from '../api/plans'
 import { ApiRequestError } from '../api/client'
 import { ApiLogPanel } from '../components/ApiLogPanel'
 import { ValidationErrorsAlert } from '../components/ValidationErrorsAlert'
-import { AttributeFeatureAccordion } from '../components/plans/AttributeFeatureAccordion'
-import {
-  getRequiredAttributeEntries,
-  RequiredAttributesSection,
-} from '../components/plans/RequiredAttributesSection'
+import { CreatePlanDetailsSection } from '../components/plans/CreatePlanDetailsSection'
+import { CreatePlanFeatureCatalogSection } from '../components/plans/CreatePlanFeatureCatalogSection'
+import { CreatePlanPayloadPreview } from '../components/plans/CreatePlanPayloadPreview'
+import { getRequiredAttributeEntries } from '../components/plans/RequiredAttributesSection'
 import { PageHeader } from '../components/layout/PageHeader'
+import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import type {
   ApiResponse,
   AttributeConfig,
   CatalogFeature,
   CreatePlanPayload,
 } from '../types/subscription'
-import { PlanType } from '../types/subscription'
 import {
-  buildAttributePlanFeature,
-  buildRequiredAttributeFeatures,
-  buildSimplePlanFeature,
+  buildCreatePlanPayload,
   createDefaultPlanForm,
   defaultAttributeConfig,
-  defaultFeatureConfig,
   isAttributeFeature,
   isSimpleFeature,
   mergeAttributeConfigUpdate,
-  mergePlanFeatures,
   REQUIRED_ATTRIBUTE_CODES,
-  sanitizeCreatePlanPayload,
 } from '../utils/planDefaults'
 import {
   extractApiErrors,
@@ -114,26 +93,42 @@ export function CreatePlanPage() {
     [attributeFeatures],
   )
 
-  const payloadPreview = useMemo(() => {
-    const required = buildRequiredAttributeFeatures(catalog, requiredAttributeConfigs)
-    const optional = Object.values(selectedAttributeFeatures)
-      .map((entry) => {
-        const feature = catalog.find((item) => item.id === entry.featureId)
-        if (!feature) return null
-        return buildAttributePlanFeature(
-          feature,
-          entry.attributeIds,
-          entry.configs,
-          entry.linkFlags,
-        )
-      })
-      .filter((item): item is NonNullable<typeof item> => item !== null)
+  const payloadSnapshot = useMemo(
+    () => ({
+      form,
+      catalog,
+      requiredAttributeConfigs,
+      selectedAttributeFeatures,
+      selectedSimpleIds,
+    }),
+    [form, catalog, requiredAttributeConfigs, selectedAttributeFeatures, selectedSimpleIds],
+  )
 
-    const simple = selectedSimpleIds.map((featureId) => buildSimplePlanFeature(featureId))
-    const features = mergePlanFeatures([...required, ...optional, ...simple])
+  const debouncedPayloadSnapshot = useDebouncedValue(payloadSnapshot, 400)
 
-    return sanitizeCreatePlanPayload({ ...form, features })
-  }, [catalog, form, requiredAttributeConfigs, selectedAttributeFeatures, selectedSimpleIds])
+  const submitPayload = useMemo(
+    () =>
+      buildCreatePlanPayload(
+        payloadSnapshot.form,
+        payloadSnapshot.catalog,
+        payloadSnapshot.requiredAttributeConfigs,
+        payloadSnapshot.selectedAttributeFeatures,
+        payloadSnapshot.selectedSimpleIds,
+      ),
+    [payloadSnapshot],
+  )
+
+  const previewPayload = useMemo(
+    () =>
+      buildCreatePlanPayload(
+        debouncedPayloadSnapshot.form,
+        debouncedPayloadSnapshot.catalog,
+        debouncedPayloadSnapshot.requiredAttributeConfigs,
+        debouncedPayloadSnapshot.selectedAttributeFeatures,
+        debouncedPayloadSnapshot.selectedSimpleIds,
+      ),
+    [debouncedPayloadSnapshot],
+  )
 
   useEffect(() => {
     if (catalog.length === 0) return
@@ -191,27 +186,48 @@ export function CreatePlanPage() {
     void loadCatalog()
   }, [loadCatalog])
 
-  const updateForm = <K extends keyof CreatePlanPayload>(key: K, value: CreatePlanPayload[K]) => {
+  const updateForm = useCallback(<K extends keyof CreatePlanPayload>(key: K, value: CreatePlanPayload[K]) => {
     setForm((current) => ({ ...current, [key]: value }))
-  }
+  }, [])
 
-  const toggleSimpleFeature = (featureId: string) => {
+  const handleTrialToggle = useCallback((enabled: boolean) => {
+    setForm((current) => ({
+      ...current,
+      isTrialPeriodEnabled: enabled,
+      trialPeriod: enabled ? (current.trialPeriod ?? 14) : null,
+    }))
+  }, [])
+
+  const handleGraceToggle = useCallback((enabled: boolean) => {
+    setForm((current) => ({
+      ...current,
+      isGracePeriodEnabled: enabled,
+      gracePeriod: enabled ? (current.gracePeriod ?? 15) : null,
+    }))
+  }, [])
+
+  const toggleSimpleFeature = useCallback((featureId: string) => {
     setSelectedSimpleIds((current) =>
       current.includes(featureId)
         ? current.filter((id) => id !== featureId)
         : [...current, featureId],
     )
-  }
+  }, [])
 
-  const toggleOptionalAttributeFeature = (feature: CatalogFeature, enabled: boolean) => {
+  const toggleOptionalAttributeFeature = useCallback((featureId: string, enabled: boolean) => {
     setSelectedAttributeFeatures((current) => {
       const next = { ...current }
       if (!enabled) {
-        delete next[feature.id]
+        delete next[featureId]
         return next
       }
 
-      next[feature.id] = {
+      const feature = catalog.find((item) => item.id === featureId)
+      if (!feature) {
+        return current
+      }
+
+      next[featureId] = {
         featureId: feature.id,
         attributeIds: feature.featureAttributes.map((attr) => attr.id),
         configs: Object.fromEntries(
@@ -226,61 +242,81 @@ export function CreatePlanPage() {
       }
       return next
     })
-  }
+  }, [catalog])
 
-  const updateRequiredAttributeConfig = (
-    attributeId: string,
-    patch: Partial<AttributeConfig>,
-  ) => {
-    setRequiredAttributeConfigs((current) => {
-      const entry = requiredAttributeEntries.find((item) => item.attributeId === attributeId)
-      const attributeCode = entry?.attributeCode ?? ''
-      return {
-        ...current,
-        [attributeId]: mergeAttributeConfigUpdate(current[attributeId], patch, attributeCode),
-      }
-    })
-  }
+  const updateRequiredAttributeConfig = useCallback(
+    (attributeId: string, patch: Partial<AttributeConfig>) => {
+      setRequiredAttributeConfigs((current) => {
+        const entry = requiredAttributeEntries.find((item) => item.attributeId === attributeId)
+        const attributeCode = entry?.attributeCode ?? ''
+        return {
+          ...current,
+          [attributeId]: mergeAttributeConfigUpdate(current[attributeId], patch, attributeCode),
+        }
+      })
+    },
+    [requiredAttributeEntries],
+  )
 
-  const updateAttributeConfig = (
-    featureId: string,
-    attributeId: string,
-    patch: Partial<AttributeConfig>,
-  ) => {
-    setSelectedAttributeFeatures((current) => {
-      const entry = current[featureId]
-      if (!entry) return current
+  const updateAttributeConfig = useCallback(
+    (featureId: string, attributeId: string, patch: Partial<AttributeConfig>) => {
+      setSelectedAttributeFeatures((current) => {
+        const entry = current[featureId]
+        if (!entry) return current
 
-      const feature = catalog.find((item) => item.id === featureId)
-      const attribute = feature?.featureAttributes.find((item) => item.id === attributeId)
-      const attributeCode = attribute?.attributeCode ?? ''
+        const feature = catalog.find((item) => item.id === featureId)
+        const attribute = feature?.featureAttributes.find((item) => item.id === attributeId)
+        const attributeCode = attribute?.attributeCode ?? ''
 
-      return {
-        ...current,
-        [featureId]: {
-          ...entry,
-          configs: {
-            ...entry.configs,
-            [attributeId]: mergeAttributeConfigUpdate(
-              entry.configs[attributeId],
-              patch,
-              attributeCode,
-            ),
+        return {
+          ...current,
+          [featureId]: {
+            ...entry,
+            configs: {
+              ...entry.configs,
+              [attributeId]: mergeAttributeConfigUpdate(
+                entry.configs[attributeId],
+                patch,
+                attributeCode,
+              ),
+            },
           },
-        },
-      }
-    })
-  }
+        }
+      })
+    },
+    [catalog],
+  )
+
+  const updateOptionalLinkFlag = useCallback(
+    (featureId: string, attributeId: string, value: boolean) => {
+      setSelectedAttributeFeatures((current) => {
+        const entry = current[featureId]
+        if (!entry) return current
+
+        return {
+          ...current,
+          [featureId]: {
+            ...entry,
+            linkFlags: {
+              ...entry.linkFlags,
+              [attributeId]: value,
+            },
+          },
+        }
+      })
+    },
+    [],
+  )
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     setSubmitting(true)
     setLastError(null)
     setLastResponse(null)
-    setLastPayload(payloadPreview)
+    setLastPayload(submitPayload)
 
     try {
-      const result = await createPlan(payloadPreview)
+      const result = await createPlan(submitPayload)
       setLastResponse({
         success: true,
         data: result,
@@ -354,331 +390,48 @@ export function CreatePlanPage() {
         )}
 
         <Stack component="form" spacing={3} onSubmit={handleSubmit}>
-              <Card>
-                <CardContent>
-                  <Stack direction="row" spacing={1} sx={{ mb: 2, alignItems: 'center' }}>
-                    <AddCircleOutlineOutlinedIcon color="primary" />
-                    <Typography variant="h6">Plan details</Typography>
-                  </Stack>
+          <CreatePlanDetailsSection
+            form={form}
+            onFormChange={updateForm}
+            onTrialToggle={handleTrialToggle}
+            onGraceToggle={handleGraceToggle}
+          />
 
-                  <Grid container spacing={2}>
-                    <Grid size={{ xs: 12, md: 8 }}>
-                      <TextField
-                        fullWidth
-                        label="Plan name"
-                        value={form.planName}
-                        onChange={(event) => updateForm('planName', event.target.value)}
-                        required
-                      />
-                    </Grid>
-                    <Grid size={{ xs: 12, md: 4 }}>
-                      <FormControl fullWidth>
-                        <InputLabel>Plan type</InputLabel>
-                        <Select
-                          label="Plan type"
-                          value={form.planType}
-                          onChange={(event) =>
-                            updateForm('planType', event.target.value as CreatePlanPayload['planType'])
-                          }
-                        >
-                          <MenuItem value={PlanType.PUBLIC}>PUBLIC</MenuItem>
-                          <MenuItem value={PlanType.CUSTOM}>CUSTOM</MenuItem>
-                        </Select>
-                      </FormControl>
-                    </Grid>
-                    <Grid size={{ xs: 12 }}>
-                      <TextField
-                        fullWidth
-                        label="Description"
-                        multiline
-                        rows={3}
-                        value={form.planDescription}
-                        onChange={(event) => updateForm('planDescription', event.target.value)}
-                        required
-                      />
-                    </Grid>
-                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                      <TextField
-                        fullWidth
-                        label="Monthly price"
-                        type="number"
-                        value={form.baseMonthlyPrice}
-                        onChange={(event) =>
-                          updateForm('baseMonthlyPrice', Number(event.target.value))
-                        }
-                      />
-                    </Grid>
-                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                      <TextField
-                        fullWidth
-                        label="Yearly price"
-                        type="number"
-                        value={form.baseYearlyPrice}
-                        onChange={(event) =>
-                          updateForm('baseYearlyPrice', Number(event.target.value))
-                        }
-                      />
-                    </Grid>
-                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                      <TextField
-                        fullWidth
-                        label="Currency"
-                        value={form.baseCurrency ?? 'USD'}
-                        onChange={(event) => updateForm('baseCurrency', event.target.value)}
-                      />
-                    </Grid>
-                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                      <TextField
-                        fullWidth
-                        label="Overage auto-charge"
-                        type="number"
-                        value={form.overageAutoChargeAmount}
-                        onChange={(event) =>
-                          updateForm('overageAutoChargeAmount', Number(event.target.value))
-                        }
-                      />
-                    </Grid>
-                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                      <TextField
-                        fullWidth
-                        label="Overage max allowed"
-                        type="number"
-                        value={form.overageMaxAllowedAmount}
-                        onChange={(event) =>
-                          updateForm('overageMaxAllowedAmount', Number(event.target.value))
-                        }
-                      />
-                    </Grid>
-                  </Grid>
+          <CreatePlanFeatureCatalogSection
+            catalogLoading={catalogLoading}
+            catalogError={catalogError}
+            requiredAttributeEntries={requiredAttributeEntries}
+            requiredAttributeConfigs={requiredAttributeConfigs}
+            optionalAttributeFeatures={optionalAttributeFeatures}
+            selectedAttributeFeatures={selectedAttributeFeatures}
+            selectedSimpleIds={selectedSimpleIds}
+            simpleFeatures={simpleFeatures}
+            onRequiredConfigChange={updateRequiredAttributeConfig}
+            onOptionalToggle={toggleOptionalAttributeFeature}
+            onOptionalConfigChange={updateAttributeConfig}
+            onOptionalLinkFlagChange={updateOptionalLinkFlag}
+            onSimpleFeatureToggle={toggleSimpleFeature}
+          />
 
-                  <Divider sx={{ my: 2.5 }} />
+          <CreatePlanPayloadPreview payload={previewPayload} />
 
-                  <Grid container spacing={2}>
-                    <Grid size={{ xs: 12, md: 6 }}>
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            checked={form.isTrialPeriodEnabled}
-                            onChange={(event) => {
-                              const enabled = event.target.checked
-                              setForm((current) => ({
-                                ...current,
-                                isTrialPeriodEnabled: enabled,
-                                trialPeriod: enabled ? (current.trialPeriod ?? 14) : null,
-                              }))
-                            }}
-                          />
-                        }
-                        label="Trial period enabled"
-                      />
-                      {form.isTrialPeriodEnabled && (
-                        <TextField
-                          fullWidth
-                          sx={{ mt: 1 }}
-                          label="Trial days"
-                          type="number"
-                          slotProps={{ htmlInput: { min: 1 } }}
-                          value={form.trialPeriod ?? 14}
-                          onChange={(event) =>
-                            updateForm('trialPeriod', Math.max(1, Number(event.target.value)))
-                          }
-                        />
-                      )}
-                    </Grid>
-                    <Grid size={{ xs: 12, md: 6 }}>
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            checked={form.isGracePeriodEnabled}
-                            onChange={(event) => {
-                              const enabled = event.target.checked
-                              setForm((current) => ({
-                                ...current,
-                                isGracePeriodEnabled: enabled,
-                                gracePeriod: enabled ? (current.gracePeriod ?? 15) : null,
-                              }))
-                            }}
-                          />
-                        }
-                        label="Grace period enabled"
-                      />
-                      {form.isGracePeriodEnabled && (
-                        <TextField
-                          fullWidth
-                          sx={{ mt: 1 }}
-                          label="Grace days"
-                          type="number"
-                          slotProps={{ htmlInput: { min: 1 } }}
-                          value={form.gracePeriod ?? 15}
-                          onChange={(event) =>
-                            updateForm('gracePeriod', Math.max(1, Number(event.target.value)))
-                          }
-                        />
-                      )}
-                    </Grid>
-                  </Grid>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent>
-                  <Stack direction="row" spacing={1} sx={{ mb: 2, alignItems: 'center' }}>
-                    <CategoryIcon color="primary" />
-                    <Typography variant="h6">Feature catalog</Typography>
-                  </Stack>
-
-                  {catalogLoading && (
-                    <Stack direction="row" spacing={1.5} sx={{ py: 2, alignItems: 'center' }}>
-                      <CircularProgress size={22} />
-                      <Typography color="text.secondary">
-                        Loading features from GET /api/v1/features...
-                      </Typography>
-                    </Stack>
-                  )}
-
-                  {catalogError && (
-                    <Alert severity="error" sx={{ mb: 2 }}>
-                      {catalogError}
-                    </Alert>
-                  )}
-
-                  <Alert icon={<InfoOutlinedIcon />} severity="info" sx={{ mb: 2 }}>
-                    These attributes are always included in every plan and must use{' '}
-                    <strong>INCLUDED</strong> pricing.
-                  </Alert>
-
-                  <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
-                    Required attributes
-                  </Typography>
-                  <Box sx={{ mb: 3 }}>
-                    <RequiredAttributesSection
-                      entries={requiredAttributeEntries}
-                      configs={requiredAttributeConfigs}
-                      onConfigChange={updateRequiredAttributeConfig}
-                    />
-                  </Box>
-
-                  <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
-                    Optional attribute features
-                  </Typography>
-                  <Stack spacing={1.5} sx={{ mb: 3 }}>
-                    {optionalAttributeFeatures.map((feature) => (
-                      <AttributeFeatureAccordion
-                        key={feature.id}
-                        feature={feature}
-                        selected={Boolean(selectedAttributeFeatures[feature.id])}
-                        configs={selectedAttributeFeatures[feature.id]?.configs ?? {}}
-                        linkFlags={selectedAttributeFeatures[feature.id]?.linkFlags ?? {}}
-                        onToggle={(enabled) => toggleOptionalAttributeFeature(feature, enabled)}
-                        onConfigChange={(attributeId, patch) =>
-                          updateAttributeConfig(feature.id, attributeId, patch)
-                        }
-                        onLinkFlagChange={(attributeId, value) =>
-                          setSelectedAttributeFeatures((current) => ({
-                            ...current,
-                            [feature.id]: {
-                              ...current[feature.id],
-                              linkFlags: {
-                                ...current[feature.id].linkFlags,
-                                [attributeId]: value,
-                              },
-                            },
-                          }))
-                        }
-                      />
-                    ))}
-                  </Stack>
-
-                  <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
-                    Simple features
-                  </Typography>
-                  <Box
-                    sx={{
-                      display: 'grid',
-                      gridTemplateColumns: {
-                        xs: '1fr',
-                        sm: 'repeat(2, minmax(0, 1fr))',
-                        md: 'repeat(3, minmax(0, 1fr))',
-                      },
-                      gap: 1.5,
-                    }}
-                  >
-                    {simpleFeatures.map((feature) => {
-                      const checked = selectedSimpleIds.includes(feature.id)
-                      return (
-                        <Card
-                          key={feature.id}
-                          variant="outlined"
-                          sx={{
-                            cursor: 'pointer',
-                            borderColor: checked ? 'primary.main' : 'divider',
-                            bgcolor: checked ? 'rgba(79, 70, 229, 0.05)' : 'background.paper',
-                          }}
-                          onClick={() => toggleSimpleFeature(feature.id)}
-                        >
-                          <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-                            <FormControlLabel
-                              control={<Switch checked={checked} />}
-                              label={
-                                <Box>
-                                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                    {feature.name}
-                                  </Typography>
-                                  <Chip label={feature.code} size="small" sx={{ mt: 0.5 }} />
-                                </Box>
-                              }
-                              sx={{ m: 0, alignItems: 'flex-start' }}
-                            />
-                          </CardContent>
-                        </Card>
-                      )
-                    })}
-                  </Box>
-
-                  {selectedSimpleIds.length > 0 && (
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>
-                      Selected simple features use default INCLUDED config (
-                      {defaultFeatureConfig().planFeaturePriceMonthly} monthly /{' '}
-                      {defaultFeatureConfig().planFeaturePriceYearly} yearly).
-                    </Typography>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    Payload preview
-                  </Typography>
-                  <Box
-                    component="pre"
-                    sx={{
-                      m: 0,
-                      p: 2,
-                      borderRadius: 2,
-                      bgcolor: '#0f172a',
-                      color: '#e2e8f0',
-                      fontSize: '0.78rem',
-                      overflow: 'auto',
-                      maxHeight: 360,
-                    }}
-                  >
-                    {JSON.stringify(payloadPreview, null, 2)}
-                  </Box>
-                </CardContent>
-              </Card>
-
-              <Stack direction="row" sx={{ justifyContent: 'flex-end' }}>
-                <Button
-                  type="submit"
-                  variant="contained"
-                  size="large"
-                  disabled={submitting || catalogLoading}
-                  startIcon={submitting ? <CircularProgress size={18} color="inherit" /> : <AddCircleOutlineOutlinedIcon />}
-                >
-                  {submitting ? 'Creating plan...' : 'Create plan'}
-                </Button>
-              </Stack>
+          <Stack direction="row" sx={{ justifyContent: 'flex-end' }}>
+            <Button
+              type="submit"
+              variant="contained"
+              size="large"
+              disabled={submitting || catalogLoading}
+              startIcon={
+                submitting ? (
+                  <CircularProgress size={18} color="inherit" />
+                ) : (
+                  <AddCircleOutlineOutlinedIcon />
+                )
+              }
+            >
+              {submitting ? 'Creating plan...' : 'Create plan'}
+            </Button>
+          </Stack>
         </Stack>
 
         {(lastPayload != null || lastResponse != null || lastError != null) && (

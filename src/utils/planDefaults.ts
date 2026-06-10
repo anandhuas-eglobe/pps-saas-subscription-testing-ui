@@ -334,3 +334,38 @@ export function sanitizeCreatePlanPayload(payload: CreatePlanPayload): CreatePla
 
   return sanitized
 }
+
+export function buildCreatePlanPayload(
+  form: CreatePlanPayload,
+  catalog: CatalogFeature[],
+  requiredAttributeConfigs: Record<string, AttributeConfig>,
+  selectedAttributeFeatures: Record<
+    string,
+    {
+      featureId: string
+      attributeIds: string[]
+      configs: Record<string, AttributeConfig>
+      linkFlags: Record<string, boolean>
+    }
+  >,
+  selectedSimpleIds: string[],
+): CreatePlanPayload {
+  const required = buildRequiredAttributeFeatures(catalog, requiredAttributeConfigs)
+  const optional = Object.values(selectedAttributeFeatures)
+    .map((entry) => {
+      const feature = catalog.find((item) => item.id === entry.featureId)
+      if (!feature) return null
+      return buildAttributePlanFeature(
+        feature,
+        entry.attributeIds,
+        entry.configs,
+        entry.linkFlags,
+      )
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null)
+
+  const simple = selectedSimpleIds.map((featureId) => buildSimplePlanFeature(featureId))
+  const features = mergePlanFeatures([...required, ...optional, ...simple])
+
+  return sanitizeCreatePlanPayload({ ...form, features })
+}

@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import Accordion from '@mui/material/Accordion'
 import AccordionDetails from '@mui/material/AccordionDetails'
 import AccordionSummary from '@mui/material/AccordionSummary'
@@ -33,7 +34,7 @@ interface AttributeFeatureAccordionProps {
   onLinkFlagChange: (attributeId: string, value: boolean) => void
 }
 
-export function AttributeFeatureAccordion({
+export const AttributeFeatureAccordion = memo(function AttributeFeatureAccordion({
   feature,
   selected,
   configs,
@@ -274,4 +275,4 @@ export function AttributeFeatureAccordion({
       </AccordionDetails>
     </Accordion>
   )
-}
+})

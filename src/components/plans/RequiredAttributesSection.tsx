@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import Alert from '@mui/material/Alert'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
@@ -60,7 +61,7 @@ export function getRequiredAttributeEntries(catalog: CatalogFeature[]): Required
   return entries
 }
 
-export function RequiredAttributesSection({
+export const RequiredAttributesSection = memo(function RequiredAttributesSection({
   entries,
   configs,
   onConfigChange,
@@ -230,4 +231,4 @@ export function RequiredAttributesSection({
       })}
     </Stack>
   )
-}
+})
