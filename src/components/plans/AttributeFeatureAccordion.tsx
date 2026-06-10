@@ -20,16 +20,23 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import TuneIcon from '@mui/icons-material/Tune'
 import type { AttributeConfig, CatalogFeature } from '../../types/subscription'
 import { InclusionType, PriceType } from '../../types/subscription'
-import { applyPriceTypeChange, defaultAttributeConfig } from '../../utils/planDefaults'
-import { VolumePriceTiersEditor } from './VolumePriceTiersEditor'
+import {
+  applyPriceTypeChange,
+  defaultAttributeConfig,
+  getOptionalFeatureAttributes,
+} from '../../utils/planDefaults'
 import { AttributeBasePriceFields } from './AttributeBasePriceFields'
+import { ProrationAddonTrialFields } from './ProrationAddonTrialFields'
+import { VolumePriceTiersEditor } from './VolumePriceTiersEditor'
 
 interface AttributeFeatureAccordionProps {
   feature: CatalogFeature
   selected: boolean
+  selectedAttributeIds: string[]
   configs: Record<string, AttributeConfig>
   linkFlags: Record<string, boolean>
   onToggle: (enabled: boolean) => void
+  onAttributeToggle: (attributeId: string, enabled: boolean) => void
   onConfigChange: (attributeId: string, patch: Partial<AttributeConfig>) => void
   onLinkFlagChange: (attributeId: string, value: boolean) => void
 }
@@ -37,12 +44,32 @@ interface AttributeFeatureAccordionProps {
 export const AttributeFeatureAccordion = memo(function AttributeFeatureAccordion({
   feature,
   selected,
+  selectedAttributeIds,
   configs,
   linkFlags,
   onToggle,
+  onAttributeToggle,
   onConfigChange,
   onLinkFlagChange,
 }: AttributeFeatureAccordionProps) {
+  const optionalAttributes = getOptionalFeatureAttributes(feature)
+
+  const handleInclusionChange = (
+    attributeId: string,
+    inclusionType: AttributeConfig['inclusionType'],
+  ) => {
+    if (inclusionType === InclusionType.ADDON) {
+      onConfigChange(attributeId, { inclusionType })
+      return
+    }
+
+    onConfigChange(attributeId, {
+      inclusionType,
+      addonTrialEnabled: false,
+      addonTrialPeriod: null,
+    })
+  }
+
   return (
     <Accordion
       expanded={selected}
@@ -69,209 +96,247 @@ export const AttributeFeatureAccordion = memo(function AttributeFeatureAccordion
       </AccordionSummary>
 
       <AccordionDetails>
-        <Stack spacing={2}>
-          {feature.featureAttributes.map((attribute) => {
-            const config =
-              configs[attribute.id] ?? defaultAttributeConfig(attribute.attributeCode)
-            const isVolumePrice = config.priceType === PriceType.VOLUME_PRICE
-            const isPerCount = config.priceType === PriceType.PER_COUNT
+        {optionalAttributes.length === 0 ? (
+          <Alert severity="info">
+            All attributes for this feature are configured in the required attributes section.
+          </Alert>
+        ) : (
+          <Stack spacing={2}>
+            {optionalAttributes.map((attribute) => {
+              const attributeSelected = selectedAttributeIds.includes(attribute.id)
+              const config =
+                configs[attribute.id] ?? defaultAttributeConfig(attribute.attributeCode)
+              const isVolumePrice = config.priceType === PriceType.VOLUME_PRICE
+              const isPerCount = config.priceType === PriceType.PER_COUNT
 
-            return (
-              <Box
-                key={attribute.id}
-                sx={{
-                  p: 2,
-                  borderRadius: 2,
-                  border: '1px dashed',
-                  borderColor: 'divider',
-                  bgcolor: 'background.default',
-                }}
-              >
-                <Stack direction="row" spacing={1} sx={{ mb: 2, alignItems: 'center' }}>
-                  <TuneIcon fontSize="small" color="action" />
-                  <Typography variant="subtitle2">{attribute.attributeName}</Typography>
-                  <Chip label={attribute.attributeCode} size="small" />
-                </Stack>
-
-                <Grid container spacing={2}>
-                  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                    <FormControl fullWidth size="small">
-                      <InputLabel>Inclusion</InputLabel>
-                      <Select
-                        label="Inclusion"
-                        value={config.inclusionType}
-                        onChange={(event) =>
-                          onConfigChange(attribute.id, {
-                            inclusionType: event.target.value as AttributeConfig['inclusionType'],
-                          })
-                        }
-                      >
-                        <MenuItem value={InclusionType.INCLUDED}>INCLUDED</MenuItem>
-                        <MenuItem value={InclusionType.ADDON}>ADDON</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </Grid>
-
-                  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                    <FormControl fullWidth size="small">
-                      <InputLabel>Price type</InputLabel>
-                      <Select
-                        label="Price type"
-                        value={config.priceType}
-                        onChange={(event) => {
-                          const priceType = event.target.value as AttributeConfig['priceType']
-                          const nextConfig = applyPriceTypeChange(config, priceType)
-                          onConfigChange(attribute.id, nextConfig)
-                          if (priceType === PriceType.VOLUME_PRICE && linkFlags[attribute.id]) {
-                            onLinkFlagChange(attribute.id, false)
-                          }
-                        }}
-                      >
-                        <MenuItem value={PriceType.PER_COUNT}>PER_COUNT</MenuItem>
-                        <MenuItem value={PriceType.VOLUME_PRICE}>VOLUME_PRICE</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </Grid>
-
-                  <AttributeBasePriceFields
-                    baseMonthlyPrice={config.baseMonthlyPrice}
-                    baseYearlyPrice={config.baseYearlyPrice}
-                    onChange={(patch) => onConfigChange(attribute.id, patch)}
-                  />
-
-                  {isPerCount && (
-                    <>
-                      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                        <TextField
-                          fullWidth
-                          size="small"
-                          label="Min limit"
-                          type="number"
-                          value={config.minLimit ?? ''}
-                          onChange={(event) =>
-                            onConfigChange(attribute.id, { minLimit: Number(event.target.value) })
-                          }
-                        />
-                      </Grid>
-
-                      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                        <TextField
-                          fullWidth
-                          size="small"
-                          label="Max limit"
-                          type="number"
-                          value={config.maxLimit ?? ''}
-                          onChange={(event) =>
-                            onConfigChange(attribute.id, { maxLimit: Number(event.target.value) })
-                          }
-                        />
-                      </Grid>
-
-                      <Grid size={{ xs: 12, sm: 6 }}>
-                        <TextField
-                          fullWidth
-                          size="small"
-                          label="Price / unit (monthly)"
-                          type="number"
-                          value={config.pricePerUnitMonthly ?? 0}
-                          onChange={(event) =>
-                            onConfigChange(attribute.id, {
-                              pricePerUnitMonthly: Number(event.target.value),
-                            })
-                          }
-                        />
-                      </Grid>
-                      <Grid size={{ xs: 12, sm: 6 }}>
-                        <TextField
-                          fullWidth
-                          size="small"
-                          label="Price / unit (yearly)"
-                          type="number"
-                          value={config.pricePerUnitYearly ?? 0}
-                          onChange={(event) =>
-                            onConfigChange(attribute.id, {
-                              pricePerUnitYearly: Number(event.target.value),
-                            })
-                          }
-                        />
-                      </Grid>
-                    </>
-                  )}
-
-                  {isVolumePrice && (
-                    <VolumePriceTiersEditor
-                      tiers={
-                        config.volumePrice ?? [
-                          { count: 20, monthlyPrice: 40, yearlyPrice: 400 },
-                        ]
-                      }
-                      onChange={(volumePrice) =>
-                        onConfigChange(attribute.id, { volumePrice })
-                      }
-                    />
-                  )}
-
-                  <Grid size={{ xs: 12, sm: 6 }}>
+              return (
+                <Box
+                  key={attribute.id}
+                  sx={{
+                    p: 2,
+                    borderRadius: 2,
+                    border: '1px dashed',
+                    borderColor: attributeSelected ? 'primary.light' : 'divider',
+                    bgcolor: attributeSelected ? 'background.default' : 'action.hover',
+                    opacity: attributeSelected ? 1 : 0.72,
+                  }}
+                >
+                  <Stack direction="row" spacing={1} sx={{ mb: 2, alignItems: 'center' }}>
                     <FormControlLabel
                       control={
-                        <Switch
-                          checked={config.isOverageEnabled}
+                        <Checkbox
+                          checked={attributeSelected}
                           onChange={(event) =>
-                            onConfigChange(attribute.id, {
-                              isOverageEnabled: event.target.checked,
-                            })
+                            onAttributeToggle(attribute.id, event.target.checked)
                           }
                         />
                       }
-                      label="Overage enabled"
+                      label={
+                        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                          <TuneIcon fontSize="small" color="action" />
+                          <Typography variant="subtitle2">{attribute.attributeName}</Typography>
+                          <Chip label={attribute.attributeCode} size="small" />
+                        </Stack>
+                      }
+                      sx={{ m: 0, flex: 1 }}
                     />
-                  </Grid>
+                  </Stack>
 
-                  {config.isOverageEnabled && (
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="Overage price / unit"
-                        type="number"
-                        value={config.overagePricePerUnit ?? 0}
-                        onChange={(event) =>
-                          onConfigChange(attribute.id, {
-                            overagePricePerUnit: Number(event.target.value),
-                          })
-                        }
-                      />
-                    </Grid>
-                  )}
-
-                  {attribute.isLinkable && isPerCount && (
-                    <Grid size={{ xs: 12 }}>
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            checked={linkFlags[attribute.id] ?? false}
+                  {attributeSelected && (
+                    <Grid container spacing={2}>
+                      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                        <FormControl fullWidth size="small">
+                          <InputLabel>Inclusion</InputLabel>
+                          <Select
+                            label="Inclusion"
+                            value={config.inclusionType}
                             onChange={(event) =>
-                              onLinkFlagChange(attribute.id, event.target.checked)
+                              handleInclusionChange(
+                                attribute.id,
+                                event.target.value as AttributeConfig['inclusionType'],
+                              )
+                            }
+                          >
+                            <MenuItem value={InclusionType.INCLUDED}>INCLUDED</MenuItem>
+                            <MenuItem value={InclusionType.ADDON}>ADDON</MenuItem>
+                          </Select>
+                        </FormControl>
+                      </Grid>
+
+                      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                        <FormControl fullWidth size="small">
+                          <InputLabel>Price type</InputLabel>
+                          <Select
+                            label="Price type"
+                            value={config.priceType}
+                            onChange={(event) => {
+                              const priceType = event.target.value as AttributeConfig['priceType']
+                              const nextConfig = applyPriceTypeChange(config, priceType)
+                              onConfigChange(attribute.id, nextConfig)
+                              if (priceType === PriceType.VOLUME_PRICE && linkFlags[attribute.id]) {
+                                onLinkFlagChange(attribute.id, false)
+                              }
+                            }}
+                          >
+                            <MenuItem value={PriceType.PER_COUNT}>PER_COUNT</MenuItem>
+                            <MenuItem value={PriceType.VOLUME_PRICE}>VOLUME_PRICE</MenuItem>
+                          </Select>
+                        </FormControl>
+                      </Grid>
+
+                      <AttributeBasePriceFields
+                        baseMonthlyPrice={config.baseMonthlyPrice}
+                        baseYearlyPrice={config.baseYearlyPrice}
+                        onChange={(patch) => onConfigChange(attribute.id, patch)}
+                      />
+
+                      {isPerCount && (
+                        <>
+                          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              label="Min limit"
+                              type="number"
+                              value={config.minLimit ?? ''}
+                              onChange={(event) =>
+                                onConfigChange(attribute.id, {
+                                  minLimit: Number(event.target.value),
+                                })
+                              }
+                            />
+                          </Grid>
+
+                          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              label="Max limit"
+                              type="number"
+                              value={config.maxLimit ?? ''}
+                              onChange={(event) =>
+                                onConfigChange(attribute.id, {
+                                  maxLimit: Number(event.target.value),
+                                })
+                              }
+                            />
+                          </Grid>
+
+                          <Grid size={{ xs: 12, sm: 6 }}>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              label="Price / unit (monthly)"
+                              type="number"
+                              value={config.pricePerUnitMonthly ?? 0}
+                              onChange={(event) =>
+                                onConfigChange(attribute.id, {
+                                  pricePerUnitMonthly: Number(event.target.value),
+                                })
+                              }
+                            />
+                          </Grid>
+                          <Grid size={{ xs: 12, sm: 6 }}>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              label="Price / unit (yearly)"
+                              type="number"
+                              value={config.pricePerUnitYearly ?? 0}
+                              onChange={(event) =>
+                                onConfigChange(attribute.id, {
+                                  pricePerUnitYearly: Number(event.target.value),
+                                })
+                              }
+                            />
+                          </Grid>
+                        </>
+                      )}
+
+                      {isVolumePrice && (
+                        <VolumePriceTiersEditor
+                          tiers={
+                            config.volumePrice ?? [
+                              { count: 20, monthlyPrice: 40, yearlyPrice: 400 },
+                            ]
+                          }
+                          onChange={(volumePrice) =>
+                            onConfigChange(attribute.id, { volumePrice })
+                          }
+                        />
+                      )}
+
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              checked={config.isOverageEnabled}
+                              onChange={(event) =>
+                                onConfigChange(attribute.id, {
+                                  isOverageEnabled: event.target.checked,
+                                })
+                              }
+                            />
+                          }
+                          label="Overage enabled"
+                        />
+                      </Grid>
+
+                      {config.isOverageEnabled && (
+                        <Grid size={{ xs: 12, sm: 6 }}>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            label="Overage price / unit"
+                            type="number"
+                            value={config.overagePricePerUnit ?? 0}
+                            onChange={(event) =>
+                              onConfigChange(attribute.id, {
+                                overagePricePerUnit: Number(event.target.value),
+                              })
                             }
                           />
-                        }
-                        label="Link to monthly order volume"
-                      />
-                    </Grid>
-                  )}
+                        </Grid>
+                      )}
 
-                  {attribute.isLinkable && isVolumePrice && (
-                    <Grid size={{ xs: 12 }}>
-                      <Alert severity="info" sx={{ py: 0.5 }}>
-                        Link to monthly order volume is only available with PER_COUNT pricing.
-                      </Alert>
+                      <ProrationAddonTrialFields
+                        inclusionType={config.inclusionType}
+                        isProrated={config.isProrated}
+                        addonTrialEnabled={config.addonTrialEnabled}
+                        addonTrialPeriod={config.addonTrialPeriod}
+                        onChange={(patch) => onConfigChange(attribute.id, patch)}
+                      />
+
+                      {attribute.isLinkable && isPerCount && (
+                        <Grid size={{ xs: 12 }}>
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                checked={linkFlags[attribute.id] ?? false}
+                                onChange={(event) =>
+                                  onLinkFlagChange(attribute.id, event.target.checked)
+                                }
+                              />
+                            }
+                            label="Link to monthly order volume"
+                          />
+                        </Grid>
+                      )}
+
+                      {attribute.isLinkable && isVolumePrice && (
+                        <Grid size={{ xs: 12 }}>
+                          <Alert severity="info" sx={{ py: 0.5 }}>
+                            Link to monthly order volume is only available with PER_COUNT pricing.
+                          </Alert>
+                        </Grid>
+                      )}
                     </Grid>
                   )}
-                </Grid>
-              </Box>
-            )
-          })}
-        </Stack>
+                </Box>
+              )
+            })}
+          </Stack>
+        )}
       </AccordionDetails>
     </Accordion>
   )

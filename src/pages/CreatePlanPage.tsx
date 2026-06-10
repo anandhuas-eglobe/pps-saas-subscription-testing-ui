@@ -25,15 +25,18 @@ import type {
   AttributeConfig,
   CatalogFeature,
   CreatePlanPayload,
+  FeatureConfig,
 } from '../types/subscription'
 import {
   buildCreatePlanPayload,
   createDefaultPlanForm,
   defaultAttributeConfig,
+  defaultFeatureConfig,
+  getOptionalFeatureAttributes,
   isAttributeFeature,
   isSimpleFeature,
   mergeAttributeConfigUpdate,
-  REQUIRED_ATTRIBUTE_CODES,
+  mergeFeatureConfigUpdate,
 } from '../utils/planDefaults'
 import {
   extractApiErrors,
@@ -54,7 +57,9 @@ export function CreatePlanPage() {
   const [catalogLoading, setCatalogLoading] = useState(true)
   const [catalogError, setCatalogError] = useState<string | null>(null)
 
-  const [selectedSimpleIds, setSelectedSimpleIds] = useState<string[]>([])
+  const [selectedSimpleFeatures, setSelectedSimpleFeatures] = useState<
+    Record<string, FeatureConfig>
+  >({})
   const [selectedAttributeFeatures, setSelectedAttributeFeatures] = useState<
     Record<string, SelectedAttributeFeature>
   >({})
@@ -83,12 +88,7 @@ export function CreatePlanPage() {
   const optionalAttributeFeatures = useMemo(
     () =>
       attributeFeatures.filter(
-        (feature) =>
-          !feature.featureAttributes.every((attr) =>
-            REQUIRED_ATTRIBUTE_CODES.includes(
-              attr.attributeCode as (typeof REQUIRED_ATTRIBUTE_CODES)[number],
-            ),
-          ),
+        (feature) => getOptionalFeatureAttributes(feature).length > 0,
       ),
     [attributeFeatures],
   )
@@ -99,9 +99,9 @@ export function CreatePlanPage() {
       catalog,
       requiredAttributeConfigs,
       selectedAttributeFeatures,
-      selectedSimpleIds,
+      selectedSimpleFeatures,
     }),
-    [form, catalog, requiredAttributeConfigs, selectedAttributeFeatures, selectedSimpleIds],
+    [form, catalog, requiredAttributeConfigs, selectedAttributeFeatures, selectedSimpleFeatures],
   )
 
   const debouncedPayloadSnapshot = useDebouncedValue(payloadSnapshot, 400)
@@ -113,7 +113,7 @@ export function CreatePlanPage() {
         payloadSnapshot.catalog,
         payloadSnapshot.requiredAttributeConfigs,
         payloadSnapshot.selectedAttributeFeatures,
-        payloadSnapshot.selectedSimpleIds,
+        payloadSnapshot.selectedSimpleFeatures,
       ),
     [payloadSnapshot],
   )
@@ -125,7 +125,7 @@ export function CreatePlanPage() {
         debouncedPayloadSnapshot.catalog,
         debouncedPayloadSnapshot.requiredAttributeConfigs,
         debouncedPayloadSnapshot.selectedAttributeFeatures,
-        debouncedPayloadSnapshot.selectedSimpleIds,
+        debouncedPayloadSnapshot.selectedSimpleFeatures,
       ),
     [debouncedPayloadSnapshot],
   )
@@ -206,13 +206,32 @@ export function CreatePlanPage() {
     }))
   }, [])
 
-  const toggleSimpleFeature = useCallback((featureId: string) => {
-    setSelectedSimpleIds((current) =>
-      current.includes(featureId)
-        ? current.filter((id) => id !== featureId)
-        : [...current, featureId],
-    )
+  const toggleSimpleFeature = useCallback((featureId: string, enabled: boolean) => {
+    setSelectedSimpleFeatures((current) => {
+      const next = { ...current }
+      if (!enabled) {
+        delete next[featureId]
+        return next
+      }
+
+      next[featureId] = current[featureId] ?? defaultFeatureConfig()
+      return next
+    })
   }, [])
+
+  const updateSimpleFeatureConfig = useCallback(
+    (featureId: string, patch: Partial<FeatureConfig>) => {
+      setSelectedSimpleFeatures((current) => {
+        if (!(featureId in current)) return current
+
+        return {
+          ...current,
+          [featureId]: mergeFeatureConfigUpdate(current[featureId], patch),
+        }
+      })
+    },
+    [],
+  )
 
   const toggleOptionalAttributeFeature = useCallback((featureId: string, enabled: boolean) => {
     setSelectedAttributeFeatures((current) => {
@@ -227,22 +246,68 @@ export function CreatePlanPage() {
         return current
       }
 
+      const optionalAttributes = getOptionalFeatureAttributes(feature)
+
       next[featureId] = {
         featureId: feature.id,
-        attributeIds: feature.featureAttributes.map((attr) => attr.id),
+        attributeIds: optionalAttributes.map((attr) => attr.id),
         configs: Object.fromEntries(
-          feature.featureAttributes.map((attr) => [
+          optionalAttributes.map((attr) => [
             attr.id,
             defaultAttributeConfig(attr.attributeCode),
           ]),
         ),
         linkFlags: Object.fromEntries(
-          feature.featureAttributes.map((attr) => [attr.id, false]),
+          optionalAttributes.map((attr) => [attr.id, false]),
         ),
       }
       return next
     })
   }, [catalog])
+
+  const toggleOptionalAttribute = useCallback(
+    (featureId: string, attributeId: string, enabled: boolean) => {
+      setSelectedAttributeFeatures((current) => {
+        const entry = current[featureId]
+        if (!entry) return current
+
+        const feature = catalog.find((item) => item.id === featureId)
+        const attribute = feature?.featureAttributes.find((item) => item.id === attributeId)
+        if (!feature || !attribute) return current
+
+        const attributeIds = enabled
+          ? [...new Set([...entry.attributeIds, attributeId])]
+          : entry.attributeIds.filter((id) => id !== attributeId)
+
+        if (attributeIds.length === 0) {
+          const next = { ...current }
+          delete next[featureId]
+          return next
+        }
+
+        return {
+          ...current,
+          [featureId]: {
+            ...entry,
+            attributeIds,
+            configs: {
+              ...entry.configs,
+              ...(enabled && !entry.configs[attributeId]
+                ? { [attributeId]: defaultAttributeConfig(attribute.attributeCode) }
+                : {}),
+            },
+            linkFlags: {
+              ...entry.linkFlags,
+              ...(enabled && entry.linkFlags[attributeId] == null
+                ? { [attributeId]: false }
+                : {}),
+            },
+          },
+        }
+      })
+    },
+    [catalog],
+  )
 
   const updateRequiredAttributeConfig = useCallback(
     (attributeId: string, patch: Partial<AttributeConfig>) => {
@@ -404,13 +469,15 @@ export function CreatePlanPage() {
             requiredAttributeConfigs={requiredAttributeConfigs}
             optionalAttributeFeatures={optionalAttributeFeatures}
             selectedAttributeFeatures={selectedAttributeFeatures}
-            selectedSimpleIds={selectedSimpleIds}
+            selectedSimpleFeatures={selectedSimpleFeatures}
             simpleFeatures={simpleFeatures}
             onRequiredConfigChange={updateRequiredAttributeConfig}
             onOptionalToggle={toggleOptionalAttributeFeature}
+            onOptionalAttributeToggle={toggleOptionalAttribute}
             onOptionalConfigChange={updateAttributeConfig}
             onOptionalLinkFlagChange={updateOptionalLinkFlag}
             onSimpleFeatureToggle={toggleSimpleFeature}
+            onSimpleFeatureConfigChange={updateSimpleFeatureConfig}
           />
 
           <CreatePlanPayloadPreview payload={previewPayload} />

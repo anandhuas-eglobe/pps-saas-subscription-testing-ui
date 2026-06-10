@@ -23,6 +23,7 @@ import {
 } from '../../utils/planDefaults'
 import { VolumePriceTiersEditor } from './VolumePriceTiersEditor'
 import { AttributeBasePriceFields } from './AttributeBasePriceFields'
+import { ProrationAddonTrialFields } from './ProrationAddonTrialFields'
 
 export interface RequiredAttributeEntry {
   feature: CatalogFeature
@@ -223,6 +224,14 @@ export const RequiredAttributesSection = memo(function RequiredAttributesSection
                       />
                     </Grid>
                   )}
+
+                  <ProrationAddonTrialFields
+                    inclusionType={config.inclusionType}
+                    isProrated={config.isProrated}
+                    addonTrialEnabled={config.addonTrialEnabled}
+                    addonTrialPeriod={config.addonTrialPeriod}
+                    onChange={(patch) => onConfigChange(attributeId, patch)}
+                  />
                 </Grid>
               </Stack>
             </CardContent>

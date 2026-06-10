@@ -10,6 +10,18 @@ import { FeatureType, InclusionType, PlanType, PriceType } from '../types/subscr
 
 export const REQUIRED_ATTRIBUTE_CODES = ['NUM_USERS', 'MONTHLY_ORDER_VOLUME'] as const
 
+export function isRequiredAttributeCode(attributeCode: string): boolean {
+  return REQUIRED_ATTRIBUTE_CODES.includes(
+    attributeCode as (typeof REQUIRED_ATTRIBUTE_CODES)[number],
+  )
+}
+
+export function getOptionalFeatureAttributes(feature: CatalogFeature) {
+  return feature.featureAttributes.filter(
+    (attribute) => !isRequiredAttributeCode(attribute.attributeCode),
+  )
+}
+
 export function defaultFeatureConfig(
   inclusionType: 'INCLUDED' | 'ADDON' = InclusionType.INCLUDED,
 ): FeatureConfig {
@@ -237,20 +249,59 @@ export function buildRequiredAttributeFeatures(
     planFeature.attributes!.push({
       featureAttributeId: attribute.id,
       linkToMonthlyOrderVolume: false,
-      attributeConfig: sanitizeAttributeConfig(
-        configs[attribute.id] ?? defaultAttributeConfig(code),
-      ),
+      attributeConfig: sanitizeAttributeConfig({
+        ...(configs[attribute.id] ?? defaultAttributeConfig(code)),
+        inclusionType: InclusionType.INCLUDED,
+        addonTrialEnabled: false,
+        addonTrialPeriod: null,
+      }),
     })
   }
 
   return requiredFeatures
 }
 
-export function buildSimplePlanFeature(featureId: string): PlanFeature {
+export function sanitizeFeatureConfig(config: FeatureConfig): FeatureConfig {
+  const sanitized: FeatureConfig = {
+    planFeaturePriceMonthly: config.planFeaturePriceMonthly,
+    planFeaturePriceYearly: config.planFeaturePriceYearly,
+    inclusionType: config.inclusionType,
+    isProrated: config.isProrated,
+    addonTrialEnabled: config.addonTrialEnabled,
+  }
+
+  if (config.inclusionType === InclusionType.ADDON && config.addonTrialEnabled) {
+    sanitized.addonTrialPeriod = config.addonTrialPeriod ?? 14
+  }
+
+  return sanitized
+}
+
+export function mergeFeatureConfigUpdate(
+  current: FeatureConfig | undefined,
+  patch: Partial<FeatureConfig>,
+): FeatureConfig {
+  const previous = current ?? defaultFeatureConfig()
+  const merged = { ...previous, ...patch }
+
+  if (merged.inclusionType !== InclusionType.ADDON) {
+    merged.addonTrialEnabled = false
+    merged.addonTrialPeriod = null
+  } else if (!merged.addonTrialEnabled) {
+    merged.addonTrialPeriod = null
+  }
+
+  return merged
+}
+
+export function buildSimplePlanFeature(
+  featureId: string,
+  config: FeatureConfig = defaultFeatureConfig(),
+): PlanFeature {
   return {
     featureId,
     featureType: FeatureType.SIMPLE,
-    featureConfig: defaultFeatureConfig(),
+    featureConfig: sanitizeFeatureConfig(config),
   }
 }
 
@@ -306,6 +357,13 @@ export function sanitizeCreatePlanPayload(payload: CreatePlanPayload): CreatePla
   const sanitized: CreatePlanPayload = {
     ...payload,
     features: payload.features.map((feature) => {
+      if (feature.featureType === FeatureType.SIMPLE && feature.featureConfig) {
+        return {
+          ...feature,
+          featureConfig: sanitizeFeatureConfig(feature.featureConfig),
+        }
+      }
+
       if (feature.featureType !== FeatureType.ATTRIBUTE || !feature.attributes) {
         return feature
       }
@@ -348,7 +406,7 @@ export function buildCreatePlanPayload(
       linkFlags: Record<string, boolean>
     }
   >,
-  selectedSimpleIds: string[],
+  selectedSimpleFeatures: Record<string, FeatureConfig>,
 ): CreatePlanPayload {
   const required = buildRequiredAttributeFeatures(catalog, requiredAttributeConfigs)
   const optional = Object.values(selectedAttributeFeatures)
@@ -364,7 +422,9 @@ export function buildCreatePlanPayload(
     })
     .filter((item): item is NonNullable<typeof item> => item !== null)
 
-  const simple = selectedSimpleIds.map((featureId) => buildSimplePlanFeature(featureId))
+  const simple = Object.entries(selectedSimpleFeatures).map(([featureId, config]) =>
+    buildSimplePlanFeature(featureId, config),
+  )
   const features = mergePlanFeatures([...required, ...optional, ...simple])
 
   return sanitizeCreatePlanPayload({ ...form, features })

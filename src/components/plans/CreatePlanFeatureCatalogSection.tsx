@@ -3,21 +3,19 @@ import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
-import Chip from '@mui/material/Chip'
 import CircularProgress from '@mui/material/CircularProgress'
-import FormControlLabel from '@mui/material/FormControlLabel'
 import Stack from '@mui/material/Stack'
-import Switch from '@mui/material/Switch'
 import Typography from '@mui/material/Typography'
 import CategoryIcon from '@mui/icons-material/Category'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
-import type { AttributeConfig, CatalogFeature } from '../../types/subscription'
+import type { AttributeConfig, CatalogFeature, FeatureConfig } from '../../types/subscription'
 import { defaultFeatureConfig } from '../../utils/planDefaults'
 import { AttributeFeatureAccordion } from './AttributeFeatureAccordion'
 import {
   RequiredAttributesSection,
   type RequiredAttributeEntry,
 } from './RequiredAttributesSection'
+import { SimpleFeatureAccordion } from './SimpleFeatureAccordion'
 
 type SelectedAttributeFeature = {
   featureId: string
@@ -30,6 +28,7 @@ interface OptionalAttributeFeatureItemProps {
   feature: CatalogFeature
   entry: SelectedAttributeFeature | undefined
   onToggle: (featureId: string, enabled: boolean) => void
+  onAttributeToggle: (featureId: string, attributeId: string, enabled: boolean) => void
   onConfigChange: (featureId: string, attributeId: string, patch: Partial<AttributeConfig>) => void
   onLinkFlagChange: (featureId: string, attributeId: string, value: boolean) => void
 }
@@ -38,6 +37,7 @@ const OptionalAttributeFeatureItem = memo(function OptionalAttributeFeatureItem(
   feature,
   entry,
   onToggle,
+  onAttributeToggle,
   onConfigChange,
   onLinkFlagChange,
 }: OptionalAttributeFeatureItemProps) {
@@ -45,11 +45,41 @@ const OptionalAttributeFeatureItem = memo(function OptionalAttributeFeatureItem(
     <AttributeFeatureAccordion
       feature={feature}
       selected={Boolean(entry)}
+      selectedAttributeIds={entry?.attributeIds ?? []}
       configs={entry?.configs ?? {}}
       linkFlags={entry?.linkFlags ?? {}}
       onToggle={(enabled) => onToggle(feature.id, enabled)}
+      onAttributeToggle={(attributeId, enabled) =>
+        onAttributeToggle(feature.id, attributeId, enabled)
+      }
       onConfigChange={(attributeId, patch) => onConfigChange(feature.id, attributeId, patch)}
       onLinkFlagChange={(attributeId, value) => onLinkFlagChange(feature.id, attributeId, value)}
+    />
+  )
+})
+
+interface SimpleFeatureItemProps {
+  feature: CatalogFeature
+  selected: boolean
+  config: FeatureConfig
+  onToggle: (featureId: string, enabled: boolean) => void
+  onConfigChange: (featureId: string, patch: Partial<FeatureConfig>) => void
+}
+
+const SimpleFeatureItem = memo(function SimpleFeatureItem({
+  feature,
+  selected,
+  config,
+  onToggle,
+  onConfigChange,
+}: SimpleFeatureItemProps) {
+  return (
+    <SimpleFeatureAccordion
+      feature={feature}
+      selected={selected}
+      config={config}
+      onToggle={(enabled) => onToggle(feature.id, enabled)}
+      onConfigChange={(patch) => onConfigChange(feature.id, patch)}
     />
   )
 })
@@ -61,17 +91,19 @@ interface CreatePlanFeatureCatalogSectionProps {
   requiredAttributeConfigs: Record<string, AttributeConfig>
   optionalAttributeFeatures: CatalogFeature[]
   selectedAttributeFeatures: Record<string, SelectedAttributeFeature>
-  selectedSimpleIds: string[]
+  selectedSimpleFeatures: Record<string, FeatureConfig>
   simpleFeatures: CatalogFeature[]
   onRequiredConfigChange: (attributeId: string, patch: Partial<AttributeConfig>) => void
   onOptionalToggle: (featureId: string, enabled: boolean) => void
+  onOptionalAttributeToggle: (featureId: string, attributeId: string, enabled: boolean) => void
   onOptionalConfigChange: (
     featureId: string,
     attributeId: string,
     patch: Partial<AttributeConfig>,
   ) => void
   onOptionalLinkFlagChange: (featureId: string, attributeId: string, value: boolean) => void
-  onSimpleFeatureToggle: (featureId: string) => void
+  onSimpleFeatureToggle: (featureId: string, enabled: boolean) => void
+  onSimpleFeatureConfigChange: (featureId: string, patch: Partial<FeatureConfig>) => void
 }
 
 export const CreatePlanFeatureCatalogSection = memo(function CreatePlanFeatureCatalogSection({
@@ -81,13 +113,15 @@ export const CreatePlanFeatureCatalogSection = memo(function CreatePlanFeatureCa
   requiredAttributeConfigs,
   optionalAttributeFeatures,
   selectedAttributeFeatures,
-  selectedSimpleIds,
+  selectedSimpleFeatures,
   simpleFeatures,
   onRequiredConfigChange,
   onOptionalToggle,
+  onOptionalAttributeToggle,
   onOptionalConfigChange,
   onOptionalLinkFlagChange,
   onSimpleFeatureToggle,
+  onSimpleFeatureConfigChange,
 }: CreatePlanFeatureCatalogSectionProps) {
   return (
     <Card>
@@ -113,8 +147,9 @@ export const CreatePlanFeatureCatalogSection = memo(function CreatePlanFeatureCa
         )}
 
         <Alert icon={<InfoOutlinedIcon />} severity="info" sx={{ mb: 2 }}>
-          These attributes are always included in every plan and must use <strong>INCLUDED</strong>{' '}
-          pricing.
+          Required attributes are always included with <strong>INCLUDED</strong> pricing. Optional
+          attribute features and simple features support INCLUDED or ADDON pricing, proration, and
+          add-on trials.
         </Alert>
 
         <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
@@ -132,12 +167,18 @@ export const CreatePlanFeatureCatalogSection = memo(function CreatePlanFeatureCa
           Optional attribute features
         </Typography>
         <Stack spacing={1.5} sx={{ mb: 3 }}>
+          {optionalAttributeFeatures.length === 0 && !catalogLoading && (
+            <Typography variant="body2" color="text.secondary">
+              No optional attribute features in the catalog.
+            </Typography>
+          )}
           {optionalAttributeFeatures.map((feature) => (
             <OptionalAttributeFeatureItem
               key={feature.id}
               feature={feature}
               entry={selectedAttributeFeatures[feature.id]}
               onToggle={onOptionalToggle}
+              onAttributeToggle={onOptionalAttributeToggle}
               onConfigChange={onOptionalConfigChange}
               onLinkFlagChange={onOptionalLinkFlagChange}
             />
@@ -147,56 +188,26 @@ export const CreatePlanFeatureCatalogSection = memo(function CreatePlanFeatureCa
         <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
           Simple features
         </Typography>
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: {
-              xs: '1fr',
-              sm: 'repeat(2, minmax(0, 1fr))',
-              md: 'repeat(3, minmax(0, 1fr))',
-            },
-            gap: 1.5,
-          }}
-        >
+        <Stack spacing={1.5}>
+          {simpleFeatures.length === 0 && !catalogLoading && (
+            <Typography variant="body2" color="text.secondary">
+              No simple features in the catalog.
+            </Typography>
+          )}
           {simpleFeatures.map((feature) => {
-            const checked = selectedSimpleIds.includes(feature.id)
+            const selected = feature.id in selectedSimpleFeatures
             return (
-              <Card
+              <SimpleFeatureItem
                 key={feature.id}
-                variant="outlined"
-                sx={{
-                  cursor: 'pointer',
-                  borderColor: checked ? 'primary.main' : 'divider',
-                  bgcolor: checked ? 'rgba(79, 70, 229, 0.05)' : 'background.paper',
-                }}
-                onClick={() => onSimpleFeatureToggle(feature.id)}
-              >
-                <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-                  <FormControlLabel
-                    control={<Switch checked={checked} />}
-                    label={
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                          {feature.name}
-                        </Typography>
-                        <Chip label={feature.code} size="small" sx={{ mt: 0.5 }} />
-                      </Box>
-                    }
-                    sx={{ m: 0, alignItems: 'flex-start' }}
-                  />
-                </CardContent>
-              </Card>
+                feature={feature}
+                selected={selected}
+                config={selectedSimpleFeatures[feature.id] ?? defaultFeatureConfig()}
+                onToggle={onSimpleFeatureToggle}
+                onConfigChange={onSimpleFeatureConfigChange}
+              />
             )
           })}
-        </Box>
-
-        {selectedSimpleIds.length > 0 && (
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>
-            Selected simple features use default INCLUDED config (
-            {defaultFeatureConfig().planFeaturePriceMonthly} monthly /{' '}
-            {defaultFeatureConfig().planFeaturePriceYearly} yearly).
-          </Typography>
-        )}
+        </Stack>
       </CardContent>
     </Card>
   )
