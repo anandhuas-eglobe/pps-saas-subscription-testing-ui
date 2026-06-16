@@ -55,6 +55,9 @@ export function ActiveSubscriptionSummary({
               color={subscriptionStatusColor(subscription.status)}
             />
             {subscription.isTrial && <Chip label="Trial" size="small" color="warning" />}
+            {subscription.isThresholdReached && (
+              <Chip label="Threshold reached" size="small" color="error" variant="outlined" />
+            )}
             <Chip
               icon={<AutorenewIcon />}
               label={subscription.autoRenew ? 'Auto-renew on' : 'Auto-renew off'}
@@ -74,10 +77,10 @@ export function ActiveSubscriptionSummary({
               <DetailField label="Billing cycle" value={subscription.billingCycle} />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <DetailField label="Start date" value={formatDateOnly(subscription.startDate)} />
+              <DetailField label="Start date" value={formatDateTime(subscription.startDate)} />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <DetailField label="End date" value={formatDateOnly(subscription.endDate)} />
+              <DetailField label="End date" value={formatDateTime(subscription.endDate)} />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <DetailField
@@ -93,6 +96,12 @@ export function ActiveSubscriptionSummary({
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <DetailField label="Plan ID" value={subscription.planId} />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <DetailField
+                label="Included attributes tracked"
+                value={subscription.limitsAndUsages.length}
+              />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <DetailField label="Created" value={formatDateTime(subscription.createdAt)} />

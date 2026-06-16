@@ -140,6 +140,28 @@ export interface CreatePlanResponse {
   message: string
 }
 
+export interface UpdatePlanPayload {
+  planName?: string
+  planDescription?: string
+  planType?: PlanTypeValue
+  baseMonthlyPrice?: number
+  baseYearlyPrice?: number
+  baseCurrency?: string
+  isTrialPeriodEnabled?: boolean
+  trialPeriod?: number | null
+  isGracePeriodEnabled?: boolean
+  gracePeriod?: number | null
+  overageAutoChargeAmount?: number
+  overageMaxAllowedAmount?: number
+  status?: Extract<PlanStatusValue, 'DRAFT' | 'ACTIVE'>
+  features: PlanFeature[]
+}
+
+export interface UpdatePlanResponse {
+  planId: string
+  message: string
+}
+
 export interface PlanListItem {
   id: string
   planName: string
@@ -335,7 +357,20 @@ export interface MerchantPlanPurchaseResult {
   }
 }
 
-export interface ActiveSubscriptionDetail {
+export interface SubscriptionLimitAndUsage {
+  usageId: string
+  planFeatureAttributeId: string
+  attributeCode: string
+  usageType: 'UNLIMITED' | 'LIMITED' | 'LIMITED_MONTHLY' | string
+  usedCount: number
+  usageLimit: number | null
+  scheduledUsageLimit: number | null
+  overageEnabled: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SubscriptionDetail {
   subscriptionId: string
   planId: string
   status: string
@@ -350,9 +385,66 @@ export interface ActiveSubscriptionDetail {
   createdAt: string | null
 }
 
+export interface ActiveSubscriptionDetail extends SubscriptionDetail {
+  isThresholdReached: boolean
+  limitsAndUsages: SubscriptionLimitAndUsage[]
+}
+
 export interface ActiveSubscriptionResponse {
   subscription: ActiveSubscriptionDetail
   plan: PlanDetail
+}
+
+export interface ActivePlanSummary {
+  id: string
+  planName: string
+  planDescription: string
+  planType: string
+  status: string
+  baseMonthlyPrice: number
+  baseYearlyPrice: number
+  baseCurrency: string
+}
+
+export interface ActivePlanAddonUsage {
+  usageType: string
+  usedCount: number
+  usageLimit: number | null
+  scheduledUsageLimit: number | null
+}
+
+export interface ActivePlanAddonAttribute {
+  planFeatureAttributeId: string
+  attributeCode: string | null
+  attributeName: string | null
+  attributeConfig: PlanDetailAttributeConfig
+}
+
+export interface ActivePlanAddonFeature {
+  featureType: FeatureTypeValue
+  featureCode: string | null
+  featureName: string | null
+  featureConfig: PlanDetailFeatureConfig | null
+  attribute: ActivePlanAddonAttribute | null
+}
+
+export interface ActivePlanAddonItem {
+  addonSubscriptionId: string
+  planFeatureId: string
+  planFeatureAttributeId: string | null
+  status: string
+  autoRenew: boolean
+  isTrial: boolean
+  trialStartDate: string | null
+  trialEndDate: string | null
+  feature: ActivePlanAddonFeature
+  usage: ActivePlanAddonUsage | null
+}
+
+export interface ActivePlanAddonsResponse {
+  subscription: SubscriptionDetail
+  plan: ActivePlanSummary
+  addons: ActivePlanAddonItem[]
 }
 
 export interface AddonCatalogItemKey {

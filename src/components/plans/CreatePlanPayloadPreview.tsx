@@ -52,6 +52,9 @@ export const CreatePlanPayloadPreview = memo(function CreatePlanPayloadPreview({
                 fontSize: '0.78rem',
                 overflow: 'auto',
                 maxHeight: 360,
+                maxWidth: '100%',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
               }}
             >
               {payloadJson}

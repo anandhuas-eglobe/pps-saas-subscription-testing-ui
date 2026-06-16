@@ -28,7 +28,7 @@ export function PageHeader({
   backLabel = 'Back to home',
 }: PageHeaderProps) {
   return (
-    <Stack spacing={2}>
+    <Stack spacing={2} sx={{ minWidth: 0, maxWidth: '100%' }}>
       {showBack && (
         <Button
           component={RouterLink}
@@ -45,14 +45,16 @@ export function PageHeader({
         spacing={2}
         sx={{
           justifyContent: 'space-between',
-          alignItems: { xs: 'flex-start', md: 'center' },
+          alignItems: { xs: 'flex-start', md: 'flex-start' },
+          minWidth: 0,
+          maxWidth: '100%',
         }}
       >
-        <Box>
+        <Box sx={{ minWidth: 0, flex: 1 }}>
           {eyebrow && (
             <Chip label={eyebrow} size="small" color="primary" sx={{ mb: 1 }} />
           )}
-          <Typography variant="h4" gutterBottom>
+          <Typography variant="h4" gutterBottom sx={{ wordBreak: 'break-word' }}>
             {title}
           </Typography>
           <Typography variant="subtitle1" color="text.secondary">
@@ -63,11 +65,31 @@ export function PageHeader({
               label={apiEndpoint}
               size="small"
               variant="outlined"
-              sx={{ mt: 1.5, fontFamily: 'monospace' }}
+              sx={{
+                mt: 1.5,
+                fontFamily: 'monospace',
+                maxWidth: '100%',
+                height: 'auto',
+                alignItems: 'flex-start',
+                '& .MuiChip-label': {
+                  display: 'block',
+                  whiteSpace: 'normal',
+                  wordBreak: 'break-word',
+                  py: 0.75,
+                },
+              }}
             />
           )}
         </Box>
-        {actions && <Stack direction="row" spacing={1}>{actions}</Stack>}
+        {actions && (
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{ flexShrink: 0, flexWrap: 'wrap', maxWidth: '100%' }}
+          >
+            {actions}
+          </Stack>
+        )}
       </Stack>
     </Stack>
   )

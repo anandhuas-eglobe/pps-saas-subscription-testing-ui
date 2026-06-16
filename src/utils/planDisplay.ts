@@ -1,12 +1,17 @@
 import { PlanStatus } from '../types/subscription'
 
+export function isDraftPlan(status: string | null | undefined): boolean {
+  return status?.toUpperCase() === PlanStatus.DRAFT
+}
+
 export function planStatusColor(status: string): 'default' | 'success' | 'warning' | 'error' {
-  switch (status) {
+  switch (status.toUpperCase()) {
     case PlanStatus.ACTIVE:
       return 'success'
     case PlanStatus.DRAFT:
       return 'warning'
     case PlanStatus.INACTIVE:
+    case PlanStatus.DISCONTINUED:
       return 'error'
     default:
       return 'default'
@@ -60,6 +65,40 @@ export function subscriptionStatusColor(
     default:
       return 'default'
   }
+}
+
+export function addonSubscriptionStatusColor(
+  status: string,
+): 'default' | 'success' | 'warning' | 'error' {
+  switch (status.toUpperCase()) {
+    case 'ACTIVE':
+      return 'success'
+    case 'TRIAL_EXPIRED':
+      return 'warning'
+    case 'MERCHANT_CANCELLED':
+    case 'RENEWAL_FAILED':
+      return 'error'
+    default:
+      return 'default'
+  }
+}
+
+export function formatUsageLimit(
+  usageType: string,
+  usedCount: number,
+  usageLimit: number | null,
+  scheduledUsageLimit?: number | null,
+): string {
+  if (usageType.toUpperCase() === 'UNLIMITED') {
+    return `${usedCount.toLocaleString()} used · Unlimited`
+  }
+
+  const limit = usageLimit ?? scheduledUsageLimit
+  if (limit == null) {
+    return `${usedCount.toLocaleString()} used`
+  }
+
+  return `${usedCount.toLocaleString()} / ${limit.toLocaleString()}`
 }
 
 export function formatDateOnly(value: string | null | undefined): string {

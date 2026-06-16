@@ -30,7 +30,7 @@ import { ApiRequestError } from '../api/client'
 import { PageHeader } from '../components/layout/PageHeader'
 import type { PlanListItem } from '../types/subscription'
 import { PlanStatus, PlanType } from '../types/subscription'
-import { planStatusColor } from '../utils/planDisplay'
+import { isDraftPlan, planStatusColor } from '../utils/planDisplay'
 
 export function ListPlansPage() {
   const navigate = useNavigate()
@@ -305,7 +305,7 @@ export function ListPlansPage() {
                               >
                                 View
                               </Button>
-                              {plan.status === PlanStatus.DRAFT && (
+                              {isDraftPlan(plan.status) && (
                                 <Button
                                   size="small"
                                   variant="contained"

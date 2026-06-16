@@ -1,4 +1,5 @@
 import type {
+  ActivePlanAddonsResponse,
   ActiveSubscriptionResponse,
   InitiateAttributePurchasePayload,
   InitiatePlanPurchasePayload,
@@ -56,6 +57,13 @@ export async function purchasePlanCart(
 export async function getActiveSubscription(): Promise<ActiveSubscriptionResponse> {
   const { body } = await apiRequest<ActiveSubscriptionResponse>(
     '/api/v1/merchant/subscription/active',
+  )
+  return body.data!
+}
+
+export async function getActivePlanAddons(): Promise<ActivePlanAddonsResponse> {
+  const { body } = await apiRequest<ActivePlanAddonsResponse>(
+    '/api/v1/merchant/subscription/active-plan/addons',
   )
   return body.data!
 }

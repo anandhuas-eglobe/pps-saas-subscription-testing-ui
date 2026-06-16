@@ -5,17 +5,26 @@ import Redis from 'ioredis'
 
 const STREAM_MAX_LEN = 10_000
 const PUBLISH_PATH = '/dev-tools/redis/publish'
+const FLUSH_CACHE_PATH = '/dev-tools/redis/flush-cache'
 const HEALTH_PATH = '/dev-tools/redis/health'
+const SUBSCRIPTION_CACHE_KEY_PATTERN = 'subscription:*'
+
+interface RedisConnectionOptions {
+  host?: string
+  port?: number
+  password?: string
+  db?: number
+}
 
 interface PublishRequestBody {
   stream?: string
   event?: unknown
-  redis?: {
-    host?: string
-    port?: number
-    password?: string
-    db?: number
-  }
+  redis?: RedisConnectionOptions
+}
+
+interface FlushCacheRequestBody {
+  redis?: RedisConnectionOptions
+  pattern?: string
 }
 
 function getPathname(url: string | undefined): string {
@@ -50,6 +59,62 @@ function sendJson(response: ServerResponse, statusCode: number, body: unknown): 
   response.end(JSON.stringify(body))
 }
 
+function resolveRedisConfig(redis?: RedisConnectionOptions) {
+  return {
+    host: redis?.host ?? 'localhost',
+    port: redis?.port ?? 6790,
+    password: redis?.password ?? 'bitnami',
+    db: redis?.db ?? 0,
+  }
+}
+
+function createRedisClient(redis?: RedisConnectionOptions): Redis {
+  const redisConfig = resolveRedisConfig(redis)
+
+  return new Redis({
+    host: redisConfig.host,
+    port: redisConfig.port,
+    password: redisConfig.password,
+    db: redisConfig.db,
+    maxRetriesPerRequest: 1,
+    connectTimeout: 5_000,
+  })
+}
+
+async function flushCacheByPattern(body: FlushCacheRequestBody): Promise<{
+  pattern: string
+  keysDeleted: number
+  message: string
+}> {
+  const pattern = body.pattern ?? SUBSCRIPTION_CACHE_KEY_PATTERN
+  const client = createRedisClient(body.redis)
+
+  try {
+    let cursor = '0'
+    let keysDeleted = 0
+
+    do {
+      const [nextCursor, keys] = await client.scan(cursor, 'MATCH', pattern, 'COUNT', 200)
+      cursor = nextCursor
+
+      if (keys.length > 0) {
+        keysDeleted += await client.del(...keys)
+      }
+    } while (cursor !== '0')
+
+    return {
+      pattern,
+      keysDeleted,
+      message:
+        keysDeleted > 0
+          ? `Flushed ${keysDeleted} Redis cache key${keysDeleted === 1 ? '' : 's'} matching "${pattern}".`
+          : `No Redis cache keys found matching "${pattern}".`,
+    }
+  } finally {
+    client.disconnect()
+  }
+}
+
 async function publishToStream(body: PublishRequestBody): Promise<{
   stream: string
   messageId: string | null
@@ -61,21 +126,7 @@ async function publishToStream(body: PublishRequestBody): Promise<{
     throw new Error('Request body must include an "event" object.')
   }
 
-  const redisConfig = {
-    host: body.redis?.host ?? 'localhost',
-    port: body.redis?.port ?? 6790,
-    password: body.redis?.password ?? 'bitnami',
-    db: body.redis?.db ?? 0,
-  }
-
-  const client = new Redis({
-    host: redisConfig.host,
-    port: redisConfig.port,
-    password: redisConfig.password,
-    db: redisConfig.db,
-    maxRetriesPerRequest: 1,
-    connectTimeout: 5_000,
-  })
+  const client = createRedisClient(body.redis)
 
   try {
     const payload = JSON.stringify(body.event)
@@ -102,7 +153,7 @@ async function publishToStream(body: PublishRequestBody): Promise<{
 }
 
 /**
- * Dev-only Vite middleware that publishes JSON payloads to a Redis stream.
+ * Dev-only Vite middleware for Redis stream publish and subscription cache flush.
  * Used by the testing UI — not included in production builds.
  */
 export function redisDevToolsPlugin(): Plugin {
@@ -117,12 +168,14 @@ export function redisDevToolsPlugin(): Plugin {
           sendJson(response, 200, {
             success: true,
             available: true,
-            message: 'Redis dev middleware is active. Use npm run dev.',
+            message:
+              'Redis dev middleware is active (publish + flush-cache). Use npm run dev.',
+            endpoints: [PUBLISH_PATH, FLUSH_CACHE_PATH],
           })
           return
         }
 
-        if (pathname !== PUBLISH_PATH) {
+        if (pathname !== PUBLISH_PATH && pathname !== FLUSH_CACHE_PATH) {
           next()
           return
         }
@@ -137,7 +190,17 @@ export function redisDevToolsPlugin(): Plugin {
 
         try {
           const body = await readJsonBody(request)
-          const result = await publishToStream(body)
+
+          if (pathname === FLUSH_CACHE_PATH) {
+            const result = await flushCacheByPattern(body as FlushCacheRequestBody)
+            sendJson(response, 200, {
+              success: true,
+              ...result,
+            })
+            return
+          }
+
+          const result = await publishToStream(body as PublishRequestBody)
 
           sendJson(response, 200, {
             success: true,
@@ -145,8 +208,13 @@ export function redisDevToolsPlugin(): Plugin {
           })
         } catch (error) {
           const message =
-            error instanceof Error ? error.message : 'Failed to publish to Redis stream'
-          const statusCode = message.includes('event') ? 400 : 500
+            error instanceof Error
+              ? error.message
+              : pathname === FLUSH_CACHE_PATH
+                ? 'Failed to flush Redis cache'
+                : 'Failed to publish to Redis stream'
+          const statusCode =
+            pathname === PUBLISH_PATH && message.includes('event') ? 400 : 500
           sendJson(response, statusCode, {
             success: false,
             message,

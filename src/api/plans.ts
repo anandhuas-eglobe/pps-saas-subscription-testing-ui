@@ -4,6 +4,8 @@ import type {
   ListPlansResponse,
   PlanDetail,
   PlanFiltersResponse,
+  UpdatePlanPayload,
+  UpdatePlanResponse,
   UpdatePlanStatusPayload,
 } from '../types/subscription'
 import { apiRequest } from './client'
@@ -47,6 +49,17 @@ export async function getPlanById(planId: string): Promise<PlanDetail> {
 export async function createPlan(payload: CreatePlanPayload): Promise<CreatePlanResponse> {
   const { body } = await apiRequest<CreatePlanResponse>('/api/v1/admin/plans/create-plan', {
     method: 'POST',
+    body: JSON.stringify(payload),
+  })
+  return body.data!
+}
+
+export async function updatePlan(
+  planId: string,
+  payload: UpdatePlanPayload,
+): Promise<UpdatePlanResponse> {
+  const { body } = await apiRequest<UpdatePlanResponse>(`/api/v1/admin/plans/${planId}`, {
+    method: 'PUT',
     body: JSON.stringify(payload),
   })
   return body.data!

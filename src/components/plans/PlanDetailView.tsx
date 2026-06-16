@@ -450,6 +450,9 @@ export function PlanDetailView({ plan }: PlanDetailViewProps) {
               fontSize: '0.78rem',
               overflow: 'auto',
               maxHeight: 420,
+              maxWidth: '100%',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
             }}
           >
             {JSON.stringify(plan, null, 2)}

@@ -45,18 +45,18 @@ export const operations: OperationLink[] = [
   },
   {
     title: 'Active Subscription',
-    description: 'View the merchant\'s current subscription status, billing period, and subscribed plan details.',
+    description: 'View subscription status, INCLUDED attribute usage, plan details, and purchased add-ons.',
     path: '/merchant/subscription',
     icon: VerifiedIcon,
-    apiEndpoint: 'GET /api/v1/merchant/subscription/active',
+    apiEndpoint: 'GET /api/v1/merchant/subscription/active · GET /api/v1/merchant/subscription/active-plan/addons',
     available: true,
   },
   {
     title: 'Plan Add-ons',
-    description: 'Browse add-ons on your active plan, configure limits or trials, add to cart, and complete payment.',
+    description: 'Browse add-ons on your active plan, configure limits or trials, add to cart, and complete payment. Purchased add-ons appear on the active subscription page.',
     path: '/merchant/addons',
     icon: ExtensionIcon,
-    apiEndpoint: 'POST /api/v1/merchant/cart/addon',
+    apiEndpoint: 'GET /api/v1/merchant/subscription/active-plan/addons · POST /api/v1/merchant/cart/addon',
     available: true,
   },
   {

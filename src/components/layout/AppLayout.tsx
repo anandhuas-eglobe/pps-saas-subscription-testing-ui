@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react'
 import AppBar from '@mui/material/AppBar'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -10,11 +9,8 @@ import Stack from '@mui/material/Stack'
 import SubscriptionsIcon from '@mui/icons-material/Subscriptions'
 import ScienceIcon from '@mui/icons-material/Science'
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
-import { Link as RouterLink, useLocation } from 'react-router-dom'
-
-interface AppLayoutProps {
-  children: ReactNode
-}
+import { Link as RouterLink, Outlet, useLocation } from 'react-router-dom'
+import { RedisCacheFlushButton } from './RedisCacheFlushButton'
 
 const navItems = [
   { label: 'Home', path: '/' },
@@ -28,11 +24,36 @@ const navItems = [
   { label: 'Confirm Payment', path: '/dev/payment-confirm' },
 ]
 
-export function AppLayout({ children }: AppLayoutProps) {
+function isNavItemActive(pathname: string, itemPath: string): boolean {
+  if (itemPath === '/') {
+    return pathname === '/'
+  }
+
+  if (itemPath === '/plans') {
+    return (
+      pathname === '/plans' ||
+      pathname.startsWith('/plans/') &&
+        pathname !== '/plans/create' &&
+        !pathname.endsWith('/edit')
+    )
+  }
+
+  return pathname === itemPath || pathname.startsWith(`${itemPath}/`)
+}
+
+export function AppLayout() {
   const location = useLocation()
 
   return (
-    <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        overflowX: 'hidden',
+        maxWidth: '100%',
+      }}
+    >
       <AppBar
         position="sticky"
         elevation={0}
@@ -41,37 +62,76 @@ export function AppLayout({ children }: AppLayoutProps) {
           background: 'linear-gradient(135deg, #312e81 0%, #4338ca 55%, #2563eb 100%)',
         }}
       >
-        <Toolbar sx={{ gap: 2 }}>
-          <SubscriptionsIcon sx={{ fontSize: 28 }} />
+        <Toolbar sx={{ gap: 2, minHeight: { xs: 56, sm: 64 } }}>
+          <SubscriptionsIcon sx={{ fontSize: 28, flexShrink: 0 }} />
           <Box
             component={RouterLink}
             to="/"
-            sx={{ flexGrow: 1, textDecoration: 'none', color: 'inherit' }}
+            sx={{
+              flex: 1,
+              minWidth: 0,
+              textDecoration: 'none',
+              color: 'inherit',
+            }}
           >
-            <Typography variant="h6" component="div">
+            <Typography variant="h6" component="div" noWrap>
               Subscription Lifecycle Tester
             </Typography>
-            <Typography variant="caption" sx={{ opacity: 0.85 }}>
+            <Typography
+              variant="caption"
+              sx={{
+                opacity: 0.85,
+                display: { xs: 'none', sm: 'block' },
+              }}
+              noWrap
+            >
               Admin tools for plan creation and API validation
             </Typography>
           </Box>
 
-          <Stack direction="row" spacing={1} sx={{ display: { xs: 'none', md: 'flex' } }}>
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{ flexShrink: 0, alignItems: 'center' }}
+          >
+            <RedisCacheFlushButton />
+            <Chip
+              icon={<ScienceIcon sx={{ fontSize: '16px !important' }} />}
+              label="Testing UI"
+              size="small"
+              sx={{
+                bgcolor: 'rgba(255,255,255,0.14)',
+                color: 'white',
+                '& .MuiChip-icon': { color: 'white' },
+                display: { xs: 'none', sm: 'flex' },
+              }}
+            />
+          </Stack>
+        </Toolbar>
+
+        <Box
+          sx={{
+            px: 2,
+            pb: 1.5,
+            overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch',
+          }}
+        >
+          <Stack direction="row" spacing={1} sx={{ width: 'max-content' }}>
             {navItems.map((item) => {
-              const active =
-                item.path === '/'
-                  ? location.pathname === '/'
-                  : location.pathname.startsWith(item.path)
+              const active = isNavItemActive(location.pathname, item.path)
 
               return (
                 <Button
                   key={item.path}
                   component={RouterLink}
                   to={item.path}
+                  size="small"
                   startIcon={item.path === '/' ? <HomeOutlinedIcon /> : undefined}
                   sx={{
                     color: 'white',
-                    bgcolor: active ? 'rgba(255,255,255,0.16)' : 'transparent',
+                    flexShrink: 0,
+                    bgcolor: active ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.08)',
                     '&:hover': { bgcolor: 'rgba(255,255,255,0.12)' },
                   }}
                 >
@@ -80,57 +140,11 @@ export function AppLayout({ children }: AppLayoutProps) {
               )
             })}
           </Stack>
-
-          <Chip
-            icon={<ScienceIcon sx={{ fontSize: '16px !important' }} />}
-            label="Testing UI"
-            size="small"
-            sx={{
-              bgcolor: 'rgba(255,255,255,0.14)',
-              color: 'white',
-              '& .MuiChip-icon': { color: 'white' },
-              display: { xs: 'none', sm: 'flex' },
-            }}
-          />
-        </Toolbar>
-
-        <Stack
-          direction="row"
-          spacing={1}
-          sx={{
-            display: { xs: 'flex', md: 'none' },
-            px: 2,
-            pb: 1.5,
-            overflowX: 'auto',
-          }}
-        >
-          {navItems.map((item) => {
-            const active =
-              item.path === '/'
-                ? location.pathname === '/'
-                : location.pathname.startsWith(item.path)
-
-            return (
-              <Button
-                key={item.path}
-                component={RouterLink}
-                to={item.path}
-                size="small"
-                sx={{
-                  color: 'white',
-                  flexShrink: 0,
-                  bgcolor: active ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.08)',
-                }}
-              >
-                {item.label}
-              </Button>
-            )
-          })}
-        </Stack>
+        </Box>
       </AppBar>
 
-      <Container maxWidth="xl" sx={{ py: 3, flex: 1 }}>
-        {children}
+      <Container maxWidth="xl" sx={{ py: 3, flex: 1, minWidth: 0, maxWidth: '100%' }}>
+        <Outlet />
       </Container>
     </Box>
   )

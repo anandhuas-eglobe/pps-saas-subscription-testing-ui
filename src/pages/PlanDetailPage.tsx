@@ -5,15 +5,19 @@ import CircularProgress from '@mui/material/CircularProgress'
 import Snackbar from '@mui/material/Snackbar'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
+import PauseCircleOutlinedIcon from '@mui/icons-material/PauseCircleOutlined'
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom'
 import { getPlanById, updatePlanStatus } from '../api/plans'
 import { ApiRequestError } from '../api/client'
 import { PageHeader } from '../components/layout/PageHeader'
+import { DeactivatePlanDialog } from '../components/plans/DeactivatePlanDialog'
 import { PlanDetailView } from '../components/plans/PlanDetailView'
 import type { PlanDetail } from '../types/subscription'
 import { PlanStatus } from '../types/subscription'
+import { isDraftPlan } from '../utils/planDisplay'
 
 export function PlanDetailPage() {
   const { planId } = useParams<{ planId: string }>()
@@ -22,7 +26,8 @@ export function PlanDetailPage() {
   const [plan, setPlan] = useState<PlanDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [activating, setActivating] = useState(false)
+  const [statusUpdating, setStatusUpdating] = useState(false)
+  const [deactivateDialogOpen, setDeactivateDialogOpen] = useState(false)
 
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
@@ -65,7 +70,7 @@ export function PlanDetailPage() {
       return
     }
 
-    setActivating(true)
+    setStatusUpdating(true)
     try {
       await updatePlanStatus(planId, { status: PlanStatus.ACTIVE })
       setSnackbar({ open: true, message: 'Plan activated successfully', severity: 'success' })
@@ -79,7 +84,38 @@ export function PlanDetailPage() {
             : 'Failed to activate plan'
       setSnackbar({ open: true, message, severity: 'error' })
     } finally {
-      setActivating(false)
+      setStatusUpdating(false)
+    }
+  }
+
+  const handleDeactivate = async (options: {
+    migrationPlanId?: string
+    isTrialPeriodEnabled?: boolean
+    trialPeriod?: number
+  }) => {
+    if (!planId) {
+      return
+    }
+
+    setStatusUpdating(true)
+    try {
+      await updatePlanStatus(planId, {
+        status: PlanStatus.INACTIVE,
+        ...options,
+      })
+      setDeactivateDialogOpen(false)
+      setSnackbar({ open: true, message: 'Plan deactivated successfully', severity: 'success' })
+      await loadPlan()
+    } catch (err) {
+      const message =
+        err instanceof ApiRequestError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : 'Failed to deactivate plan'
+      setSnackbar({ open: true, message, severity: 'error' })
+    } finally {
+      setStatusUpdating(false)
     }
   }
 
@@ -100,8 +136,8 @@ export function PlanDetailPage() {
         <PageHeader
           eyebrow="Plan details"
           title={plan?.planName ?? 'Loading plan...'}
-          description="Full subscription plan configuration including pricing, trial settings, and attached features."
-          apiEndpoint={`GET /api/v1/admin/plans/${planId}`}
+          description="Full subscription plan configuration including pricing, trial settings, and attached features. Draft plans can be edited; activate or deactivate from the actions above."
+          apiEndpoint={`GET /api/v1/admin/plans/${planId} · PUT /api/v1/admin/plans/${planId} · PATCH /api/v1/admin/plans/${planId}`}
           backTo="/plans"
           backLabel="Back to plans"
           actions={
@@ -114,14 +150,35 @@ export function PlanDetailPage() {
               >
                 Refresh
               </Button>
-              {plan?.status === PlanStatus.DRAFT && (
+              {plan && isDraftPlan(plan.status) && (
+                <>
+                  <Button
+                    variant="outlined"
+                    startIcon={<EditOutlinedIcon />}
+                    disabled={loading}
+                    onClick={() => navigate(`/plans/${planId}/edit`)}
+                  >
+                    Edit plan
+                  </Button>
+                  <Button
+                    variant="contained"
+                    startIcon={<PlayArrowIcon />}
+                    onClick={() => void handleActivate()}
+                    disabled={statusUpdating || loading}
+                  >
+                    Activate plan
+                  </Button>
+                </>
+              )}
+              {plan?.status === PlanStatus.ACTIVE && (
                 <Button
-                  variant="contained"
-                  startIcon={<PlayArrowIcon />}
-                  onClick={() => void handleActivate()}
-                  disabled={activating || loading}
+                  variant="outlined"
+                  color="warning"
+                  startIcon={<PauseCircleOutlinedIcon />}
+                  onClick={() => setDeactivateDialogOpen(true)}
+                  disabled={statusUpdating || loading}
                 >
-                  Activate plan
+                  Deactivate plan
                 </Button>
               )}
             </Stack>
@@ -153,6 +210,16 @@ export function PlanDetailPage() {
 
         {!loading && !error && plan && <PlanDetailView plan={plan} />}
       </Stack>
+
+      {plan && (
+        <DeactivatePlanDialog
+          open={deactivateDialogOpen}
+          plan={plan}
+          submitting={statusUpdating}
+          onClose={() => setDeactivateDialogOpen(false)}
+          onConfirm={(payload) => void handleDeactivate(payload)}
+        />
+      )}
 
       <Snackbar
         open={snackbar.open}

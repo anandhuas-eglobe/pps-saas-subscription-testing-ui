@@ -216,19 +216,29 @@ export function MerchantAddonsPage() {
         <PageHeader
           eyebrow="Merchant add-ons"
           title="Purchase plan add-ons"
-          description="Browse add-ons available on your active subscription plan, configure limits or trials, add to cart, and complete checkout."
-          apiEndpoint="GET /api/v1/merchant/subscription/active · POST /api/v1/merchant/cart/addon · POST /api/v1/merchant/subscription/addon/purchase"
+          description="Browse add-ons available on your active subscription plan, configure limits or trials, add to cart, and complete checkout. View purchased add-ons on the active subscription page."
+          apiEndpoint="GET /api/v1/merchant/subscription/active · GET /api/v1/merchant/subscription/active-plan/addons · POST /api/v1/merchant/cart/addon · POST /api/v1/merchant/subscription/addon/purchase"
           backTo="/"
           backLabel="Back to home"
           actions={
-            <Button
-              variant="outlined"
-              startIcon={<RefreshIcon />}
-              onClick={() => void loadSubscription()}
-              disabled={loading}
-            >
-              Refresh
-            </Button>
+            <Stack direction="row" spacing={1}>
+              <Button
+                component={RouterLink}
+                to="/merchant/subscription?tab=addons"
+                variant="outlined"
+                disabled={loading || notFound}
+              >
+                View purchased add-ons
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<RefreshIcon />}
+                onClick={() => void loadSubscription()}
+                disabled={loading}
+              >
+                Refresh
+              </Button>
+            </Stack>
           }
         />
 
