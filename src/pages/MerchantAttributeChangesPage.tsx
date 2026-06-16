@@ -42,6 +42,7 @@ import {
   validateAttributeCartDrafts,
   type AttributeChangeDraft,
 } from '../utils/attributeChangeBuilder'
+import { buildAttributePurchasePayload } from '../utils/billingAddress'
 import { saveLastPaymentHandoff } from '../utils/paymentEventBuilder'
 
 function applyCartPreviewToDrafts(
@@ -223,7 +224,7 @@ export function MerchantAttributeChangesPage() {
     setPurchaseResult(null)
 
     try {
-      const result = await purchaseAttributeCart({ billingAddress })
+      const result = await purchaseAttributeCart(buildAttributePurchasePayload(billingAddress))
       setPurchaseResult(result)
       if (result.paymentHandoff) {
         saveLastPaymentHandoff(result.paymentHandoff)

@@ -7,9 +7,7 @@ import Chip from '@mui/material/Chip'
 import CircularProgress from '@mui/material/CircularProgress'
 import Collapse from '@mui/material/Collapse'
 import Divider from '@mui/material/Divider'
-import Grid from '@mui/material/Grid'
 import Stack from '@mui/material/Stack'
-import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import PaymentIcon from '@mui/icons-material/Payment'
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong'
@@ -19,21 +17,19 @@ import type {
   MerchantAddonCartPreview,
   MerchantAddonPurchaseResult,
 } from '../../types/subscription'
+import {
+  defaultBillingAddress,
+  isBillingAddressComplete,
+  requiresBillingAddressForCheckout,
+} from '../../utils/billingAddress'
 import { formatMoney } from '../../utils/planDisplay'
+import { BillingAddressFields } from './BillingAddressFields'
 
 interface AddonCartPreviewPanelProps {
   cart: MerchantAddonCartPreview
   purchasing?: boolean
   purchaseResult?: MerchantAddonPurchaseResult | null
   onConfirmPayment: (billingAddress?: BillingAddress) => void
-}
-
-const defaultBillingAddress: BillingAddress = {
-  street: '123 Main St',
-  city: 'San Francisco',
-  stateProvince: 'CA',
-  country: 'US',
-  zipPostalCode: '94102',
 }
 
 export function AddonCartPreviewPanel({
@@ -48,7 +44,10 @@ export function AddonCartPreviewPanel({
     addon.featureName ??
     addon.featureCode ??
     'Add-on'
-  const requiresBillingAddress = !cart.isTrial && pricing.grandTotal > 0
+  const requiresBillingAddress = requiresBillingAddressForCheckout({
+    isTrial: cart.isTrial,
+    grandTotal: pricing.grandTotal,
+  })
   const [billingAddress, setBillingAddress] = useState<BillingAddress>(defaultBillingAddress)
 
   const handleConfirm = () => {
@@ -58,6 +57,9 @@ export function AddonCartPreviewPanel({
     }
     onConfirmPayment()
   }
+
+  const canConfirm =
+    !purchasing && (!requiresBillingAddress || isBillingAddressComplete(billingAddress))
 
   return (
     <Card>
@@ -110,72 +112,16 @@ export function AddonCartPreviewPanel({
           {requiresBillingAddress && (
             <Box>
               <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
-                Billing address (required for paid add-on checkout)
+                Billing address (required for paid checkout)
               </Typography>
-              <Grid container spacing={2}>
-                <Grid size={{ xs: 12 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Street"
-                    value={billingAddress.street}
-                    onChange={(event) =>
-                      setBillingAddress((current) => ({ ...current, street: event.target.value }))
-                    }
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="City"
-                    value={billingAddress.city}
-                    onChange={(event) =>
-                      setBillingAddress((current) => ({ ...current, city: event.target.value }))
-                    }
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="State / province"
-                    value={billingAddress.stateProvince}
-                    onChange={(event) =>
-                      setBillingAddress((current) => ({
-                        ...current,
-                        stateProvince: event.target.value,
-                      }))
-                    }
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Country"
-                    value={billingAddress.country}
-                    onChange={(event) =>
-                      setBillingAddress((current) => ({ ...current, country: event.target.value }))
-                    }
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="ZIP / postal code"
-                    value={billingAddress.zipPostalCode}
-                    onChange={(event) =>
-                      setBillingAddress((current) => ({
-                        ...current,
-                        zipPostalCode: event.target.value,
-                      }))
-                    }
-                  />
-                </Grid>
-              </Grid>
+              <BillingAddressFields value={billingAddress} onChange={setBillingAddress} />
             </Box>
+          )}
+
+          {cart.isTrial && (
+            <Alert severity="info">
+              Add-on trial activation does not require a billing address.
+            </Alert>
           )}
 
           <Button
@@ -183,7 +129,7 @@ export function AddonCartPreviewPanel({
             color="success"
             size="large"
             startIcon={purchasing ? <CircularProgress size={18} color="inherit" /> : <PaymentIcon />}
-            disabled={purchasing}
+            disabled={!canConfirm}
             onClick={handleConfirm}
           >
             Confirm payment

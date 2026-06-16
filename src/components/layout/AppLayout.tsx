@@ -20,6 +20,7 @@ const navItems = [
   { label: 'Plan Add-ons', path: '/merchant/addons' },
   { label: 'Attribute Changes', path: '/merchant/attributes' },
   { label: 'Active Subscription', path: '/merchant/subscription' },
+  { label: 'Usage Simulation', path: '/merchant/usage-simulation' },
   { label: 'Invoices', path: '/merchant/invoices' },
   { label: 'Confirm Payment', path: '/dev/payment-confirm' },
 ]

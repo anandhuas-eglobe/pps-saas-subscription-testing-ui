@@ -7,6 +7,7 @@ import TuneIcon from '@mui/icons-material/Tune'
 import VerifiedIcon from '@mui/icons-material/Verified'
 import PaymentIcon from '@mui/icons-material/Payment'
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong'
+import TimelineIcon from '@mui/icons-material/Timeline'
 import type { SvgIconComponent } from '@mui/icons-material'
 
 export interface OperationLink {
@@ -49,6 +50,14 @@ export const operations: OperationLink[] = [
     path: '/merchant/subscription',
     icon: VerifiedIcon,
     apiEndpoint: 'GET /api/v1/merchant/subscription/active · GET /api/v1/merchant/subscription/active-plan/addons',
+    available: true,
+  },
+  {
+    title: 'Usage Simulation',
+    description: 'Simulate the merchant usage tracking flow: validate, log, confirm, and remove usage against your active subscription.',
+    path: '/merchant/usage-simulation',
+    icon: TimelineIcon,
+    apiEndpoint: 'GET/POST/PUT/DELETE /api/v1/merchant/usage-tracking/*',
     available: true,
   },
   {

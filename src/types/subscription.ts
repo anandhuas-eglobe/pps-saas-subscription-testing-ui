@@ -637,3 +637,40 @@ export interface ListInvoicesParams {
   sortBy?: string
   sortOrder?: 'asc' | 'desc'
 }
+
+export interface ValidateMerchantUsageResponse {
+  usageLimit: number | null
+  isOverageAllowed: boolean
+  planFeatureAttributeId: string
+  merchantSubscriptionId: string
+}
+
+export interface LogMerchantUsagePayload {
+  attributeCode: string
+  entityReferenceId: string
+  planFeatureAttributeId: string
+  merchantSubscriptionId: string
+  isOverageAllowed: boolean
+}
+
+export interface LogMerchantUsageResponse {
+  id: string
+  isOverage: boolean
+}
+
+export interface ConfirmMerchantUsagePayload {
+  entityReferenceId: string
+  attributeCode: string
+  isOverage: boolean
+  usageId: string
+}
+
+export interface ConfirmMerchantUsageResponse {
+  usageId: string
+  message: string
+}
+
+export interface RemoveMerchantUsagePayload {
+  entityReferenceId: string
+  attributeCode: string
+}

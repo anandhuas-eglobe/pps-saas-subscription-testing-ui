@@ -47,6 +47,10 @@ import {
   type AddonCatalogItem,
 } from '../utils/addonBuilder'
 import { formatMoney } from '../utils/planDisplay'
+import {
+  buildInitiatePurchasePayload,
+  requiresBillingAddressForCheckout,
+} from '../utils/billingAddress'
 import { saveLastPaymentHandoff } from '../utils/paymentEventBuilder'
 
 export function MerchantAddonsPage() {
@@ -192,7 +196,15 @@ export function MerchantAddonsPage() {
     setPurchaseResult(null)
 
     try {
-      const result = await purchaseAddonCart(billingAddress ? { billingAddress } : {})
+      const requiresBilling = cartPreview
+        ? requiresBillingAddressForCheckout({
+            isTrial: cartPreview.isTrial,
+            grandTotal: cartPreview.pricing.grandTotal,
+          })
+        : false
+      const result = await purchaseAddonCart(
+        buildInitiatePurchasePayload(billingAddress, requiresBilling),
+      )
       setPurchaseResult(result)
       if (result.paymentHandoff) {
         saveLastPaymentHandoff(result.paymentHandoff)

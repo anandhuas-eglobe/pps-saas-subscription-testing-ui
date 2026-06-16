@@ -12,6 +12,7 @@ import { MerchantAttributeChangesPage } from './pages/MerchantAttributeChangesPa
 import { MerchantPlansPage } from './pages/MerchantPlansPage'
 import { PaymentConfirmationPage } from './pages/PaymentConfirmationPage'
 import { PlanDetailPage } from './pages/PlanDetailPage'
+import { UsageSimulationPage } from './pages/UsageSimulationPage'
 
 const router = createBrowserRouter([
   {
@@ -27,6 +28,7 @@ const router = createBrowserRouter([
       { path: 'merchant/addons', element: <MerchantAddonsPage /> },
       { path: 'merchant/attributes', element: <MerchantAttributeChangesPage /> },
       { path: 'merchant/subscription', element: <ActiveSubscriptionPage /> },
+      { path: 'merchant/usage-simulation', element: <UsageSimulationPage /> },
       { path: 'merchant/invoices/:invoiceId', element: <InvoiceDetailPage /> },
       { path: 'merchant/invoices', element: <InvoiceListPage /> },
       { path: 'dev/payment-confirm', element: <PaymentConfirmationPage /> },

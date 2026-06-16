@@ -7,7 +7,6 @@ import Chip from '@mui/material/Chip'
 import CircularProgress from '@mui/material/CircularProgress'
 import Collapse from '@mui/material/Collapse'
 import Divider from '@mui/material/Divider'
-import Grid from '@mui/material/Grid'
 import Stack from '@mui/material/Stack'
 import Table from '@mui/material/Table'
 import TableBody from '@mui/material/TableBody'
@@ -15,7 +14,6 @@ import TableCell from '@mui/material/TableCell'
 import TableContainer from '@mui/material/TableContainer'
 import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
-import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import PaymentIcon from '@mui/icons-material/Payment'
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong'
@@ -25,21 +23,19 @@ import type {
   MerchantCartPreview,
   MerchantPlanPurchaseResult,
 } from '../../types/subscription'
+import {
+  defaultBillingAddress,
+  isBillingAddressComplete,
+  requiresBillingAddressForCheckout,
+} from '../../utils/billingAddress'
 import { formatMoney } from '../../utils/planDisplay'
+import { BillingAddressFields } from './BillingAddressFields'
 
 interface CartPreviewPanelProps {
   cart: MerchantCartPreview
   purchasing?: boolean
   purchaseResult?: MerchantPlanPurchaseResult | null
   onConfirmPayment: (billingAddress?: BillingAddress) => void
-}
-
-const defaultBillingAddress: BillingAddress = {
-  street: '123 Main St',
-  city: 'San Francisco',
-  stateProvince: 'CA',
-  country: 'US',
-  zipPostalCode: '94102',
 }
 
 export function CartPreviewPanel({
@@ -49,17 +45,22 @@ export function CartPreviewPanel({
   onConfirmPayment,
 }: CartPreviewPanelProps) {
   const { pricing, plan } = cart
-  const showBillingFields = !cart.isTrial && pricing.grandTotal > 0
+  const requiresBillingAddress = requiresBillingAddressForCheckout({
+    isTrial: cart.isTrial,
+    grandTotal: pricing.grandTotal,
+  })
   const [billingAddress, setBillingAddress] = useState<BillingAddress>(defaultBillingAddress)
-  const [includeBillingAddress, setIncludeBillingAddress] = useState(false)
 
   const handleConfirm = () => {
-    if (showBillingFields && includeBillingAddress) {
+    if (requiresBillingAddress) {
       onConfirmPayment(billingAddress)
       return
     }
     onConfirmPayment()
   }
+
+  const canConfirm =
+    !purchasing && (!requiresBillingAddress || isBillingAddressComplete(billingAddress))
 
   return (
     <Card>
@@ -137,87 +138,20 @@ export function CartPreviewPanel({
             </Stack>
           </Stack>
 
-          {showBillingFields && (
+          {requiresBillingAddress && (
             <Box>
-              <Stack direction="row" spacing={1} sx={{ mb: 1.5, alignItems: 'center' }}>
-                <Typography variant="subtitle2">Billing address (optional)</Typography>
-                <Chip
-                  label={includeBillingAddress ? 'Included in request' : 'Omitted'}
-                  size="small"
-                  variant="outlined"
-                  onClick={() => setIncludeBillingAddress((current) => !current)}
-                  sx={{ cursor: 'pointer' }}
-                />
-              </Stack>
-              <Grid container spacing={2}>
-                <Grid size={{ xs: 12 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Street"
-                    value={billingAddress.street}
-                    disabled={!includeBillingAddress}
-                    onChange={(event) =>
-                      setBillingAddress((current) => ({ ...current, street: event.target.value }))
-                    }
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="City"
-                    value={billingAddress.city}
-                    disabled={!includeBillingAddress}
-                    onChange={(event) =>
-                      setBillingAddress((current) => ({ ...current, city: event.target.value }))
-                    }
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="State / province"
-                    value={billingAddress.stateProvince}
-                    disabled={!includeBillingAddress}
-                    onChange={(event) =>
-                      setBillingAddress((current) => ({
-                        ...current,
-                        stateProvince: event.target.value,
-                      }))
-                    }
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Country"
-                    value={billingAddress.country}
-                    disabled={!includeBillingAddress}
-                    onChange={(event) =>
-                      setBillingAddress((current) => ({ ...current, country: event.target.value }))
-                    }
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="ZIP / postal code"
-                    value={billingAddress.zipPostalCode}
-                    disabled={!includeBillingAddress}
-                    onChange={(event) =>
-                      setBillingAddress((current) => ({
-                        ...current,
-                        zipPostalCode: event.target.value,
-                      }))
-                    }
-                  />
-                </Grid>
-              </Grid>
+              <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
+                Billing address (required for paid checkout)
+              </Typography>
+              <BillingAddressFields value={billingAddress} onChange={setBillingAddress} />
             </Box>
+          )}
+
+          {cart.isTrial && (
+            <Alert severity="info">
+              Trial activation does not require a billing address. Omit it from the purchase
+              request.
+            </Alert>
           )}
 
           <Button
@@ -225,7 +159,7 @@ export function CartPreviewPanel({
             color="success"
             size="large"
             startIcon={purchasing ? <CircularProgress size={18} color="inherit" /> : <PaymentIcon />}
-            disabled={purchasing}
+            disabled={!canConfirm}
             onClick={handleConfirm}
           >
             Confirm payment

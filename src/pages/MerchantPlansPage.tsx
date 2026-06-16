@@ -40,6 +40,10 @@ import {
   validateCartSelections,
 } from '../utils/cartBuilder'
 import { formatMoney, formatTrialGrace, planStatusColor } from '../utils/planDisplay'
+import {
+  buildInitiatePurchasePayload,
+  requiresBillingAddressForCheckout,
+} from '../utils/billingAddress'
 import { saveLastPaymentHandoff } from '../utils/paymentEventBuilder'
 
 export function MerchantPlansPage() {
@@ -173,8 +177,14 @@ export function MerchantPlansPage() {
     setPurchaseResult(null)
 
     try {
+      const requiresBilling = cartPreview
+        ? requiresBillingAddressForCheckout({
+            isTrial: cartPreview.isTrial,
+            grandTotal: cartPreview.pricing.grandTotal,
+          })
+        : false
       const result = await purchasePlanCart(
-        billingAddress ? { billingAddress } : {},
+        buildInitiatePurchasePayload(billingAddress, requiresBilling),
       )
       setPurchaseResult(result)
       if (result.paymentHandoff) {
