@@ -6,6 +6,7 @@ import ExtensionIcon from '@mui/icons-material/Extension'
 import TuneIcon from '@mui/icons-material/Tune'
 import VerifiedIcon from '@mui/icons-material/Verified'
 import PaymentIcon from '@mui/icons-material/Payment'
+import LocalMallIcon from '@mui/icons-material/LocalMall'
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong'
 import TimelineIcon from '@mui/icons-material/Timeline'
 import type { SvgIconComponent } from '@mui/icons-material'
@@ -90,6 +91,14 @@ export const operations: OperationLink[] = [
     path: '/dev/payment-confirm',
     icon: PaymentIcon,
     apiEndpoint: 'Vite dev /dev-tools/redis/publish',
+    available: true,
+  },
+  {
+    title: 'Reseller Overage',
+    description: 'Publish a ResellerOverageRequested event to order.reseller.overage.requested for the subscription reseller overage consumer.',
+    path: '/dev/reseller-overage',
+    icon: LocalMallIcon,
+    apiEndpoint: 'Redis stream order.reseller.overage.requested',
     available: true,
   },
   {

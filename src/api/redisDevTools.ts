@@ -66,10 +66,10 @@ export async function checkRedisDevToolsHealth(): Promise<RedisDevToolsHealth> {
   return parseJsonResponse<RedisDevToolsHealth>(response)
 }
 
-export async function publishToRedisStream(
-  event: PaymentInvoiceStatusEvent,
+export async function publishEventToRedisStream(
+  event: unknown,
   options: {
-    stream?: string
+    stream: string
     redis: RedisConnectionSettings
   },
 ): Promise<PublishRedisStreamResult> {
@@ -77,7 +77,7 @@ export async function publishToRedisStream(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      stream: options.stream ?? 'payment.invoice.status.updated',
+      stream: options.stream,
       event,
       redis: options.redis,
     }),
@@ -90,6 +90,19 @@ export async function publishToRedisStream(
   }
 
   return body
+}
+
+export async function publishToRedisStream(
+  event: PaymentInvoiceStatusEvent,
+  options: {
+    stream?: string
+    redis: RedisConnectionSettings
+  },
+): Promise<PublishRedisStreamResult> {
+  return publishEventToRedisStream(event, {
+    stream: options.stream ?? 'payment.invoice.status.updated',
+    redis: options.redis,
+  })
 }
 
 export async function flushRedisCache(

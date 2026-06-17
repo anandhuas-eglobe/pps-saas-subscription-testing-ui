@@ -23,6 +23,7 @@ const navItems = [
   { label: 'Usage Simulation', path: '/merchant/usage-simulation' },
   { label: 'Invoices', path: '/merchant/invoices' },
   { label: 'Confirm Payment', path: '/dev/payment-confirm' },
+  { label: 'Reseller Overage', path: '/dev/reseller-overage' },
 ]
 
 function isNavItemActive(pathname: string, itemPath: string): boolean {

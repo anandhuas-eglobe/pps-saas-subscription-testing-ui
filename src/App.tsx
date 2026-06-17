@@ -11,6 +11,7 @@ import { MerchantAddonsPage } from './pages/MerchantAddonsPage'
 import { MerchantAttributeChangesPage } from './pages/MerchantAttributeChangesPage'
 import { MerchantPlansPage } from './pages/MerchantPlansPage'
 import { PaymentConfirmationPage } from './pages/PaymentConfirmationPage'
+import { ResellerOveragePublishPage } from './pages/ResellerOveragePublishPage'
 import { PlanDetailPage } from './pages/PlanDetailPage'
 import { UsageSimulationPage } from './pages/UsageSimulationPage'
 
@@ -32,6 +33,7 @@ const router = createBrowserRouter([
       { path: 'merchant/invoices/:invoiceId', element: <InvoiceDetailPage /> },
       { path: 'merchant/invoices', element: <InvoiceListPage /> },
       { path: 'dev/payment-confirm', element: <PaymentConfirmationPage /> },
+      { path: 'dev/reseller-overage', element: <ResellerOveragePublishPage /> },
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },
