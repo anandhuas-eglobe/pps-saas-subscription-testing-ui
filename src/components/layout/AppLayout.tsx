@@ -20,9 +20,12 @@ const navItems = [
   { label: 'Plan Add-ons', path: '/merchant/addons' },
   { label: 'Attribute Changes', path: '/merchant/attributes' },
   { label: 'Active Subscription', path: '/merchant/subscription' },
+  { label: 'Overage', path: '/merchant/overage' },
   { label: 'Usage Simulation', path: '/merchant/usage-simulation' },
   { label: 'Invoices', path: '/merchant/invoices' },
+  { label: 'Extend Subscription', path: '/admin/extend-subscription' },
   { label: 'Confirm Payment', path: '/dev/payment-confirm' },
+  { label: 'Cleanup Pending', path: '/dev/cleanup-pending-invoices' },
   { label: 'Reseller Overage', path: '/dev/reseller-overage' },
 ]
 

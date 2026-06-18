@@ -7,6 +7,7 @@ import CircularProgress from '@mui/material/CircularProgress'
 import Snackbar from '@mui/material/Snackbar'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
+import CancelScheduleSendIcon from '@mui/icons-material/CancelScheduleSend'
 import DownloadIcon from '@mui/icons-material/Download'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart'
@@ -14,6 +15,7 @@ import TuneIcon from '@mui/icons-material/Tune'
 import VerifiedIcon from '@mui/icons-material/Verified'
 import { Link as RouterLink } from 'react-router-dom'
 import {
+  cancelAttributeDowngradeSchedule,
   getActiveSubscription,
   getMerchantAttributeCart,
   purchaseAttributeCart,
@@ -93,6 +95,18 @@ export function MerchantAttributeChangesPage() {
     () => (subscriptionData ? extractSubscribedPlanAttributes(subscriptionData.plan) : []),
     [subscriptionData],
   )
+
+  const scheduledDowngradeAttributes = useMemo(
+    () =>
+      subscriptionData?.subscription.limitsAndUsages.filter(
+        (row) =>
+          row.scheduledUsageLimit != null &&
+          row.scheduledUsageLimit !== row.usageLimit,
+      ) ?? [],
+    [subscriptionData],
+  )
+
+  const [cancellingAttributeId, setCancellingAttributeId] = useState<string | null>(null)
 
   const loadSubscription = useCallback(async () => {
     setLoading(true)
@@ -218,6 +232,23 @@ export function MerchantAttributeChangesPage() {
     }
   }
 
+  const handleCancelAttributeDowngrade = async (planFeatureAttributeId: string) => {
+    setCancellingAttributeId(planFeatureAttributeId)
+    try {
+      const result = await cancelAttributeDowngradeSchedule(planFeatureAttributeId)
+      setSnackbar({ open: true, message: result.message, severity: 'success' })
+      await loadSubscription()
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: getApiErrorSummary(error),
+        severity: 'error',
+      })
+    } finally {
+      setCancellingAttributeId(null)
+    }
+  }
+
   const handleConfirmPayment = async (billingAddress: BillingAddress) => {
     setPurchasing(true)
     setPurchaseError(null)
@@ -252,7 +283,7 @@ export function MerchantAttributeChangesPage() {
           eyebrow="Attribute changes"
           title="Upgrade or downgrade limits"
           description="View all included and add-on attributes on your subscribed plan, change limits, upsert the attribute cart, and fetch pricing preview."
-          apiEndpoint="POST /api/v1/merchant/cart/attribute · GET /api/v1/merchant/cart/attribute · POST /api/v1/merchant/subscription/attribute/purchase"
+          apiEndpoint="POST /api/v1/merchant/cart/attribute · POST /api/v1/merchant/subscription/attribute/purchase · POST /api/v1/merchant/subscription/attribute/downgrade/schedule/cancel"
           backTo="/"
           backLabel="Back to home"
           actions={
@@ -316,6 +347,46 @@ export function MerchantAttributeChangesPage() {
                 Attribute limit changes require an active, non-trial subscription. Complete plan
                 checkout first.
               </Alert>
+            )}
+
+            {scheduledDowngradeAttributes.length > 0 && (
+              <Card>
+                <CardContent>
+                  <Stack spacing={2}>
+                    <Typography variant="h6">Scheduled attribute downgrades</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Cancel a pending attribute limit downgrade before it takes effect.
+                    </Typography>
+                    {scheduledDowngradeAttributes.map((row) => (
+                      <Stack
+                        key={row.planFeatureAttributeId}
+                        direction={{ xs: 'column', sm: 'row' }}
+                        spacing={1}
+                        sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between' }}
+                      >
+                        <Typography variant="body2">
+                          {row.attributeCode}: current limit {row.usageLimit ?? '∞'} → scheduled{' '}
+                          {row.scheduledUsageLimit ?? '∞'}
+                        </Typography>
+                        <Button
+                          variant="outlined"
+                          color="warning"
+                          size="small"
+                          startIcon={<CancelScheduleSendIcon />}
+                          disabled={cancellingAttributeId === row.planFeatureAttributeId}
+                          onClick={() =>
+                            void handleCancelAttributeDowngrade(row.planFeatureAttributeId)
+                          }
+                        >
+                          {cancellingAttributeId === row.planFeatureAttributeId
+                            ? 'Cancelling…'
+                            : 'Cancel scheduled downgrade'}
+                        </Button>
+                      </Stack>
+                    ))}
+                  </Stack>
+                </CardContent>
+              </Card>
             )}
 
             {attributeItems.length === 0 ? (

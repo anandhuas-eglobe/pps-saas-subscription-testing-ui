@@ -674,3 +674,188 @@ export interface RemoveMerchantUsagePayload {
   entityReferenceId: string
   attributeCode: string
 }
+
+export interface ScheduledSubscriptionDowngradeDetail {
+  scheduledChangeId: string
+  subscriptionId: string
+  scheduledPlanId: string
+  previousPlanId: string
+  scheduledDate: string
+  billingCycle: BillingCycleValue
+  autoRenew: boolean
+}
+
+export interface ScheduledDowngradeLimitAndUsage {
+  planFeatureAttributeId: string
+  attributeCode: string
+  usageType: string
+  usedCount: number
+  usageLimit: number
+  overageEnabled: boolean
+}
+
+export interface ScheduledSubscriptionDowngradeResponse {
+  scheduledChange: ScheduledSubscriptionDowngradeDetail
+  plan: PlanDetail
+  limitsAndUsages: ScheduledDowngradeLimitAndUsage[]
+  pricing: CartPricingPreview
+}
+
+export const ManualSubscriptionRenewalPreviewUnavailableReason = {
+  SCHEDULED_PLAN_CHANGE: 'SCHEDULED_PLAN_CHANGE',
+  AUTO_RENEW_ENABLED: 'AUTO_RENEW_ENABLED',
+  SUBSCRIPTION_NOT_ACTIVE: 'SUBSCRIPTION_NOT_ACTIVE',
+} as const
+
+export type ManualSubscriptionRenewalPreviewUnavailableReasonValue =
+  (typeof ManualSubscriptionRenewalPreviewUnavailableReason)[keyof typeof ManualSubscriptionRenewalPreviewUnavailableReason]
+
+export interface ManualSubscriptionRenewalPreviewSubscription {
+  subscriptionId: string
+  planId: string
+  status: string
+  endDate: string
+  billingCycle: BillingCycleValue
+  autoRenew: boolean
+}
+
+export type ManualSubscriptionRenewalPreviewResponse =
+  | {
+      available: true
+      subscription: ManualSubscriptionRenewalPreviewSubscription
+      plan: PlanDetail
+      pricing: CartPricingPreview
+    }
+  | {
+      available: false
+      reason: ManualSubscriptionRenewalPreviewUnavailableReasonValue
+      message: string
+    }
+
+export interface SubscriptionHistoryListItem {
+  id: string
+  planId: string
+  invoiceId: string | null
+  planName: string | null
+  invoiceNumber: string | null
+  grandTotal: number | null
+  createdAt: string
+  startDate: string
+  endDate: string
+}
+
+export interface PaginatedListResponse<TItem> {
+  items: TItem[]
+  pagination: {
+    total: number
+    page: number
+    limit: number
+    totalPages: number
+    hasNext: boolean
+    hasPrev: boolean
+  }
+}
+
+export interface ListSubscriptionHistoryParams {
+  page?: number
+  limit?: number
+  startDateFrom?: string
+  startDateTo?: string
+  endDateFrom?: string
+  endDateTo?: string
+  invoiceAmountFrom?: number
+  invoiceAmountTo?: number
+  invoiceNumber?: string
+  sortBy?: string
+  sortOrder?: 'asc' | 'desc'
+}
+
+export const MerchantSubscriptionOverageStatus = {
+  PAID: 'PAID',
+  PROCESSING: 'PROCESSING',
+  FAILED: 'FAILED',
+} as const
+
+export type MerchantSubscriptionOverageStatusValue =
+  (typeof MerchantSubscriptionOverageStatus)[keyof typeof MerchantSubscriptionOverageStatus]
+
+export const OverageType = {
+  SUBSCRIPTION: 'SUBSCRIPTION',
+  ADDON: 'ADDON',
+  RESELLER: 'RESELLER',
+} as const
+
+export type OverageTypeValue = (typeof OverageType)[keyof typeof OverageType]
+
+export interface OverageHistoryListItem {
+  id: string
+  merchantId: string
+  overageType: OverageTypeValue | string
+  planFeatureAttributeId: string | null
+  quantity: number | null
+  overagePricePerUnit: number | null
+  overageAmount: number
+  invoiceId: string | null
+  status: MerchantSubscriptionOverageStatusValue | string
+  attributeCode: string | null
+  attributeName: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ListOverageHistoryParams {
+  page?: number
+  limit?: number
+  status?: string
+  overageType?: string
+  invoiceId?: string
+  planFeatureAttributeId?: string
+  attributeCode?: string
+  dateFrom?: string
+  dateTo?: string
+  sortBy?: string
+  sortOrder?: 'asc' | 'desc'
+}
+
+export interface ManualOveragePaymentResult {
+  checkoutUrl?: string
+  message: string
+  paymentHandoff?: {
+    invoiceId: string
+    invoiceNumber: string
+    grandTotal: number
+    currency: string
+    status: string
+  }
+}
+
+export interface CancelAddonSubscriptionResult {
+  message: string
+  addonSubscriptionId: string
+}
+
+export interface CancelAttributeDowngradeScheduleResult {
+  message: string
+  currentLimits: {
+    planFeatureAttributeId: string
+    usageLimit: number | null
+    usedCount: number
+  }
+}
+
+export interface CancelMessageResult {
+  message: string
+}
+
+export interface ExtendMerchantSubscriptionEndDatePayload {
+  merchantId: string
+  days: number
+}
+
+export interface ExtendMerchantSubscriptionEndDateResponse {
+  subscriptionId: string
+  merchantId: string
+  previousEndDate: string
+  newEndDate: string
+  message: string
+}

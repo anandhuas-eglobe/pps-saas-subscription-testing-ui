@@ -48,3 +48,37 @@ export async function apiRequest<T>(
 
   return { response, body }
 }
+
+export async function apiDownloadBlob(path: string, fallbackFilename = 'download.pdf'): Promise<void> {
+  const url = `${API_BASE}${path}`
+  const response = await fetch(url)
+
+  if (!response.ok) {
+    const text = await response.text()
+    if (text) {
+      try {
+        const body = JSON.parse(text) as ApiResponse<unknown>
+        throw new ApiRequestError(response.status, body)
+      } catch (error) {
+        if (error instanceof ApiRequestError) {
+          throw error
+        }
+      }
+    }
+    throw new Error(`Download failed with status ${response.status}`)
+  }
+
+  const blob = await response.blob()
+  const disposition = response.headers.get('Content-Disposition')
+  const filename =
+    disposition?.match(/filename="([^"]+)"/)?.[1] ??
+    disposition?.match(/filename=([^;]+)/)?.[1]?.trim() ??
+    fallbackFilename
+
+  const objectUrl = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = objectUrl
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(objectUrl)
+}

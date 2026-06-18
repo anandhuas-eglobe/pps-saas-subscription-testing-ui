@@ -1,11 +1,17 @@
 import type {
   ActivePlanAddonsResponse,
   ActiveSubscriptionResponse,
+  CancelAddonSubscriptionResult,
+  CancelAttributeDowngradeScheduleResult,
+  CancelMessageResult,
   InitiateAttributePurchasePayload,
   InitiatePlanPurchasePayload,
   InvoiceDetail,
   InvoiceListResponse,
+  InvoiceReceipt,
   ListInvoicesParams,
+  ListSubscriptionHistoryParams,
+  ManualSubscriptionRenewalPreviewResponse,
   MerchantAddonCartPreview,
   MerchantAddonPurchaseResult,
   MerchantAttributeCartPreview,
@@ -13,11 +19,15 @@ import type {
   MerchantCartPreview,
   MerchantPlanListResponse,
   MerchantPlanPurchaseResult,
+  PaginatedListResponse,
+  ScheduledSubscriptionDowngradeResponse,
+  SubscriptionHistoryListItem,
   UpsertAddonCartPayload,
   UpsertAttributeCartPayload,
   UpsertMerchantCartPayload,
 } from '../types/subscription'
-import { apiRequest } from './client'
+import type { PlanDetail } from '../types/subscription'
+import { apiDownloadBlob, apiRequest } from './client'
 
 export async function listMerchantPlans(): Promise<MerchantPlanListResponse> {
   const { body } = await apiRequest<MerchantPlanListResponse>(
@@ -146,4 +156,112 @@ export async function getInvoiceById(invoiceId: string): Promise<InvoiceDetail> 
     `/api/v1/merchant/subscription/invoices/${invoiceId}`,
   )
   return body.data!
+}
+
+export async function listGuestPlans(): Promise<PlanDetail[]> {
+  const { body } = await apiRequest<PlanDetail[]>('/api/v1/merchant/subscription/guest-plans')
+  return body.data ?? []
+}
+
+export async function getScheduledSubscriptionDowngrade(): Promise<ScheduledSubscriptionDowngradeResponse> {
+  const { body } = await apiRequest<ScheduledSubscriptionDowngradeResponse>(
+    '/api/v1/merchant/subscription/downgrade/schedule',
+  )
+  return body.data!
+}
+
+export async function cancelScheduledSubscriptionDowngrade(): Promise<CancelMessageResult> {
+  const { body } = await apiRequest<CancelMessageResult>(
+    '/api/v1/merchant/subscription/downgrade/schedule/cancel',
+    { method: 'POST' },
+  )
+  return body.data ?? { message: body.message ?? 'Scheduled downgrade cancelled' }
+}
+
+export async function getManualSubscriptionRenewalPreview(): Promise<ManualSubscriptionRenewalPreviewResponse> {
+  const { body } = await apiRequest<ManualSubscriptionRenewalPreviewResponse>(
+    '/api/v1/merchant/subscription/renewal/preview',
+  )
+  return body.data!
+}
+
+export async function cancelSubscriptionAutoRenew(): Promise<CancelMessageResult> {
+  const { body } = await apiRequest<CancelMessageResult>(
+    '/api/v1/merchant/subscription/auto-renew/cancel',
+    { method: 'PUT' },
+  )
+  return body.data ?? { message: body.message ?? 'Auto-renew disabled' }
+}
+
+export async function listSubscriptionHistory(
+  params: ListSubscriptionHistoryParams = {},
+): Promise<PaginatedListResponse<SubscriptionHistoryListItem>> {
+  const searchParams = new URLSearchParams()
+  if (params.page) searchParams.set('page', String(params.page))
+  if (params.limit) searchParams.set('limit', String(params.limit))
+  if (params.startDateFrom) searchParams.set('startDateFrom', params.startDateFrom)
+  if (params.startDateTo) searchParams.set('startDateTo', params.startDateTo)
+  if (params.endDateFrom) searchParams.set('endDateFrom', params.endDateFrom)
+  if (params.endDateTo) searchParams.set('endDateTo', params.endDateTo)
+  if (params.invoiceAmountFrom != null) {
+    searchParams.set('invoiceAmountFrom', String(params.invoiceAmountFrom))
+  }
+  if (params.invoiceAmountTo != null) {
+    searchParams.set('invoiceAmountTo', String(params.invoiceAmountTo))
+  }
+  if (params.invoiceNumber) searchParams.set('invoiceNumber', params.invoiceNumber)
+  if (params.sortBy) searchParams.set('sortBy', params.sortBy)
+  if (params.sortOrder) searchParams.set('sortOrder', params.sortOrder)
+
+  const query = searchParams.toString()
+  const path = `/api/v1/merchant/subscription/history${query ? `?${query}` : ''}`
+  const { body } = await apiRequest<PaginatedListResponse<SubscriptionHistoryListItem>>(path)
+  return body.data!
+}
+
+export async function cancelAddonSubscription(
+  addonSubscriptionId: string,
+): Promise<CancelAddonSubscriptionResult> {
+  const { body } = await apiRequest<CancelAddonSubscriptionResult>(
+    '/api/v1/merchant/subscription/addon/cancel',
+    {
+      method: 'POST',
+      body: JSON.stringify({ addonSubscriptionId }),
+    },
+  )
+  return body.data!
+}
+
+export async function cancelAttributeDowngradeSchedule(
+  planFeatureAttributeId: string,
+): Promise<CancelAttributeDowngradeScheduleResult> {
+  const { body } = await apiRequest<CancelAttributeDowngradeScheduleResult>(
+    '/api/v1/merchant/subscription/attribute/downgrade/schedule/cancel',
+    {
+      method: 'POST',
+      body: JSON.stringify({ planFeatureAttributeId }),
+    },
+  )
+  return body.data!
+}
+
+export async function downloadInvoicePdf(invoiceId: string): Promise<void> {
+  await apiDownloadBlob(
+    `/api/v1/merchant/subscription/invoices/${invoiceId}/download`,
+    `invoice-${invoiceId}.pdf`,
+  )
+}
+
+export async function getReceiptById(receiptId: string): Promise<InvoiceReceipt> {
+  const { body } = await apiRequest<InvoiceReceipt>(
+    `/api/v1/merchant/subscription/receipts/${receiptId}`,
+  )
+  return body.data!
+}
+
+export async function downloadReceiptPdf(receiptId: string): Promise<void> {
+  await apiDownloadBlob(
+    `/api/v1/merchant/subscription/receipts/${receiptId}/download`,
+    `receipt-${receiptId}.pdf`,
+  )
 }

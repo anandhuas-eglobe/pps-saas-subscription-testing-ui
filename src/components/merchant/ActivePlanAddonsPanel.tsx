@@ -9,9 +9,13 @@ import Divider from '@mui/material/Divider'
 import Grid from '@mui/material/Grid'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
+import { useState } from 'react'
+import CancelIcon from '@mui/icons-material/Cancel'
 import ExtensionIcon from '@mui/icons-material/Extension'
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart'
 import { Link as RouterLink } from 'react-router-dom'
+import { cancelAddonSubscription } from '../../api/merchant'
+import { ApiRequestError } from '../../api/client'
 import type { ActivePlanAddonItem } from '../../types/subscription'
 import { FeatureType } from '../../types/subscription'
 import {
@@ -27,6 +31,7 @@ interface ActivePlanAddonsPanelProps {
   loading?: boolean
   error?: string | null
   onRetry?: () => void
+  onCancelled?: () => void
 }
 
 function DetailField({ label, value }: { label: string; value: React.ReactNode }) {
@@ -42,7 +47,40 @@ function DetailField({ label, value }: { label: string; value: React.ReactNode }
   )
 }
 
-function AddonCard({ addon, planCurrency }: { addon: ActivePlanAddonItem; planCurrency: string }) {
+function AddonCard({
+  addon,
+  planCurrency,
+  onCancelled,
+}: {
+  addon: ActivePlanAddonItem
+  planCurrency: string
+  onCancelled?: () => void
+}) {
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelError, setCancelError] = useState<string | null>(null)
+  const [cancelMessage, setCancelMessage] = useState<string | null>(null)
+
+  const handleCancel = async () => {
+    setCancelling(true)
+    setCancelError(null)
+    setCancelMessage(null)
+    try {
+      const result = await cancelAddonSubscription(addon.addonSubscriptionId)
+      setCancelMessage(result.message)
+      onCancelled?.()
+    } catch (err) {
+      const message =
+        err instanceof ApiRequestError
+          ? err.body.message ?? err.message
+          : err instanceof Error
+            ? err.message
+            : 'Failed to cancel add-on subscription'
+      setCancelError(message)
+    } finally {
+      setCancelling(false)
+    }
+  }
+
   const isSimple = addon.feature.featureType === FeatureType.SIMPLE
   const title = isSimple
     ? (addon.feature.featureName ?? addon.feature.featureCode ?? 'Simple add-on')
@@ -161,6 +199,22 @@ function AddonCard({ addon, planCurrency }: { addon: ActivePlanAddonItem; planCu
               </Grid>
             </>
           )}
+
+          {cancelMessage && <Alert severity="success">{cancelMessage}</Alert>}
+          {cancelError && <Alert severity="error">{cancelError}</Alert>}
+
+          {addon.status.toUpperCase() === 'ACTIVE' && (
+            <Button
+              variant="outlined"
+              color="warning"
+              size="small"
+              startIcon={<CancelIcon />}
+              disabled={cancelling}
+              onClick={() => void handleCancel()}
+            >
+              {cancelling ? 'Cancelling…' : 'Cancel add-on subscription'}
+            </Button>
+          )}
         </Stack>
       </CardContent>
     </Card>
@@ -173,6 +227,7 @@ export function ActivePlanAddonsPanel({
   loading = false,
   error = null,
   onRetry,
+  onCancelled,
 }: ActivePlanAddonsPanelProps) {
   if (loading) {
     return (
@@ -232,7 +287,12 @@ export function ActivePlanAddonsPanel({
       </Stack>
 
       {addons.map((addon) => (
-        <AddonCard key={addon.addonSubscriptionId} addon={addon} planCurrency={planCurrency} />
+        <AddonCard
+          key={addon.addonSubscriptionId}
+          addon={addon}
+          planCurrency={planCurrency}
+          onCancelled={onCancelled}
+        />
       ))}
     </Stack>
   )

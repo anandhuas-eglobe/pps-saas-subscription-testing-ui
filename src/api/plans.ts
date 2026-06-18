@@ -1,6 +1,8 @@
 import type {
   CreatePlanPayload,
   CreatePlanResponse,
+  ExtendMerchantSubscriptionEndDatePayload,
+  ExtendMerchantSubscriptionEndDateResponse,
   ListPlansResponse,
   PlanDetail,
   PlanFiltersResponse,
@@ -74,4 +76,17 @@ export async function updatePlanStatus(
     body: JSON.stringify(payload),
   })
   return body.data ?? { message: body.message ?? 'Updated' }
+}
+
+export async function extendMerchantSubscriptionEndDate(
+  payload: ExtendMerchantSubscriptionEndDatePayload,
+): Promise<ExtendMerchantSubscriptionEndDateResponse> {
+  const { body } = await apiRequest<ExtendMerchantSubscriptionEndDateResponse>(
+    '/api/v1/admin/plans/merchant/extend-subscription-end-date',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+  )
+  return body.data!
 }

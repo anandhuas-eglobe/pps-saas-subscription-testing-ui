@@ -5,10 +5,14 @@ import StorefrontIcon from '@mui/icons-material/Storefront'
 import ExtensionIcon from '@mui/icons-material/Extension'
 import TuneIcon from '@mui/icons-material/Tune'
 import VerifiedIcon from '@mui/icons-material/Verified'
+import CleaningServicesIcon from '@mui/icons-material/CleaningServices'
 import PaymentIcon from '@mui/icons-material/Payment'
 import LocalMallIcon from '@mui/icons-material/LocalMall'
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong'
 import TimelineIcon from '@mui/icons-material/Timeline'
+import WarningAmberIcon from '@mui/icons-material/WarningAmber'
+import PublicIcon from '@mui/icons-material/Public'
+import EventAvailableIcon from '@mui/icons-material/EventAvailable'
 import type { SvgIconComponent } from '@mui/icons-material'
 
 export interface OperationLink {
@@ -47,10 +51,26 @@ export const operations: OperationLink[] = [
   },
   {
     title: 'Active Subscription',
-    description: 'View subscription status, INCLUDED attribute usage, plan details, and purchased add-ons.',
+    description: 'View subscription status, manage renewals/downgrades, billing history, and purchased add-ons.',
     path: '/merchant/subscription',
     icon: VerifiedIcon,
-    apiEndpoint: 'GET /api/v1/merchant/subscription/active · GET /api/v1/merchant/subscription/active-plan/addons',
+    apiEndpoint: 'GET /api/v1/merchant/subscription/active · manage · history · addon cancel',
+    available: true,
+  },
+  {
+    title: 'Overage History',
+    description: 'Browse overage billing records and initiate manual overage payment checkout.',
+    path: '/merchant/overage',
+    icon: WarningAmberIcon,
+    apiEndpoint: 'GET /api/v1/merchant/overage-tracking · POST manual-payment',
+    available: true,
+  },
+  {
+    title: 'Guest Plans',
+    description: 'Public catalog of active subscription plans (no merchant context required).',
+    path: '/merchant/guest-plans',
+    icon: PublicIcon,
+    apiEndpoint: 'GET /api/v1/merchant/subscription/guest-plans',
     available: true,
   },
   {
@@ -86,11 +106,27 @@ export const operations: OperationLink[] = [
     available: true,
   },
   {
+    title: 'Extend Subscription',
+    description: 'Admin tool to add days to a merchant active subscription end date for testing renewals.',
+    path: '/admin/extend-subscription',
+    icon: EventAvailableIcon,
+    apiEndpoint: 'POST /api/v1/admin/plans/merchant/extend-subscription-end-date',
+    available: true,
+  },
+  {
     title: 'Confirm Payment',
     description: 'Publish payment success to the Redis stream from the Vite dev server, or copy the docker exec command as a fallback.',
     path: '/dev/payment-confirm',
     icon: PaymentIcon,
     apiEndpoint: 'Vite dev /dev-tools/redis/publish',
+    available: true,
+  },
+  {
+    title: 'Cleanup Pending Invoices',
+    description: 'Publish CleanupPendingInvoicesRequested to payment.pending.invoice.cleanup.requested for the subscription pending invoice cleanup consumer.',
+    path: '/dev/cleanup-pending-invoices',
+    icon: CleaningServicesIcon,
+    apiEndpoint: 'Redis stream payment.pending.invoice.cleanup.requested',
     available: true,
   },
   {

@@ -15,14 +15,21 @@ import { ApiRequestError } from '../api/client'
 import { PageHeader } from '../components/layout/PageHeader'
 import { ActivePlanAddonsPanel } from '../components/merchant/ActivePlanAddonsPanel'
 import { ActiveSubscriptionSummary } from '../components/merchant/ActiveSubscriptionSummary'
+import { SubscriptionHistoryPanel } from '../components/merchant/SubscriptionHistoryPanel'
 import { SubscriptionLimitsAndUsagesPanel } from '../components/merchant/SubscriptionLimitsAndUsagesPanel'
+import { SubscriptionManagementPanel } from '../components/merchant/SubscriptionManagementPanel'
 import { PlanDetailView } from '../components/plans/PlanDetailView'
 import type { ActivePlanAddonsResponse, ActiveSubscriptionResponse } from '../types/subscription'
 
-type ActiveSubscriptionTab = 'overview' | 'limits' | 'addons'
+type ActiveSubscriptionTab = 'overview' | 'limits' | 'addons' | 'manage' | 'history'
 
 function parseActiveSubscriptionTab(value: string | null): ActiveSubscriptionTab {
-  if (value === 'limits' || value === 'addons') {
+  if (
+    value === 'limits' ||
+    value === 'addons' ||
+    value === 'manage' ||
+    value === 'history'
+  ) {
     return value
   }
   return 'overview'
@@ -100,7 +107,7 @@ export function ActiveSubscriptionPage() {
         eyebrow="Merchant subscription"
         title="Active subscription"
         description="View subscription status, INCLUDED attribute usage, subscribed plan details, and purchased add-ons."
-        apiEndpoint="GET /api/v1/merchant/subscription/active · GET /api/v1/merchant/subscription/active-plan/addons"
+        apiEndpoint="GET /api/v1/merchant/subscription/active · downgrade · renewal · history · addon cancel"
         backTo="/"
         backLabel="Back to home"
         actions={
@@ -178,6 +185,8 @@ export function ActiveSubscriptionPage() {
                 label={`Active add-ons (${addonsData?.addons.length ?? '…'})`}
                 value="addons"
               />
+              <Tab label="Manage" value="manage" />
+              <Tab label="History" value="history" />
             </Tabs>
           </Box>
 
@@ -204,8 +213,18 @@ export function ActiveSubscriptionPage() {
               loading={addonsLoading}
               error={addonsError}
               onRetry={() => void loadAddons()}
+              onCancelled={() => void loadAddons()}
             />
           )}
+
+          {activeTab === 'manage' && (
+            <SubscriptionManagementPanel
+              subscriptionData={data}
+              onChanged={() => void loadSubscription()}
+            />
+          )}
+
+          {activeTab === 'history' && <SubscriptionHistoryPanel />}
         </Stack>
       )}
     </Stack>
