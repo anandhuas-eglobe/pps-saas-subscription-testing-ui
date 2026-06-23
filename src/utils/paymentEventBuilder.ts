@@ -187,6 +187,22 @@ export function applyInvoiceToPaymentForm(
   }
 }
 
+export function buildSucceededPaymentEventFromHandoff(handoff: {
+  invoiceId: string
+  invoiceNumber: string
+  merchantId?: string
+  currency: string
+  grandTotal: number
+  correlationId?: string
+}): PaymentInvoiceStatusEvent {
+  const form = applyPaymentHandoffToForm(createDefaultPaymentConfirmationForm(), handoff)
+  return buildPaymentInvoiceStatusEvent({
+    ...form,
+    action: 'PAYMENT_SUCCEEDED',
+    newStatus: 'COMPLETED',
+  })
+}
+
 export function getInvoiceLineItemCategory(invoice: {
   lineItems: Array<{ lineItemCategory?: string }>
 }): string {

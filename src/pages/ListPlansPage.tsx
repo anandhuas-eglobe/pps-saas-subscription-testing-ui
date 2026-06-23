@@ -22,15 +22,19 @@ import TableRow from '@mui/material/TableRow'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
+import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import { Link as RouterLink, useNavigate } from 'react-router-dom'
-import { listPlans, updatePlanStatus } from '../api/plans'
+import { createPlan, getPlanById, listPlans, updatePlanStatus } from '../api/plans'
 import { ApiRequestError } from '../api/client'
+import { ApiErrorAlert } from '../components/ApiErrorAlert'
 import { PageHeader } from '../components/layout/PageHeader'
 import type { PlanListItem } from '../types/subscription'
 import { PlanStatus, PlanType } from '../types/subscription'
+import { getApiErrorSummary } from '../utils/apiErrors'
 import { isDraftPlan, planStatusColor } from '../utils/planDisplay'
+import { planDetailToDuplicatePayload } from '../utils/planDetailForm'
 
 export function ListPlansPage() {
   const navigate = useNavigate()
@@ -52,6 +56,8 @@ export function ListPlansPage() {
     message: '',
     severity: 'success',
   })
+  const [duplicatingPlanId, setDuplicatingPlanId] = useState<string | null>(null)
+  const [duplicateError, setDuplicateError] = useState<unknown>(null)
 
   const loadPlans = useCallback(async () => {
     setLoading(true)
@@ -100,6 +106,33 @@ export function ListPlansPage() {
             ? err.message
             : 'Failed to activate plan'
       setSnackbar({ open: true, message, severity: 'error' })
+    }
+  }
+
+  const handleDuplicatePlan = async (planId: string) => {
+    setDuplicatingPlanId(planId)
+    setDuplicateError(null)
+
+    try {
+      const source = await getPlanById(planId)
+      const payload = planDetailToDuplicatePayload(source)
+      const result = await createPlan(payload)
+      setSnackbar({
+        open: true,
+        message: `Duplicated as "${payload.planName}"`,
+        severity: 'success',
+      })
+      await loadPlans()
+      navigate(`/plans/${result.planId}`)
+    } catch (err) {
+      setDuplicateError(err)
+      setSnackbar({
+        open: true,
+        message: getApiErrorSummary(err),
+        severity: 'error',
+      })
+    } finally {
+      setDuplicatingPlanId(null)
     }
   }
 
@@ -220,6 +253,13 @@ export function ListPlansPage() {
 
         {error && <Alert severity="error">{error}</Alert>}
 
+        {duplicateError != null && (
+          <ApiErrorAlert
+            error={duplicateError}
+            subtitle="Could not duplicate this plan. Review the API errors below and try again."
+          />
+        )}
+
         <Card>
           <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
             {loading ? (
@@ -304,6 +344,24 @@ export function ListPlansPage() {
                                 onClick={(event) => event.stopPropagation()}
                               >
                                 View
+                              </Button>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                startIcon={
+                                  duplicatingPlanId === plan.id ? (
+                                    <CircularProgress size={14} />
+                                  ) : (
+                                    <ContentCopyIcon />
+                                  )
+                                }
+                                disabled={duplicatingPlanId != null}
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  void handleDuplicatePlan(plan.id)
+                                }}
+                              >
+                                {duplicatingPlanId === plan.id ? 'Duplicating…' : 'Duplicate'}
                               </Button>
                               {isDraftPlan(plan.status) && (
                                 <Button

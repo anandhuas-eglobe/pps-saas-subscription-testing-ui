@@ -20,7 +20,7 @@ import { ApiRequestError } from '../api/client'
 import { PageHeader } from '../components/layout/PageHeader'
 import { CartPreviewPanel } from '../components/merchant/CartPreviewPanel'
 import { PlanCartConfigurator } from '../components/merchant/PlanCartConfigurator'
-import { ValidationErrorsAlert } from '../components/ValidationErrorsAlert'
+import { ApiErrorAlert } from '../components/ApiErrorAlert'
 import type {
   BillingAddress,
   BillingCycleValue,
@@ -30,9 +30,7 @@ import type {
 } from '../types/subscription'
 import { BillingCycle } from '../types/subscription'
 import {
-  extractApiErrors,
   getApiErrorSummary,
-  getApiErrorTitle,
 } from '../utils/apiErrors'
 import {
   buildDefaultCartSelections,
@@ -346,14 +344,8 @@ export function MerchantPlansPage() {
                 )}
 
                 {submitError != null && (
-                  <ValidationErrorsAlert
-                    title={getApiErrorTitle(submitError)}
-                    errors={extractApiErrors(submitError)}
-                    errorCode={
-                      submitError instanceof ApiRequestError
-                        ? submitError.body.errorCode
-                        : undefined
-                    }
+                  <ApiErrorAlert
+                    error={submitError}
                     subtitle="The cart API rejected this configuration. Review each item below and update the form."
                   />
                 )}
@@ -371,14 +363,8 @@ export function MerchantPlansPage() {
                 {cartPreview && (
                   <>
                     {purchaseError != null && (
-                      <ValidationErrorsAlert
-                        title={getApiErrorTitle(purchaseError)}
-                        errors={extractApiErrors(purchaseError)}
-                        errorCode={
-                          purchaseError instanceof ApiRequestError
-                            ? purchaseError.body.errorCode
-                            : undefined
-                        }
+                      <ApiErrorAlert
+                        error={purchaseError}
                         subtitle="Plan purchase failed. Review the error below and try again."
                       />
                     )}

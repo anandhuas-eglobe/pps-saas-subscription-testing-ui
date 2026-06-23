@@ -17,6 +17,7 @@ import { UsageSimulationPage } from './pages/UsageSimulationPage'
 import { CleanupPendingInvoicesPage } from './pages/CleanupPendingInvoicesPage'
 import { ExtendSubscriptionEndDatePage } from './pages/ExtendSubscriptionEndDatePage'
 import { MerchantGuestPlansPage } from './pages/MerchantGuestPlansPage'
+import { NitroTestPage } from './pages/NitroTestPage'
 import { MerchantOveragePage } from './pages/MerchantOveragePage'
 
 const router = createBrowserRouter([
@@ -25,6 +26,7 @@ const router = createBrowserRouter([
     element: <AppLayout />,
     children: [
       { index: true, element: <HomePage /> },
+      { path: 'nitro-test', element: <NitroTestPage /> },
       { path: 'plans/create', element: <CreatePlanPage /> },
       { path: 'plans/:planId/edit', element: <EditPlanPage /> },
       { path: 'plans/:planId', element: <PlanDetailPage /> },

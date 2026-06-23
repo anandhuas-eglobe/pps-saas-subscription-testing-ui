@@ -10,6 +10,69 @@ import { FeatureType, InclusionType, PlanType, PriceType } from '../types/subscr
 
 export const REQUIRED_ATTRIBUTE_CODES = ['NUM_USERS', 'MONTHLY_ORDER_VOLUME'] as const
 
+export const DEFAULT_VOLUME_PRICE_TIERS = [
+  { count: 20, monthlyPrice: 40, yearlyPrice: 400 },
+  { count: 50, monthlyPrice: 90, yearlyPrice: 900 },
+] as const
+
+export const DEFAULT_MONTHLY_ORDER_VOLUME_TIERS = [
+  { count: 100, monthlyPrice: 29, yearlyPrice: 290 },
+  { count: 250, monthlyPrice: 59, yearlyPrice: 590 },
+  { count: 500, monthlyPrice: 99, yearlyPrice: 990 },
+  { count: 1000, monthlyPrice: 149, yearlyPrice: 1490 },
+  { count: 2500, monthlyPrice: 249, yearlyPrice: 2490 },
+  { count: 5000, monthlyPrice: 399, yearlyPrice: 3990 },
+  { count: 10000, monthlyPrice: 599, yearlyPrice: 5990 },
+] as const
+
+export function defaultVolumePriceTiers(attributeCode?: string) {
+  return attributeCode === 'MONTHLY_ORDER_VOLUME'
+    ? [...DEFAULT_MONTHLY_ORDER_VOLUME_TIERS]
+    : [...DEFAULT_VOLUME_PRICE_TIERS]
+}
+
+export function randomInt(min: number, max: number): number {
+  if (max <= min) return min
+  return Math.floor(Math.random() * (max - min + 1)) + min
+}
+
+/** Random min/max for PER_COUNT attributes; optional tier widens the range (default mid-tier). */
+export function randomCountLimits(
+  attributeCode: string,
+  tier = 3,
+  scale = 1,
+): { minLimit: number; maxLimit: number } {
+  const tierFactor = 1 + (tier - 1) * 0.35
+
+  const ranges: Record<string, { minLo: number; minHi: number; maxLo: number; maxHi: number }> = {
+    NUM_USERS: { minLo: 2, minHi: 8, maxLo: 12, maxHi: 55 },
+    ECOM_CHANNELS: { minLo: 1, minHi: 4, maxLo: 4, maxHi: 18 },
+    FULFILLMENT_STATIONS: { minLo: 1, minHi: 5, maxLo: 6, maxHi: 24 },
+    SHIPPING_CARRIERS: { minLo: 1, minHi: 3, maxLo: 3, maxHi: 12 },
+    PACKING_BOXES: { minLo: 2, minHi: 8, maxLo: 10, maxHi: 40 },
+    NUM_WAREHOUSES: { minLo: 1, minHi: 3, maxLo: 2, maxHi: 10 },
+    SHIPPING_MAPPING_RULES: { minLo: 1, minHi: 6, maxLo: 8, maxHi: 30 },
+    ORDER_SPLITTING_RULES: { minLo: 1, minHi: 5, maxLo: 5, maxHi: 20 },
+    MONTHLY_ORDER_VOLUME: { minLo: 50, minHi: 200, maxLo: 500, maxHi: 5000 },
+  }
+
+  const range = ranges[attributeCode] ?? { minLo: 1, minHi: 6, maxLo: 5, maxHi: 25 }
+  const minLimit = randomInt(
+    Math.max(1, Math.round(range.minLo * scale)),
+    Math.max(1, Math.round(range.minHi * tierFactor * scale)),
+  )
+  const maxLimit = randomInt(
+    Math.max(minLimit + 1, Math.round(range.maxLo * tierFactor * scale)),
+    Math.max(minLimit + 2, Math.round(range.maxHi * tierFactor * scale)),
+  )
+
+  return { minLimit, maxLimit }
+}
+
+function defaultPerCountLimits(attributeCode: string): { minLimit: number; maxLimit: number } {
+  return randomCountLimits(attributeCode)
+}
+
 export function isRequiredAttributeCode(attributeCode: string): boolean {
   return REQUIRED_ATTRIBUTE_CODES.includes(
     attributeCode as (typeof REQUIRED_ATTRIBUTE_CODES)[number],
@@ -37,11 +100,15 @@ export function defaultFeatureConfig(
 
 export function defaultAttributeConfig(
   attributeCode: string,
-  priceType: 'PER_COUNT' | 'VOLUME_PRICE' = PriceType.PER_COUNT,
+  priceType?: 'PER_COUNT' | 'VOLUME_PRICE',
 ): AttributeConfig {
+  const resolvedPriceType =
+    priceType ??
+    (attributeCode === 'MONTHLY_ORDER_VOLUME' ? PriceType.VOLUME_PRICE : PriceType.PER_COUNT)
+
   const base: AttributeConfig = {
     inclusionType: InclusionType.INCLUDED,
-    priceType,
+    priceType: resolvedPriceType,
     baseMonthlyPrice: 99.99,
     baseYearlyPrice: 999.99,
     isProrated: false,
@@ -50,31 +117,33 @@ export function defaultAttributeConfig(
     addonTrialPeriod: null,
   }
 
-  if (priceType === PriceType.VOLUME_PRICE) {
+  if (resolvedPriceType === PriceType.VOLUME_PRICE) {
     return {
       ...base,
-      volumePrice: [
-        { count: 20, monthlyPrice: 40, yearlyPrice: 400 },
-        { count: 50, monthlyPrice: 90, yearlyPrice: 900 },
-      ],
+      volumePrice: defaultVolumePriceTiers(attributeCode),
+      ...(attributeCode === 'MONTHLY_ORDER_VOLUME'
+        ? { isOverageEnabled: true, overagePricePerUnit: 0.25 }
+        : {}),
     }
   }
 
   if (attributeCode === 'NUM_USERS') {
+    const limits = defaultPerCountLimits(attributeCode)
     return {
       ...base,
-      minLimit: 1,
-      maxLimit: 10,
+      minLimit: limits.minLimit,
+      maxLimit: limits.maxLimit,
       pricePerUnitMonthly: 5,
       pricePerUnitYearly: 50,
     }
   }
 
   if (attributeCode === 'MONTHLY_ORDER_VOLUME') {
+    const limits = defaultPerCountLimits(attributeCode)
     return {
       ...base,
-      minLimit: 100,
-      maxLimit: 1000,
+      minLimit: limits.minLimit,
+      maxLimit: limits.maxLimit,
       pricePerUnitMonthly: 0,
       pricePerUnitYearly: 0,
       isOverageEnabled: true,
@@ -82,10 +151,11 @@ export function defaultAttributeConfig(
     }
   }
 
+  const limits = defaultPerCountLimits(attributeCode)
   return {
     ...base,
-    minLimit: 1,
-    maxLimit: 10,
+    minLimit: limits.minLimit,
+    maxLimit: limits.maxLimit,
     pricePerUnitMonthly: 2,
     pricePerUnitYearly: 20,
   }
@@ -94,6 +164,7 @@ export function defaultAttributeConfig(
 export function applyPriceTypeChange(
   config: AttributeConfig,
   priceType: AttributeConfig['priceType'],
+  attributeCode?: string,
 ): AttributeConfig {
   if (priceType === PriceType.VOLUME_PRICE) {
     return {
@@ -103,25 +174,27 @@ export function applyPriceTypeChange(
       baseYearlyPrice: config.baseYearlyPrice ?? 999.99,
       volumePrice: config.volumePrice?.length
         ? config.volumePrice
-        : [
-            { count: 20, monthlyPrice: 40, yearlyPrice: 400 },
-            { count: 50, monthlyPrice: 90, yearlyPrice: 900 },
-          ],
+        : defaultVolumePriceTiers(attributeCode),
       isProrated: config.isProrated,
-      isOverageEnabled: config.isOverageEnabled,
-      overagePricePerUnit: config.overagePricePerUnit,
+      isOverageEnabled:
+        attributeCode === 'MONTHLY_ORDER_VOLUME' ? true : config.isOverageEnabled,
+      overagePricePerUnit:
+        attributeCode === 'MONTHLY_ORDER_VOLUME'
+          ? (config.overagePricePerUnit ?? 0.25)
+          : config.overagePricePerUnit,
       addonTrialEnabled: config.addonTrialEnabled,
       addonTrialPeriod: config.addonTrialPeriod,
     }
   }
 
+  const limits = randomCountLimits(attributeCode ?? '')
   return {
     inclusionType: config.inclusionType,
     priceType,
     baseMonthlyPrice: config.baseMonthlyPrice ?? 99.99,
     baseYearlyPrice: config.baseYearlyPrice ?? 999.99,
-    minLimit: config.minLimit ?? 1,
-    maxLimit: config.maxLimit ?? 10,
+    minLimit: config.minLimit ?? limits.minLimit,
+    maxLimit: config.maxLimit ?? limits.maxLimit,
     pricePerUnitMonthly: config.pricePerUnitMonthly ?? 2,
     pricePerUnitYearly: config.pricePerUnitYearly ?? 20,
     isProrated: config.isProrated,
@@ -132,15 +205,33 @@ export function applyPriceTypeChange(
   }
 }
 
-export function sanitizeAttributeConfig(config: AttributeConfig): AttributeConfig {
+export function sanitizeAttributeConfig(
+  config: AttributeConfig,
+  linkToMonthlyOrderVolume = false,
+): AttributeConfig {
   const base = {
     inclusionType: config.inclusionType,
-    priceType: config.priceType,
+    priceType: linkToMonthlyOrderVolume ? PriceType.PER_COUNT : config.priceType,
     baseMonthlyPrice: config.baseMonthlyPrice ?? 0,
     baseYearlyPrice: config.baseYearlyPrice ?? 0,
     isProrated: config.isProrated,
     isOverageEnabled: config.isOverageEnabled,
     addonTrialEnabled: config.addonTrialEnabled,
+  }
+
+  if (linkToMonthlyOrderVolume) {
+    return {
+      ...base,
+      priceType: PriceType.PER_COUNT,
+      pricePerUnitMonthly: config.pricePerUnitMonthly ?? 0,
+      pricePerUnitYearly: config.pricePerUnitYearly ?? 0,
+      ...(config.isOverageEnabled
+        ? { overagePricePerUnit: config.overagePricePerUnit ?? 0 }
+        : {}),
+      ...(config.addonTrialEnabled
+        ? { addonTrialPeriod: config.addonTrialPeriod ?? 14 }
+        : {}),
+    }
   }
 
   if (config.priceType === PriceType.VOLUME_PRICE) {
@@ -181,13 +272,13 @@ export function mergeAttributeConfigUpdate(
   const previous = current ?? defaultAttributeConfig(attributeCode)
 
   if (patch.priceType && patch.priceType !== previous.priceType) {
-    return applyPriceTypeChange(previous, patch.priceType)
+    return applyPriceTypeChange(previous, patch.priceType, attributeCode)
   }
 
   const merged = { ...previous, ...patch }
 
   if (merged.priceType === PriceType.VOLUME_PRICE) {
-    return applyPriceTypeChange(merged, PriceType.VOLUME_PRICE)
+    return applyPriceTypeChange(merged, PriceType.VOLUME_PRICE, attributeCode)
   }
 
   const { volumePrice: _volumePrice, ...perCountConfig } = merged
@@ -319,6 +410,7 @@ export function buildAttributePlanFeature(
       linkToMonthlyOrderVolume: linkFlags[attributeId] ?? false,
       attributeConfig: sanitizeAttributeConfig(
         attributeConfigs[attributeId] ?? defaultAttributeConfig(code),
+        linkFlags[attributeId] ?? false,
       ),
     }
   })
@@ -372,7 +464,10 @@ export function sanitizeCreatePlanPayload(payload: CreatePlanPayload): CreatePla
         ...feature,
         attributes: feature.attributes.map((attribute) => ({
           ...attribute,
-          attributeConfig: sanitizeAttributeConfig(attribute.attributeConfig),
+          attributeConfig: sanitizeAttributeConfig(
+            attribute.attributeConfig,
+            attribute.linkToMonthlyOrderVolume ?? false,
+          ),
         })),
       }
     }),

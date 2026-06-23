@@ -1,3 +1,6 @@
+import Accordion from '@mui/material/Accordion'
+import AccordionDetails from '@mui/material/AccordionDetails'
+import AccordionSummary from '@mui/material/AccordionSummary'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -7,22 +10,22 @@ import Chip from '@mui/material/Chip'
 import CircularProgress from '@mui/material/CircularProgress'
 import Collapse from '@mui/material/Collapse'
 import Divider from '@mui/material/Divider'
+import Grid from '@mui/material/Grid'
 import Stack from '@mui/material/Stack'
-import Table from '@mui/material/Table'
-import TableBody from '@mui/material/TableBody'
-import TableCell from '@mui/material/TableCell'
-import TableContainer from '@mui/material/TableContainer'
-import TableHead from '@mui/material/TableHead'
-import TableRow from '@mui/material/TableRow'
 import Typography from '@mui/material/Typography'
+import CodeIcon from '@mui/icons-material/Code'
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import PaymentIcon from '@mui/icons-material/Payment'
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
+import { PlanDetailView } from '../plans/PlanDetailView'
+import { SubscriptionActionChip } from './SubscriptionActionChip'
 import type {
   BillingAddress,
   MerchantCartPreview,
   MerchantPlanPurchaseResult,
 } from '../../types/subscription'
+import { SubscriptionAction } from '../../types/subscription'
 import {
   defaultBillingAddress,
   isBillingAddressComplete,
@@ -30,12 +33,29 @@ import {
 } from '../../utils/billingAddress'
 import { formatMoney } from '../../utils/planDisplay'
 import { BillingAddressFields } from './BillingAddressFields'
+import { CartPricingPreviewDetails } from './CartPricingPreviewDetails'
 
 interface CartPreviewPanelProps {
   cart: MerchantCartPreview
   purchasing?: boolean
   purchaseResult?: MerchantPlanPurchaseResult | null
   onConfirmPayment: (billingAddress?: BillingAddress) => void
+}
+
+function DetailField({ label, value, mono = false }: { label: string; value: ReactNode; mono?: boolean }) {
+  return (
+    <Box>
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+        {label}
+      </Typography>
+      <Typography
+        variant="body2"
+        sx={{ fontWeight: 500, ...(mono ? { fontFamily: 'monospace', fontSize: '0.8rem' } : {}) }}
+      >
+        {value}
+      </Typography>
+    </Box>
+  )
 }
 
 export function CartPreviewPanel({
@@ -62,22 +82,25 @@ export function CartPreviewPanel({
   const canConfirm =
     !purchasing && (!requiresBillingAddress || isBillingAddressComplete(billingAddress))
 
+  const isDowngrade = cart.subscriptionAction === SubscriptionAction.DOWNGRADE
+
   return (
     <Card>
       <CardContent>
-        <Stack spacing={2}>
+        <Stack spacing={2.5}>
           <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
             <ReceiptLongIcon color="success" />
             <Box>
               <Typography variant="h6">Cart preview</Typography>
               <Typography variant="body2" color="text.secondary">
-                Pricing from GET /api/v1/merchant/cart/plan
+                Full response from GET /api/v1/merchant/cart/plan
               </Typography>
             </Box>
           </Stack>
 
           <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
             <Chip label={plan.planName} size="small" />
+            <SubscriptionActionChip action={cart.subscriptionAction} />
             {cart.isTrial ? (
               <Chip label="Trial cart" size="small" color="warning" />
             ) : (
@@ -88,55 +111,69 @@ export function CartPreviewPanel({
               size="small"
               variant="outlined"
             />
+            <Chip
+              label={formatMoney(pricing.currency, pricing.grandTotal)}
+              size="small"
+              color="success"
+              variant="outlined"
+            />
           </Stack>
 
-          <TableContainer>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Line item</TableCell>
-                  <TableCell align="right">Qty</TableCell>
-                  <TableCell align="right">Unit</TableCell>
-                  <TableCell align="right">Subtotal</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {pricing.lines.map((line) => (
-                  <TableRow key={`${line.lineItemName}-${line.subTotal}`}>
-                    <TableCell>{line.lineItemName}</TableCell>
-                    <TableCell align="right">{line.quantity ?? '—'}</TableCell>
-                    <TableCell align="right">
-                      {line.unitPrice != null
-                        ? formatMoney(pricing.currency, line.unitPrice)
-                        : '—'}
-                    </TableCell>
-                    <TableCell align="right">
-                      {formatMoney(pricing.currency, line.subTotal)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+          <Box>
+            <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600 }}>
+              Cart settings
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <DetailField label="Plan ID" value={cart.planId} mono />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <DetailField label="Billing cycle" value={cart.billingCycle ?? '—'} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <DetailField label="Auto renew" value={cart.autoRenew ? 'Yes' : 'No'} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <DetailField label="Trial cart" value={cart.isTrial ? 'Yes' : 'No'} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <DetailField label="Subscription action" value={cart.subscriptionAction} />
+              </Grid>
+            </Grid>
+          </Box>
+
+          {isDowngrade && (
+            <Alert severity="info">
+              This cart is a plan downgrade. Checkout schedules the change for the next billing
+              cycle — payment may not be required immediately.
+            </Alert>
+          )}
+
+          {cart.subscriptionAction === SubscriptionAction.UPGRADE && (
+            <Alert severity="info">
+              Plan upgrade cart — pricing includes prorated charges where applicable.
+            </Alert>
+          )}
 
           <Divider />
 
-          <Stack spacing={0.5}>
-            <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
-              <Typography color="text.secondary">Subtotal</Typography>
-              <Typography>{formatMoney(pricing.currency, pricing.subtotal)}</Typography>
-            </Stack>
-            <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
-              <Typography color="text.secondary">Tax</Typography>
-              <Typography>{formatMoney(pricing.currency, pricing.taxAmount)}</Typography>
-            </Stack>
-            <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
-              <Typography sx={{ fontWeight: 700 }}>Grand total</Typography>
-              <Typography sx={{ fontWeight: 700 }}>
-                {formatMoney(pricing.currency, pricing.grandTotal)}
-              </Typography>
-            </Stack>
-          </Stack>
+          <CartPricingPreviewDetails pricing={pricing} />
+
+          <Divider />
+
+          <Accordion variant="outlined" disableGutters>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                  Plan snapshot
+                </Typography>
+                <Chip label={`${plan.features.length} features`} size="small" variant="outlined" />
+              </Stack>
+            </AccordionSummary>
+            <AccordionDetails sx={{ p: 0 }}>
+              <PlanDetailView plan={plan} />
+            </AccordionDetails>
+          </Accordion>
 
           {requiresBillingAddress && (
             <Box>
@@ -201,6 +238,33 @@ export function CartPreviewPanel({
               </Alert>
             )}
           </Collapse>
+
+          <Accordion variant="outlined" disableGutters>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                <CodeIcon fontSize="small" color="action" />
+                <Typography variant="subtitle2">Raw API response</Typography>
+              </Stack>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Box
+                component="pre"
+                sx={{
+                  m: 0,
+                  p: 2,
+                  borderRadius: 2,
+                  bgcolor: '#0f172a',
+                  color: '#e2e8f0',
+                  fontSize: '0.75rem',
+                  lineHeight: 1.5,
+                  overflow: 'auto',
+                  maxHeight: 420,
+                }}
+              >
+                {JSON.stringify(cart, null, 2)}
+              </Box>
+            </AccordionDetails>
+          </Accordion>
         </Stack>
       </CardContent>
     </Card>

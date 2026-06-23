@@ -17,8 +17,6 @@ import TableRow from '@mui/material/TableRow'
 import Typography from '@mui/material/Typography'
 import PaymentIcon from '@mui/icons-material/Payment'
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong'
-import TrendingDownIcon from '@mui/icons-material/TrendingDown'
-import TrendingUpIcon from '@mui/icons-material/TrendingUp'
 import { useState } from 'react'
 import type {
   BillingAddress,
@@ -28,6 +26,7 @@ import type {
 import { defaultBillingAddress, isBillingAddressComplete } from '../../utils/billingAddress'
 import { formatMoney } from '../../utils/planDisplay'
 import { BillingAddressFields } from './BillingAddressFields'
+import { SubscriptionActionChip } from './SubscriptionActionChip'
 
 interface AttributeCartPreviewPanelProps {
   cart: MerchantAttributeCartPreview
@@ -42,7 +41,6 @@ export function AttributeCartPreviewPanel({
   purchaseResult = null,
   onConfirmPayment,
 }: AttributeCartPreviewPanelProps) {
-  const isUpgrade = cart.subscriptionAction === 'UPGRADE'
   const [billingAddress, setBillingAddress] = useState<BillingAddress>(defaultBillingAddress)
   const canConfirm = !purchasing && isBillingAddressComplete(billingAddress)
 
@@ -61,12 +59,7 @@ export function AttributeCartPreviewPanel({
           </Stack>
 
           <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-            <Chip
-              icon={isUpgrade ? <TrendingUpIcon /> : <TrendingDownIcon />}
-              label={cart.subscriptionAction}
-              size="small"
-              color={isUpgrade ? 'success' : 'warning'}
-            />
+            <SubscriptionActionChip action={cart.subscriptionAction} />
             <Chip label={cart.billingCycle ?? '—'} size="small" variant="outlined" />
             <Chip
               label={

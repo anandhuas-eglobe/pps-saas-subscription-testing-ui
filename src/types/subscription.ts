@@ -41,10 +41,13 @@ export interface ApiResponse<T> {
   message?: string
   timestamp: string
   path?: string
+  method?: string
   statusCode?: number
   errorCode?: string
   errors?: ApiErrorItem[]
   errorCount?: number
+  correlationId?: string
+  context?: Record<string, unknown>
 }
 
 export interface ApiErrorItem {
@@ -53,6 +56,16 @@ export interface ApiErrorItem {
   field?: string
   value?: unknown
   constraints?: string[]
+  metadata?: Record<string, unknown>
+}
+
+export interface ApiErrorMeta {
+  statusCode?: number
+  path?: string
+  method?: string
+  correlationId?: string
+  errorCount?: number
+  context?: Record<string, unknown>
 }
 
 export interface FeatureAttributeRow {
@@ -286,6 +299,15 @@ export const BillingCycle = {
 
 export type BillingCycleValue = (typeof BillingCycle)[keyof typeof BillingCycle]
 
+export const SubscriptionAction = {
+  NEW: 'NEW',
+  UPGRADE: 'UPGRADE',
+  DOWNGRADE: 'DOWNGRADE',
+} as const
+
+export type SubscriptionActionValue =
+  (typeof SubscriptionAction)[keyof typeof SubscriptionAction]
+
 export interface MerchantPlanListResponse {
   plans: PlanDetail[]
   activePlanId: string | null
@@ -310,16 +332,27 @@ export interface UpsertMerchantCartPayload {
 
 export interface CartPricingLine {
   lineItemName: string
+  lineItemCategory?: string
+  lineItemType?: string
+  lineItemReference?: string
   quantity: number | null
   unitPrice: number | null
   subTotal: number
+  baseSubTotal?: number
+  attributeBasePrice?: number | null
 }
 
 export interface CartPricingPreview {
   subtotal: number
+  baseSubtotal?: number
+  proratedDifference?: number | null
+  baseProratedDifference?: number | null
   currency: string
   taxAmount: number
+  baseTaxAmount?: number
+  taxData?: unknown
   grandTotal: number
+  baseGrandTotal?: number
   lines: CartPricingLine[]
 }
 
@@ -328,6 +361,7 @@ export interface MerchantCartPreview {
   billingCycle: BillingCycleValue | null
   autoRenew: boolean
   isTrial: boolean
+  subscriptionAction: SubscriptionActionValue
   plan: PlanDetail
   pricing: CartPricingPreview
 }
@@ -533,7 +567,7 @@ export interface MerchantAttributeCartPreview {
   baseCurrency: string
   billingCycle: BillingCycleValue | null
   autoRenew: boolean
-  subscriptionAction: string
+  subscriptionAction: SubscriptionActionValue
   subscriptionId: string
   attributeChanges: AttributeCartChangeLine[]
   pricing: AttributeCartPricing

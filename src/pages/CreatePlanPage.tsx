@@ -13,7 +13,7 @@ import { fetchFeatures } from '../api/features'
 import { createPlan } from '../api/plans'
 import { ApiRequestError } from '../api/client'
 import { ApiLogPanel } from '../components/ApiLogPanel'
-import { ValidationErrorsAlert } from '../components/ValidationErrorsAlert'
+import { ApiErrorAlert } from '../components/ApiErrorAlert'
 import { CreatePlanDetailsSection } from '../components/plans/CreatePlanDetailsSection'
 import { CreatePlanFeatureCatalogSection } from '../components/plans/CreatePlanFeatureCatalogSection'
 import { CreatePlanPayloadPreview } from '../components/plans/CreatePlanPayloadPreview'
@@ -39,9 +39,7 @@ import {
   mergeFeatureConfigUpdate,
 } from '../utils/planDefaults'
 import {
-  extractApiErrors,
   getApiErrorSummary,
-  getApiErrorTitle,
 } from '../utils/apiErrors'
 
 type SelectedAttributeFeature = {
@@ -144,30 +142,11 @@ export function CreatePlanPage() {
     })
   }, [catalog])
 
-  const validationErrors = useMemo(() => {
-    const fromError = extractApiErrors(lastError)
-    const fromResponse =
-      lastResponse?.success === false ? extractApiErrors(lastResponse) : []
-    return [...fromError, ...fromResponse].filter(
-      (item, index, list) =>
-        list.findIndex(
-          (other) =>
-            other.field === item.field &&
-            other.message === item.message &&
-            other.code === item.code,
-        ) === index,
-    )
-  }, [lastError, lastResponse])
-
-  const validationErrorCode =
-    (lastError instanceof ApiRequestError ? lastError.body.errorCode : undefined) ??
-    lastResponse?.errorCode
-
   useEffect(() => {
-    if (validationErrors.length > 0) {
+    if (lastError != null || lastResponse?.success === false) {
       validationErrorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
-  }, [validationErrors])
+  }, [lastError, lastResponse])
 
   const loadCatalog = useCallback(async () => {
     setCatalogLoading(true)
@@ -443,12 +422,10 @@ export function CreatePlanPage() {
           </Alert>
         )}
 
-        {validationErrors.length > 0 && (
+        {(lastError != null || lastResponse?.success === false) && (
           <Box ref={validationErrorRef}>
-            <ValidationErrorsAlert
-              title={getApiErrorTitle(lastError ?? lastResponse)}
-              errors={validationErrors}
-              errorCode={validationErrorCode}
+            <ApiErrorAlert
+              error={lastError ?? lastResponse}
               subtitle="The API rejected this plan payload. Review each item below and update the form."
             />
           </Box>

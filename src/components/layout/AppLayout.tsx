@@ -14,6 +14,7 @@ import { RedisCacheFlushButton } from './RedisCacheFlushButton'
 
 const navItems = [
   { label: 'Home', path: '/' },
+  { label: 'Nitro Test', path: '/nitro-test' },
   { label: 'Create Plan', path: '/plans/create' },
   { label: 'List Plans', path: '/plans' },
   { label: 'Merchant Plans', path: '/merchant/plans' },

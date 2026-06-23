@@ -4,11 +4,13 @@ import type {
   FeatureConfig,
   PlanDetail,
   PlanDetailAttributeConfig,
+  PlanDetailFeatureAttribute,
   PlanDetailFeatureConfig,
+  PlanFeature,
   UpdatePlanPayload,
 } from '../types/subscription'
 import { FeatureType } from '../types/subscription'
-import { isRequiredAttributeCode } from './planDefaults'
+import { isRequiredAttributeCode, sanitizeCreatePlanPayload } from './planDefaults'
 
 export type SelectedAttributeFeatureState = {
   featureId: string
@@ -150,4 +152,53 @@ export function createPlanPayloadToUpdatePayload(payload: CreatePlanPayload): Up
     overageMaxAllowedAmount: payload.overageMaxAllowedAmount,
     features: payload.features,
   }
+}
+
+function attributeLinksToMonthlyOrderVolume(attribute: PlanDetailFeatureAttribute): boolean {
+  return attribute.parentFeatureAttributeId != null
+}
+
+function planDetailFeatureToCreateFeature(planFeature: PlanDetail['features'][number]): PlanFeature {
+  if (planFeature.featureType === FeatureType.SIMPLE && planFeature.featureConfig) {
+    return {
+      featureId: planFeature.featureId,
+      featureType: FeatureType.SIMPLE,
+      featureConfig: detailFeatureConfigToFeatureConfig(planFeature.featureConfig),
+    }
+  }
+
+  return {
+    featureId: planFeature.featureId,
+    featureType: FeatureType.ATTRIBUTE,
+    attributes: (planFeature.attributes ?? []).map((attribute) => ({
+      featureAttributeId: attribute.featureAttributeId,
+      linkToMonthlyOrderVolume: attributeLinksToMonthlyOrderVolume(attribute),
+      attributeConfig: detailAttributeConfigToAttributeConfig(attribute.attributeConfig),
+    })),
+  }
+}
+
+/** Build a create-plan payload copied from an existing plan (new draft). */
+export function planDetailToDuplicatePayload(
+  plan: PlanDetail,
+  options?: { nameSuffix?: string; uniqueSuffix?: string },
+): CreatePlanPayload {
+  const suffix = options?.nameSuffix ?? ' Copy'
+  const uniqueSuffix = options?.uniqueSuffix ?? String(Date.now()).slice(-6)
+
+  return sanitizeCreatePlanPayload({
+    planName: `${plan.planName}${suffix} ${uniqueSuffix}`.trim(),
+    planDescription: plan.planDescription,
+    planType: plan.planType,
+    baseMonthlyPrice: plan.baseMonthlyPrice,
+    baseYearlyPrice: plan.baseYearlyPrice,
+    baseCurrency: plan.baseCurrency,
+    isTrialPeriodEnabled: plan.trial.enabled,
+    trialPeriod: plan.trial.days,
+    isGracePeriodEnabled: plan.grace.enabled,
+    gracePeriod: plan.grace.days,
+    overageAutoChargeAmount: plan.overageAutoChargeAmount,
+    overageMaxAllowedAmount: plan.overageMaxAllowedAmount,
+    features: (plan.features ?? []).map(planDetailFeatureToCreateFeature),
+  })
 }

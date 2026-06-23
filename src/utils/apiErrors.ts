@@ -1,5 +1,20 @@
 import { ApiRequestError } from '../api/client'
-import type { ApiErrorItem, ApiResponse } from '../types/subscription'
+import type { ApiErrorItem, ApiErrorMeta, ApiResponse } from '../types/subscription'
+
+export function extractApiErrorBody(source: unknown): ApiResponse<unknown> | null {
+  if (source instanceof ApiRequestError) {
+    return source.body
+  }
+
+  if (source && typeof source === 'object' && 'success' in source) {
+    const body = source as ApiResponse<unknown>
+    if (body.success === false) {
+      return body
+    }
+  }
+
+  return null
+}
 
 export function extractApiErrors(source: unknown): ApiErrorItem[] {
   if (source instanceof ApiRequestError) {
@@ -25,7 +40,45 @@ export function extractApiErrors(source: unknown): ApiErrorItem[] {
   return []
 }
 
+export function extractApiErrorMeta(source: unknown): ApiErrorMeta | null {
+  const body = extractApiErrorBody(source)
+
+  if (!body && !(source instanceof ApiRequestError)) {
+    return null
+  }
+
+  const meta: ApiErrorMeta = {
+    statusCode: body?.statusCode ?? (source instanceof ApiRequestError ? source.status : undefined),
+    path: body?.path,
+    method: body?.method,
+    correlationId: body?.correlationId,
+    errorCount: body?.errorCount ?? body?.errors?.length,
+    context: body?.context,
+  }
+
+  if (
+    meta.statusCode == null &&
+    meta.path == null &&
+    meta.method == null &&
+    meta.correlationId == null &&
+    meta.errorCount == null &&
+    meta.context == null
+  ) {
+    return null
+  }
+
+  return meta
+}
+
+export function getApiErrorCode(source: unknown): string | undefined {
+  return extractApiErrorBody(source)?.errorCode
+}
+
 export function getApiErrorTitle(source: unknown): string {
+  if (typeof source === 'string') {
+    return source
+  }
+
   if (source instanceof ApiRequestError) {
     return source.body.message ?? 'Request failed'
   }

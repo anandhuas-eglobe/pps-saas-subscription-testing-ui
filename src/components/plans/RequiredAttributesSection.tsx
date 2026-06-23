@@ -19,6 +19,7 @@ import { PriceType } from '../../types/subscription'
 import {
   applyPriceTypeChange,
   defaultAttributeConfig,
+  defaultVolumePriceTiers,
   REQUIRED_ATTRIBUTE_CODES,
 } from '../../utils/planDefaults'
 import { VolumePriceTiersEditor } from './VolumePriceTiersEditor'
@@ -111,7 +112,7 @@ export const RequiredAttributesSection = memo(function RequiredAttributesSection
                         value={config.priceType}
                         onChange={(event) => {
                           const priceType = event.target.value as AttributeConfig['priceType']
-                          onConfigChange(attributeId, applyPriceTypeChange(config, priceType))
+                          onConfigChange(attributeId, applyPriceTypeChange(config, priceType, attributeCode))
                         }}
                       >
                         <MenuItem value={PriceType.PER_COUNT}>PER_COUNT</MenuItem>
@@ -185,9 +186,7 @@ export const RequiredAttributesSection = memo(function RequiredAttributesSection
 
                   {isVolumePrice && (
                     <VolumePriceTiersEditor
-                      tiers={
-                        config.volumePrice ?? [{ count: 20, monthlyPrice: 40, yearlyPrice: 400 }]
-                      }
+                      tiers={config.volumePrice ?? defaultVolumePriceTiers(attributeCode)}
                       onChange={(volumePrice) => onConfigChange(attributeId, { volumePrice })}
                     />
                   )}

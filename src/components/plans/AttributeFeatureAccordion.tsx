@@ -171,7 +171,11 @@ export const AttributeFeatureAccordion = memo(function AttributeFeatureAccordion
                             value={config.priceType}
                             onChange={(event) => {
                               const priceType = event.target.value as AttributeConfig['priceType']
-                              const nextConfig = applyPriceTypeChange(config, priceType)
+                              const nextConfig = applyPriceTypeChange(
+                                config,
+                                priceType,
+                                attribute.attributeCode,
+                              )
                               onConfigChange(attribute.id, nextConfig)
                               if (priceType === PriceType.VOLUME_PRICE && linkFlags[attribute.id]) {
                                 onLinkFlagChange(attribute.id, false)

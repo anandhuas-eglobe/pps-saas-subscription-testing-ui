@@ -1,7 +1,6 @@
 import Accordion from '@mui/material/Accordion'
 import AccordionDetails from '@mui/material/AccordionDetails'
 import AccordionSummary from '@mui/material/AccordionSummary'
-import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
@@ -12,7 +11,12 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import CodeIcon from '@mui/icons-material/Code'
 import type { ApiResponse } from '../types/subscription'
 import { ValidationErrorsAlert } from './ValidationErrorsAlert'
-import { extractApiErrors, getApiErrorTitle } from '../utils/apiErrors'
+import {
+  extractApiErrorMeta,
+  extractApiErrors,
+  getApiErrorCode,
+  getApiErrorTitle,
+} from '../utils/apiErrors'
 
 interface ApiLogPanelProps {
   title: string
@@ -64,10 +68,8 @@ export function ApiLogPanel({ title, payload, response, error }: ApiLogPanelProp
       ) === index,
   )
   const responseFailed = response?.success === false
-  const errorCode =
-    (error && typeof error === 'object' && 'body' in error
-      ? (error as { body?: ApiResponse<unknown> }).body?.errorCode
-      : undefined) ?? response?.errorCode
+  const errorCode = getApiErrorCode(error ?? response)
+  const meta = extractApiErrorMeta(error ?? response)
 
   return (
     <Card>
@@ -77,12 +79,13 @@ export function ApiLogPanel({ title, payload, response, error }: ApiLogPanelProp
           <Typography variant="h6">{title}</Typography>
         </Stack>
 
-        {uniqueErrors.length > 0 && (
+        {(uniqueErrors.length > 0 || errorCode || meta) && (
           <Box sx={{ mb: 2 }}>
             <ValidationErrorsAlert
               title={getApiErrorTitle(error ?? response)}
               errors={uniqueErrors}
               errorCode={errorCode}
+              meta={meta}
             />
           </Box>
         )}
@@ -125,15 +128,17 @@ export function ApiLogPanel({ title, payload, response, error }: ApiLogPanelProp
           </Accordion>
         )}
 
-        {error != null && uniqueErrors.length === 0 && (
-          <Alert severity="error" sx={{ mt: 1 }}>
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              Error details
-            </Typography>
-            <Box component="pre" sx={{ ...codeBlockSx, bgcolor: '#450a0a', maxHeight: 240 }}>
-              {formatError(error)}
-            </Box>
-          </Alert>
+        {error != null && (
+          <Accordion disableGutters elevation={0} sx={{ border: '1px solid', borderColor: 'divider', mt: 1 }}>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography sx={{ fontWeight: 600 }}>Raw error response</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Box component="pre" sx={{ ...codeBlockSx, bgcolor: '#450a0a', maxHeight: 360 }}>
+                {formatError(error)}
+              </Box>
+            </AccordionDetails>
+          </Accordion>
         )}
       </CardContent>
     </Card>

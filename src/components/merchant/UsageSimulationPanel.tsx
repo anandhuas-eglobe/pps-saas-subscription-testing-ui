@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -52,6 +52,9 @@ interface UsageSimulationPanelProps {
   limitsAndUsages: SubscriptionLimitAndUsage[]
   refreshingUsage?: boolean
   onUsageUpdated?: () => void | Promise<void>
+  initialAttributeCode?: string
+  hideCurrentUsageTable?: boolean
+  hideAttributePicker?: boolean
 }
 
 function createEntityReferenceId(): string {
@@ -93,9 +96,12 @@ export function UsageSimulationPanel({
   limitsAndUsages,
   refreshingUsage = false,
   onUsageUpdated,
+  initialAttributeCode = '',
+  hideCurrentUsageTable = false,
+  hideAttributePicker = false,
 }: UsageSimulationPanelProps) {
   const [activeStep, setActiveStep] = useState<SimulationStep>('validate')
-  const [attributeCode, setAttributeCode] = useState('')
+  const [attributeCode, setAttributeCode] = useState(initialAttributeCode)
   const [entityReferenceId, setEntityReferenceId] = useState(createEntityReferenceId)
   const [planFeatureAttributeId, setPlanFeatureAttributeId] = useState('')
   const [subscriptionId, setSubscriptionId] = useState(merchantSubscriptionId)
@@ -136,6 +142,13 @@ export function UsageSimulationPanel({
       setUsageLimit(match.usageLimit)
     }
   }
+
+  useEffect(() => {
+    if (initialAttributeCode) {
+      applyAttributeSelection(initialAttributeCode)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialAttributeCode])
 
   async function refreshCurrentUsage() {
     if (onUsageUpdated) {
@@ -334,7 +347,7 @@ export function UsageSimulationPanel({
               Usage tracking flow
             </Typography>
 
-            {limitsAndUsages.length > 0 && (
+            {!hideCurrentUsageTable && limitsAndUsages.length > 0 && (
               <Box>
                 <Stack direction="row" spacing={1} sx={{ mb: 1, alignItems: 'center' }}>
                   <Typography variant="subtitle2">Current usage</Typography>
@@ -405,29 +418,31 @@ export function UsageSimulationPanel({
               </Box>
             )}
 
-            <FormControl fullWidth size="small">
-              <InputLabel id="usage-simulation-attribute-label">Attribute</InputLabel>
-              <Select
-                labelId="usage-simulation-attribute-label"
-                label="Attribute"
-                value={attributeCode}
-                onChange={(event) => applyAttributeSelection(event.target.value)}
-              >
-                {attributeOptions.length === 0 && (
-                  <MenuItem value="" disabled>
-                    No INCLUDED attributes on this subscription
-                  </MenuItem>
-                )}
-                {attributeOptions.map((option) => {
-                  const row = limitsAndUsages.find((item) => item.attributeCode === option.code)
-                  return (
-                    <MenuItem key={option.code} value={option.code}>
-                      {row ? formatAttributeUsageLabel(row) : option.code}
+            {!hideAttributePicker && (
+              <FormControl fullWidth size="small">
+                <InputLabel id="usage-simulation-attribute-label">Attribute</InputLabel>
+                <Select
+                  labelId="usage-simulation-attribute-label"
+                  label="Attribute"
+                  value={attributeCode}
+                  onChange={(event) => applyAttributeSelection(event.target.value)}
+                >
+                  {attributeOptions.length === 0 && (
+                    <MenuItem value="" disabled>
+                      No INCLUDED attributes on this subscription
                     </MenuItem>
-                  )
-                })}
-              </Select>
-            </FormControl>
+                  )}
+                  {attributeOptions.map((option) => {
+                    const row = limitsAndUsages.find((item) => item.attributeCode === option.code)
+                    return (
+                      <MenuItem key={option.code} value={option.code}>
+                        {row ? formatAttributeUsageLabel(row) : option.code}
+                      </MenuItem>
+                    )
+                  })}
+                </Select>
+              </FormControl>
+            )}
 
             <Stack
               direction={{ xs: 'column', sm: 'row' }}

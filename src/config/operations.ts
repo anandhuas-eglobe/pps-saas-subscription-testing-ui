@@ -13,6 +13,7 @@ import TimelineIcon from '@mui/icons-material/Timeline'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import PublicIcon from '@mui/icons-material/Public'
 import EventAvailableIcon from '@mui/icons-material/EventAvailable'
+import BoltIcon from '@mui/icons-material/Bolt'
 import type { SvgIconComponent } from '@mui/icons-material'
 
 export interface OperationLink {
@@ -25,6 +26,14 @@ export interface OperationLink {
 }
 
 export const operations: OperationLink[] = [
+  {
+    title: 'Nitro Test',
+    description: 'High-speed testing — one-click plan creation with required attributes, addons, and mixed feature pricing.',
+    path: '/nitro-test',
+    icon: BoltIcon,
+    apiEndpoint: 'POST /api/v1/admin/plans/create-plan',
+    available: true,
+  },
   {
     title: 'Create Plan',
     description: 'Build a new subscription plan with features, pricing, trial settings, and overage rules.',
