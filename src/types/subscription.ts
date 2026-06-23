@@ -323,6 +323,39 @@ export interface CartFeatureSelection {
   attributes: CartAttributeValue[]
 }
 
+export interface PlanCartFeatureSelection extends CartFeatureSelection {
+  isAddonTrial?: boolean
+}
+
+export interface PlanCartSystemAddedEntity {
+  id: string
+  type: 'PLAN_FEATURE' | 'PLAN_FEATURE_ATTRIBUTE'
+  count: number
+  reason: string
+}
+
+export interface PlanCartAutoAlignedAttribute {
+  attributeId: string
+  previousSelectedCount: number
+  adjustedCount: number
+  reason: string
+}
+
+export interface PlanCartWarningAttribute {
+  attributeId: string
+  selectedCount: number
+  usedCount: number
+  requiredMinimum: number
+  message: string
+}
+
+export interface PlanCartPlanDetails {
+  selections: PlanCartFeatureSelection[]
+  systemAddedEntities?: PlanCartSystemAddedEntity[]
+  autoAlignedAttributes?: PlanCartAutoAlignedAttribute[]
+  warningAttributes?: PlanCartWarningAttribute[]
+}
+
 export interface UpsertMerchantCartPayload {
   planId: string
   isTrial?: boolean
@@ -363,6 +396,7 @@ export interface MerchantCartPreview {
   isTrial: boolean
   subscriptionAction: SubscriptionActionValue
   plan: PlanDetail
+  planDetails: PlanCartPlanDetails
   pricing: CartPricingPreview
 }
 

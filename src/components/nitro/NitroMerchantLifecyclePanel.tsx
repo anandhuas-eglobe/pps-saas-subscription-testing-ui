@@ -383,11 +383,37 @@ export function NitroMerchantLifecyclePanel() {
               )}
 
               {cartPreview && (
-                <Alert severity="info" icon={<ShoppingCartIcon />}>
+                <Alert
+                  severity={
+                    (cartPreview.planDetails?.warningAttributes?.length ?? 0) > 0
+                      ? 'warning'
+                      : 'info'
+                  }
+                  icon={<ShoppingCartIcon />}
+                >
                   Cart: <strong>{cartPreview.subscriptionAction}</strong>
                   {' · '}
                   {cartPreview.isTrial ? 'Trial' : cartPreview.billingCycle ?? billingCycle} ·{' '}
                   {formatMoney(cartPreview.pricing.currency, cartPreview.pricing.grandTotal)}
+                  {(cartPreview.planDetails?.warningAttributes?.length ?? 0) > 0 && (
+                    <>
+                      {' · '}
+                      {cartPreview.planDetails?.warningAttributes?.length} attribute warning
+                      {(cartPreview.planDetails?.warningAttributes?.length ?? 0) === 1 ? '' : 's'}
+                    </>
+                  )}
+                  {(cartPreview.planDetails?.systemAddedEntities?.length ?? 0) > 0 && (
+                    <>
+                      {' · '}
+                      {cartPreview.planDetails?.systemAddedEntities?.length} system-added
+                    </>
+                  )}
+                  {(cartPreview.planDetails?.autoAlignedAttributes?.length ?? 0) > 0 && (
+                    <>
+                      {' · '}
+                      {cartPreview.planDetails?.autoAlignedAttributes?.length} auto-aligned
+                    </>
+                  )}
                 </Alert>
               )}
 

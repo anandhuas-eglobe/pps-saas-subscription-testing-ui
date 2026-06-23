@@ -34,6 +34,7 @@ import {
 import { formatMoney } from '../../utils/planDisplay'
 import { BillingAddressFields } from './BillingAddressFields'
 import { CartPricingPreviewDetails } from './CartPricingPreviewDetails'
+import { PlanCartPlanDetailsPanel } from './PlanCartPlanDetailsPanel'
 
 interface CartPreviewPanelProps {
   cart: MerchantCartPreview
@@ -64,7 +65,10 @@ export function CartPreviewPanel({
   purchaseResult = null,
   onConfirmPayment,
 }: CartPreviewPanelProps) {
-  const { pricing, plan } = cart
+  const { pricing, plan, planDetails } = cart
+  const systemAddedCount = planDetails?.systemAddedEntities?.length ?? 0
+  const autoAlignedCount = planDetails?.autoAlignedAttributes?.length ?? 0
+  const warningCount = planDetails?.warningAttributes?.length ?? 0
   const requiresBillingAddress = requiresBillingAddressForCheckout({
     isTrial: cart.isTrial,
     grandTotal: pricing.grandTotal,
@@ -117,6 +121,29 @@ export function CartPreviewPanel({
               color="success"
               variant="outlined"
             />
+            {warningCount > 0 && (
+              <Chip
+                label={`${warningCount} warning${warningCount === 1 ? '' : 's'}`}
+                size="small"
+                color="warning"
+              />
+            )}
+            {systemAddedCount > 0 && (
+              <Chip
+                label={`${systemAddedCount} system-added`}
+                size="small"
+                color="info"
+                variant="outlined"
+              />
+            )}
+            {autoAlignedCount > 0 && (
+              <Chip
+                label={`${autoAlignedCount} auto-aligned`}
+                size="small"
+                color="success"
+                variant="outlined"
+              />
+            )}
           </Stack>
 
           <Box>
@@ -153,6 +180,13 @@ export function CartPreviewPanel({
             <Alert severity="info">
               Plan upgrade cart — pricing includes prorated charges where applicable.
             </Alert>
+          )}
+
+          {planDetails && (
+            <>
+              <Divider />
+              <PlanCartPlanDetailsPanel plan={plan} planDetails={planDetails} />
+            </>
           )}
 
           <Divider />
