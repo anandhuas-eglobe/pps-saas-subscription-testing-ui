@@ -5,6 +5,7 @@ import Redis from 'ioredis'
 
 const STREAM_MAX_LEN = 10_000
 const PUBLISH_PATH = '/dev-tools/redis/publish'
+const READ_STREAMS_PATH = '/dev-tools/redis/read-streams'
 const FLUSH_CACHE_PATH = '/dev-tools/redis/flush-cache'
 const HEALTH_PATH = '/dev-tools/redis/health'
 const SUBSCRIPTION_CACHE_KEY_PATTERN = 'subscription:*'
@@ -25,6 +26,50 @@ interface PublishRequestBody {
 interface FlushCacheRequestBody {
   redis?: RedisConnectionOptions
   pattern?: string
+}
+
+interface ReadStreamsRequestBody {
+  streams: string[]
+  count?: number
+  redis?: RedisConnectionOptions
+}
+
+interface RedisStreamMessageRecord {
+  stream: string
+  id: string
+  payload: unknown
+  timestamp: string | null
+  correlationId: string | null
+  key: string | null
+}
+
+function parseStreamFields(fields: string[]): {
+  payload: unknown
+  timestamp: string | null
+  correlationId: string | null
+  key: string | null
+} {
+  const readField = (name: string): string | null => {
+    const index = fields.indexOf(name)
+    return index !== -1 ? fields[index + 1] ?? null : null
+  }
+
+  const rawPayload = readField('payload')
+  let payload: unknown = rawPayload
+  if (rawPayload) {
+    try {
+      payload = JSON.parse(rawPayload)
+    } catch {
+      payload = rawPayload
+    }
+  }
+
+  return {
+    payload,
+    timestamp: readField('timestamp'),
+    correlationId: readField('correlationId'),
+    key: readField('key'),
+  }
 }
 
 function getPathname(url: string | undefined): string {
@@ -152,6 +197,46 @@ async function publishToStream(body: PublishRequestBody): Promise<{
   }
 }
 
+async function readStreams(body: ReadStreamsRequestBody): Promise<{
+  messages: RedisStreamMessageRecord[]
+}> {
+  if (!Array.isArray(body.streams) || body.streams.length === 0) {
+    throw new Error('Request body must include a non-empty "streams" array.')
+  }
+
+  const count = body.count ?? 25
+  const client = createRedisClient(body.redis)
+  const messages: RedisStreamMessageRecord[] = []
+
+  try {
+    for (const stream of body.streams) {
+      const entries = await client.xrevrange(stream, '+', '-', 'COUNT', count)
+
+      for (const [id, fields] of entries) {
+        const parsed = parseStreamFields(fields)
+        messages.push({
+          stream,
+          id,
+          ...parsed,
+        })
+      }
+    }
+
+    messages.sort((left, right) => {
+      const leftTs = left.timestamp ? Number(left.timestamp) : 0
+      const rightTs = right.timestamp ? Number(right.timestamp) : 0
+      if (leftTs !== rightTs) {
+        return rightTs - leftTs
+      }
+      return right.id.localeCompare(left.id)
+    })
+
+    return { messages }
+  } finally {
+    client.disconnect()
+  }
+}
+
 /**
  * Dev-only Vite middleware for Redis stream publish and subscription cache flush.
  * Used by the testing UI — not included in production builds.
@@ -169,13 +254,17 @@ export function redisDevToolsPlugin(): Plugin {
             success: true,
             available: true,
             message:
-              'Redis dev middleware is active (publish + flush-cache). Use npm run dev.',
-            endpoints: [PUBLISH_PATH, FLUSH_CACHE_PATH],
+              'Redis dev middleware is active (publish, read-streams, flush-cache). Use npm run dev.',
+            endpoints: [PUBLISH_PATH, READ_STREAMS_PATH, FLUSH_CACHE_PATH],
           })
           return
         }
 
-        if (pathname !== PUBLISH_PATH && pathname !== FLUSH_CACHE_PATH) {
+        if (
+          pathname !== PUBLISH_PATH &&
+          pathname !== READ_STREAMS_PATH &&
+          pathname !== FLUSH_CACHE_PATH
+        ) {
           next()
           return
         }
@@ -200,6 +289,15 @@ export function redisDevToolsPlugin(): Plugin {
             return
           }
 
+          if (pathname === READ_STREAMS_PATH) {
+            const result = await readStreams(body as ReadStreamsRequestBody)
+            sendJson(response, 200, {
+              success: true,
+              ...result,
+            })
+            return
+          }
+
           const result = await publishToStream(body as PublishRequestBody)
 
           sendJson(response, 200, {
@@ -212,9 +310,14 @@ export function redisDevToolsPlugin(): Plugin {
               ? error.message
               : pathname === FLUSH_CACHE_PATH
                 ? 'Failed to flush Redis cache'
-                : 'Failed to publish to Redis stream'
+                : pathname === READ_STREAMS_PATH
+                  ? 'Failed to read Redis streams'
+                  : 'Failed to publish to Redis stream'
           const statusCode =
-            pathname === PUBLISH_PATH && message.includes('event') ? 400 : 500
+            (pathname === PUBLISH_PATH || pathname === READ_STREAMS_PATH) &&
+            (message.includes('event') || message.includes('streams'))
+              ? 400
+              : 500
           sendJson(response, statusCode, {
             success: false,
             message,

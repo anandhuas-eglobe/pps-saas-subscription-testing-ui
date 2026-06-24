@@ -28,6 +28,20 @@ export interface FlushRedisCacheResult {
   message: string
 }
 
+export interface RedisStreamMessage {
+  stream: string
+  id: string
+  payload: unknown
+  timestamp: string | null
+  correlationId: string | null
+  key: string | null
+}
+
+export interface ReadRedisStreamsResult {
+  success: boolean
+  messages: RedisStreamMessage[]
+}
+
 export const DEFAULT_REDIS_CONNECTION: RedisConnectionSettings = {
   host: 'localhost',
   port: 6790,
@@ -103,6 +117,34 @@ export async function publishToRedisStream(
     stream: options.stream ?? 'payment.invoice.status.updated',
     redis: options.redis,
   })
+}
+
+export async function readRedisStreams(
+  options: {
+    streams: string[]
+    count?: number
+    redis?: RedisConnectionSettings
+  },
+): Promise<ReadRedisStreamsResult> {
+  const response = await fetch(devToolsUrl('/dev-tools/redis/read-streams'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      streams: options.streams,
+      count: options.count ?? 25,
+      redis: options.redis ?? DEFAULT_REDIS_CONNECTION,
+    }),
+  })
+
+  const body = await parseJsonResponse<ReadRedisStreamsResult>(response)
+
+  if (!response.ok || body.success === false) {
+    throw new Error(
+      (body as { message?: string }).message ?? `Read streams failed with status ${response.status}`,
+    )
+  }
+
+  return body
 }
 
 export async function flushRedisCache(

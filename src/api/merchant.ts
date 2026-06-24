@@ -11,6 +11,8 @@ import type {
   InvoiceReceipt,
   ListInvoicesParams,
   ListSubscriptionHistoryParams,
+  InitiateManualRenewalPayload,
+  ManualRenewalResponse,
   ManualSubscriptionRenewalPreviewResponse,
   MerchantAddonCartPreview,
   MerchantAddonPurchaseResult,
@@ -191,6 +193,19 @@ export async function cancelSubscriptionAutoRenew(): Promise<CancelMessageResult
     { method: 'PUT' },
   )
   return body.data ?? { message: body.message ?? 'Auto-renew disabled' }
+}
+
+export async function initiateManualRenewal(
+  payload: InitiateManualRenewalPayload = {},
+): Promise<ManualRenewalResponse> {
+  const { body } = await apiRequest<ManualRenewalResponse>(
+    '/api/v1/merchant/subscription/renew',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+  )
+  return body.data!
 }
 
 export async function listSubscriptionHistory(

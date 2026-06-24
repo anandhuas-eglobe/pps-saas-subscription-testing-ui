@@ -1,4 +1,8 @@
-import type { BillingAddress, InitiatePlanPurchasePayload } from '../types/subscription'
+import type {
+  BillingAddress,
+  InitiateManualRenewalPayload,
+  InitiatePlanPurchasePayload,
+} from '../types/subscription'
 
 export const defaultBillingAddress: BillingAddress = {
   street: '123 Main St',
@@ -45,6 +49,21 @@ export function buildAttributePurchasePayload(
 ): { billingAddress: BillingAddress } {
   if (!isBillingAddressComplete(billingAddress)) {
     throw new Error('Billing address is required')
+  }
+
+  return { billingAddress }
+}
+
+export function buildInitiateManualRenewalPayload(
+  billingAddress: BillingAddress | undefined,
+  includeBillingAddress: boolean,
+): InitiateManualRenewalPayload {
+  if (!includeBillingAddress) {
+    return {}
+  }
+
+  if (!billingAddress || !isBillingAddressComplete(billingAddress)) {
+    throw new Error('Billing address is required when no prior completed invoice address exists')
   }
 
   return { billingAddress }

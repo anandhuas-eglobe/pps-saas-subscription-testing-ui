@@ -19,6 +19,8 @@ import { ExtendSubscriptionEndDatePage } from './pages/ExtendSubscriptionEndDate
 import { MerchantGuestPlansPage } from './pages/MerchantGuestPlansPage'
 import { NitroTestPage } from './pages/NitroTestPage'
 import { MerchantOveragePage } from './pages/MerchantOveragePage'
+import { OverageTestingPage } from './pages/OverageTestingPage'
+import { SubscriptionRenewalTestingPage } from './pages/SubscriptionRenewalTestingPage'
 
 const router = createBrowserRouter([
   {
@@ -35,7 +37,9 @@ const router = createBrowserRouter([
       { path: 'merchant/addons', element: <MerchantAddonsPage /> },
       { path: 'merchant/attributes', element: <MerchantAttributeChangesPage /> },
       { path: 'merchant/subscription', element: <ActiveSubscriptionPage /> },
+      { path: 'merchant/renewal-testing', element: <SubscriptionRenewalTestingPage /> },
       { path: 'merchant/overage', element: <MerchantOveragePage /> },
+      { path: 'merchant/overage-testing', element: <OverageTestingPage /> },
       { path: 'merchant/guest-plans', element: <MerchantGuestPlansPage /> },
       { path: 'merchant/usage-simulation', element: <UsageSimulationPage /> },
       { path: 'admin/extend-subscription', element: <ExtendSubscriptionEndDatePage /> },

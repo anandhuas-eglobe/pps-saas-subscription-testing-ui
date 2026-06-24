@@ -12,6 +12,7 @@ import ReceiptLongIcon from '@mui/icons-material/ReceiptLong'
 import TimelineIcon from '@mui/icons-material/Timeline'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import PublicIcon from '@mui/icons-material/Public'
+import AutorenewIcon from '@mui/icons-material/Autorenew'
 import EventAvailableIcon from '@mui/icons-material/EventAvailable'
 import BoltIcon from '@mui/icons-material/Bolt'
 import type { SvgIconComponent } from '@mui/icons-material'
@@ -63,7 +64,17 @@ export const operations: OperationLink[] = [
     description: 'View subscription status, manage renewals/downgrades, billing history, and purchased add-ons.',
     path: '/merchant/subscription',
     icon: VerifiedIcon,
-    apiEndpoint: 'GET /api/v1/merchant/subscription/active · manage · history · addon cancel',
+    apiEndpoint:
+      'GET /active · GET /renewal/preview · POST /renew · PUT /auto-renew/cancel',
+    available: true,
+  },
+  {
+    title: 'Overage Testing',
+    description:
+      'Full overage workspace — usage generation, bulk overage, auto-charge thresholds, manual payment, reseller Redis events, and scenario playbook.',
+    path: '/merchant/overage-testing',
+    icon: WarningAmberIcon,
+    apiEndpoint: 'usage-tracking · overage-tracking · Redis reseller stream',
     available: true,
   },
   {
@@ -112,6 +123,16 @@ export const operations: OperationLink[] = [
     path: '/merchant/invoices',
     icon: ReceiptLongIcon,
     apiEndpoint: 'GET /api/v1/merchant/subscription/invoices',
+    available: true,
+  },
+  {
+    title: 'Renewal Testing',
+    description:
+      'Test auto-renew scheduler flows, manual renewal preview, POST /renew recovery checkout, and all renewal scenarios.',
+    path: '/merchant/renewal-testing',
+    icon: AutorenewIcon,
+    apiEndpoint:
+      'GET /renewal/preview · POST /renew · PUT /auto-renew/cancel · Scheduler',
     available: true,
   },
   {

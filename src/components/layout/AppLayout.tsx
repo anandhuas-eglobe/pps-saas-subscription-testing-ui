@@ -21,6 +21,8 @@ const navItems = [
   { label: 'Plan Add-ons', path: '/merchant/addons' },
   { label: 'Attribute Changes', path: '/merchant/attributes' },
   { label: 'Active Subscription', path: '/merchant/subscription' },
+  { label: 'Renewal Testing', path: '/merchant/renewal-testing' },
+  { label: 'Overage Testing', path: '/merchant/overage-testing' },
   { label: 'Overage', path: '/merchant/overage' },
   { label: 'Usage Simulation', path: '/merchant/usage-simulation' },
   { label: 'Invoices', path: '/merchant/invoices' },

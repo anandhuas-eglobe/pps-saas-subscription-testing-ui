@@ -927,3 +927,47 @@ export interface ExtendMerchantSubscriptionEndDateResponse {
   newEndDate: string
   message: string
 }
+
+export type SubscriptionRenewalType = 'NORMAL' | 'DOWNGRADE' | 'MIGRATION'
+
+export type ManualRenewalOutcome = 'processed' | 'existing_invoice'
+
+export interface ManualRenewalInvoice {
+  invoiceId: string
+  invoiceNumber: string
+  status: 'PENDING' | 'COMPLETED' | 'PROCESSING'
+  grandTotal: number
+  currency: string
+}
+
+export interface ManualRenewalResponse {
+  outcome: ManualRenewalOutcome
+  renewalType: SubscriptionRenewalType
+  message: string
+  invoice: ManualRenewalInvoice
+  paymentHandoff?: {
+    invoiceId: string
+    invoiceNumber: string
+    grandTotal: number
+    currency: string
+    status: string
+    correlationId?: string
+  }
+}
+
+export interface InitiateManualRenewalPayload {
+  billingAddress?: BillingAddress
+}
+
+export interface ManualRenewalFailureResponse {
+  failureCode: string
+  failureReason: string
+  renewalType: SubscriptionRenewalType
+  violatingAttributes?: Array<{
+    attributeCode: string
+    currentUsage: number
+    targetLimit: number
+  }>
+}
+
+export type ManualRenewalEligibleState = 'RENEWAL_FAILED' | 'GRACE_PERIOD' | 'CANCELLED'

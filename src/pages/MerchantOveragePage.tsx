@@ -122,10 +122,10 @@ export function MerchantOveragePage() {
       <PageHeader
         eyebrow="Merchant billing"
         title="Overage history"
-        description="Browse overage billing records and initiate manual payment checkout for outstanding overage."
+        description="Browse overage billing records and initiate manual payment checkout for outstanding overage. For full scenario testing see Overage Testing."
         apiEndpoint="GET /api/v1/merchant/overage-tracking · POST /api/v1/merchant/overage-tracking/manual-payment"
-        backTo="/"
-        backLabel="Back to home"
+        backTo="/merchant/overage-testing"
+        backLabel="Back to overage testing"
         actions={
           <Stack direction="row" spacing={1}>
             <Button
@@ -147,6 +147,11 @@ export function MerchantOveragePage() {
           </Stack>
         }
       />
+
+      <Alert severity="info">
+        For usage generation, bulk overage, reseller events, and the full scenario playbook, use{' '}
+        <RouterLink to="/merchant/overage-testing">Overage Testing</RouterLink>.
+      </Alert>
 
       {paymentResult && (
         <Alert severity="success">

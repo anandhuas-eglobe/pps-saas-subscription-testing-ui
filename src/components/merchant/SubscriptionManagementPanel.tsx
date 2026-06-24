@@ -18,20 +18,35 @@ import TableRow from '@mui/material/TableRow'
 import Typography from '@mui/material/Typography'
 import CancelScheduleSendIcon from '@mui/icons-material/CancelScheduleSend'
 import EventRepeatIcon from '@mui/icons-material/EventRepeat'
+import PaymentIcon from '@mui/icons-material/Payment'
 import TrendingDownIcon from '@mui/icons-material/TrendingDown'
+import { Link as RouterLink } from 'react-router-dom'
 import {
   cancelScheduledSubscriptionDowngrade,
   cancelSubscriptionAutoRenew,
   getManualSubscriptionRenewalPreview,
   getScheduledSubscriptionDowngrade,
+  initiateManualRenewal,
 } from '../../api/merchant'
 import { ApiRequestError } from '../../api/client'
 import type {
   ActiveSubscriptionResponse,
+  BillingAddress,
+  ManualRenewalResponse,
   ManualSubscriptionRenewalPreviewResponse,
   ScheduledSubscriptionDowngradeResponse,
 } from '../../types/subscription'
+import {
+  buildInitiateManualRenewalPayload,
+  defaultBillingAddress,
+} from '../../utils/billingAddress'
 import { formatDateOnly, formatMoney } from '../../utils/planDisplay'
+import { saveLastPaymentHandoff } from '../../utils/paymentEventBuilder'
+import {
+  checkManualRenewalEligibility,
+  resolveManualRenewalEligibleState,
+} from '../../utils/renewalEligibility'
+import { BillingAddressFields } from './BillingAddressFields'
 
 interface SubscriptionManagementPanelProps {
   subscriptionData: ActiveSubscriptionResponse
@@ -125,6 +140,15 @@ export function SubscriptionManagementPanel({
   const [actionError, setActionError] = useState<string | null>(null)
   const [cancellingDowngrade, setCancellingDowngrade] = useState(false)
   const [cancellingAutoRenew, setCancellingAutoRenew] = useState(false)
+
+  const [billingAddress, setBillingAddress] = useState<BillingAddress>(defaultBillingAddress)
+  const [includeBillingAddress, setIncludeBillingAddress] = useState(false)
+  const [initiatingRenewal, setInitiatingRenewal] = useState(false)
+  const [renewalResult, setRenewalResult] = useState<ManualRenewalResponse | null>(null)
+  const [renewalInitError, setRenewalInitError] = useState<string | null>(null)
+
+  const manualRecoveryState = resolveManualRenewalEligibleState(subscription)
+  const manualRecoveryCheck = checkManualRenewalEligibility(subscription)
 
   const loadDowngrade = useCallback(async () => {
     setDowngradeLoading(true)
@@ -220,6 +244,34 @@ export function SubscriptionManagementPanel({
       setActionError(message)
     } finally {
       setCancellingAutoRenew(false)
+    }
+  }
+
+  const handleInitiateManualRenewal = async () => {
+    setInitiatingRenewal(true)
+    setRenewalInitError(null)
+    setRenewalResult(null)
+    setActionError(null)
+    setActionMessage(null)
+    try {
+      const payload = buildInitiateManualRenewalPayload(billingAddress, includeBillingAddress)
+      const result = await initiateManualRenewal(payload)
+      setRenewalResult(result)
+      setActionMessage(result.message)
+      if (result.paymentHandoff) {
+        saveLastPaymentHandoff(result.paymentHandoff)
+      }
+      onChanged?.()
+    } catch (err) {
+      const message =
+        err instanceof ApiRequestError
+          ? err.body.message ?? err.message
+          : err instanceof Error
+            ? err.message
+            : 'Failed to initiate manual renewal'
+      setRenewalInitError(message)
+    } finally {
+      setInitiatingRenewal(false)
     }
   }
 
@@ -414,6 +466,65 @@ export function SubscriptionManagementPanel({
                 title="Estimated renewal cost for next billing cycle"
               />
             </Stack>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent>
+          <Stack direction="row" spacing={1} sx={{ mb: 2, alignItems: 'center' }}>
+            <PaymentIcon color="primary" fontSize="small" />
+            <Typography variant="h6">Manual renewal recovery</Typography>
+            {manualRecoveryState && (
+              <Chip label={manualRecoveryState} size="small" color="warning" />
+            )}
+          </Stack>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            POST /api/v1/merchant/subscription/renew — recovery checkout for RENEWAL_FAILED, grace
+            period, or MERCHANT_CANCELLED subscriptions. For full scenario testing see{' '}
+            <RouterLink to="/merchant/renewal-testing">Renewal Testing</RouterLink>.
+          </Typography>
+
+          {manualRecoveryCheck.eligible ? (
+            <Stack spacing={2}>
+              <Alert severity="warning">
+                Subscription is eligible for manual recovery ({manualRecoveryState}).
+              </Alert>
+              <BillingAddressFields value={billingAddress} onChange={setBillingAddress} disabled={!includeBillingAddress} />
+              <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                <Button
+                  variant="contained"
+                  disabled={initiatingRenewal}
+                  onClick={() => void handleInitiateManualRenewal()}
+                >
+                  {initiatingRenewal ? 'Initiating…' : 'Initiate manual renewal'}
+                </Button>
+                <Button
+                  variant="text"
+                  size="small"
+                  onClick={() => setIncludeBillingAddress((value) => !value)}
+                >
+                  {includeBillingAddress ? 'Omit billing address' : 'Include billing address'}
+                </Button>
+              </Stack>
+              {renewalInitError && <Alert severity="error">{renewalInitError}</Alert>}
+              {renewalResult && (
+                <Alert severity="success">
+                  {renewalResult.message} — Invoice {renewalResult.invoice.invoiceNumber} (
+                  {formatMoney(renewalResult.invoice.currency, renewalResult.invoice.grandTotal)}) ·{' '}
+                  {renewalResult.invoice.status}
+                  {renewalResult.paymentHandoff && (
+                    <>
+                      {' '}
+                      ·{' '}
+                      <RouterLink to="/dev/payment-confirm">Confirm payment</RouterLink>
+                    </>
+                  )}
+                </Alert>
+              )}
+            </Stack>
+          ) : (
+            <Alert severity="info">{manualRecoveryCheck.reasons.join(' ')}</Alert>
           )}
         </CardContent>
       </Card>

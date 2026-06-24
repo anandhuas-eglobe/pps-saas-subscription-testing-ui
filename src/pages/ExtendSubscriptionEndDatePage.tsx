@@ -59,10 +59,10 @@ export function ExtendSubscriptionEndDatePage() {
       <PageHeader
         eyebrow="Admin"
         title="Extend subscription end date"
-        description="Add days to a merchant's active subscription end date. Useful for testing renewal and expiry flows."
+        description="Add days to a merchant's active subscription end date. Useful for testing renewal timing. To trigger auto-renew immediately, expire the subscription in DB (see Renewal Testing page)."
         apiEndpoint="POST /api/v1/admin/plans/merchant/extend-subscription-end-date"
-        backTo="/"
-        backLabel="Back to home"
+        backTo="/merchant/renewal-testing"
+        backLabel="Back to renewal testing"
       />
 
       <Card>
