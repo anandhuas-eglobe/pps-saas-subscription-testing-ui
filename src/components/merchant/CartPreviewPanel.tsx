@@ -71,7 +71,7 @@ export function CartPreviewPanel({
   const warningCount = planDetails?.warningAttributes?.length ?? 0
   const requiresBillingAddress = requiresBillingAddressForCheckout({
     isTrial: cart.isTrial,
-    grandTotal: pricing.grandTotal,
+    subscriptionAction: cart.subscriptionAction,
   })
   const [billingAddress, setBillingAddress] = useState<BillingAddress>(defaultBillingAddress)
 
@@ -213,6 +213,12 @@ export function CartPreviewPanel({
             <Box>
               <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
                 Billing address (required for paid checkout)
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                Sent as <code>billingAddress</code> with keys{' '}
+                <code>street</code>, <code>city</code>, <code>state</code>, <code>country</code>,{' '}
+                <code>zipCode</code>. Required for new plan and upgrade purchases even when the
+                cart total is $0.
               </Typography>
               <BillingAddressFields value={billingAddress} onChange={setBillingAddress} />
             </Box>

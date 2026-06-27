@@ -46,7 +46,6 @@ export function AddonCartPreviewPanel({
     'Add-on'
   const requiresBillingAddress = requiresBillingAddressForCheckout({
     isTrial: cart.isTrial,
-    grandTotal: pricing.grandTotal,
   })
   const [billingAddress, setBillingAddress] = useState<BillingAddress>(defaultBillingAddress)
 

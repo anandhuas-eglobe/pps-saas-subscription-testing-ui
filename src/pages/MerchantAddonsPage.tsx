@@ -199,7 +199,6 @@ export function MerchantAddonsPage() {
       const requiresBilling = cartPreview
         ? requiresBillingAddressForCheckout({
             isTrial: cartPreview.isTrial,
-            grandTotal: cartPreview.pricing.grandTotal,
           })
         : false
       const result = await purchaseAddonCart(

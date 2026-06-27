@@ -3,6 +3,7 @@ import type {
   InitiateManualRenewalPayload,
   InitiatePlanPurchasePayload,
 } from '../types/subscription'
+import { SubscriptionAction, type SubscriptionActionValue } from '../types/subscription'
 
 export const defaultBillingAddress: BillingAddress = {
   street: '123 Main St',
@@ -56,11 +57,26 @@ export function formatBillingAddress(address: unknown): string {
   return parts.length ? parts.join(', ') : '—'
 }
 
+/**
+ * Whether checkout must include billingAddress in the purchase POST body.
+ * Mirrors subscription MS rules:
+ * - Trial checkout: omit address
+ * - Plan/attribute downgrade scheduling: omit address (no invoice)
+ * - All other paid checkouts create an invoice and require address, even at $0
+ */
 export function requiresBillingAddressForCheckout(options: {
   isTrial?: boolean
-  grandTotal: number
+  subscriptionAction?: SubscriptionActionValue | string | null
 }): boolean {
-  return !options.isTrial && options.grandTotal > 0
+  if (options.isTrial) {
+    return false
+  }
+
+  if (options.subscriptionAction === SubscriptionAction.DOWNGRADE) {
+    return false
+  }
+
+  return true
 }
 
 export function isBillingAddressComplete(address: BillingAddress): boolean {
@@ -71,6 +87,16 @@ export function isBillingAddressComplete(address: BillingAddress): boolean {
     address.country.trim() !== '' &&
     address.zipCode.trim() !== ''
   )
+}
+
+export function toBillingAddressPayload(address: BillingAddress): BillingAddress {
+  return {
+    street: address.street.trim(),
+    city: address.city.trim(),
+    state: address.state.trim(),
+    country: address.country.trim(),
+    zipCode: address.zipCode.trim(),
+  }
 }
 
 export function buildInitiatePurchasePayload(
@@ -85,7 +111,7 @@ export function buildInitiatePurchasePayload(
     throw new Error('Billing address is required for paid checkout')
   }
 
-  return { billingAddress }
+  return { billingAddress: toBillingAddressPayload(billingAddress) }
 }
 
 export function buildAttributePurchasePayload(
@@ -95,7 +121,7 @@ export function buildAttributePurchasePayload(
     throw new Error('Billing address is required')
   }
 
-  return { billingAddress }
+  return { billingAddress: toBillingAddressPayload(billingAddress) }
 }
 
 export function buildInitiateManualRenewalPayload(
@@ -110,5 +136,5 @@ export function buildInitiateManualRenewalPayload(
     throw new Error('Billing address is required when no prior completed invoice address exists')
   }
 
-  return { billingAddress }
+  return { billingAddress: toBillingAddressPayload(billingAddress) }
 }

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Alert from '@mui/material/Alert'
+import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
@@ -34,9 +35,11 @@ import {
 import { ApiRequestError } from '../../api/client'
 import { DEFAULT_REDIS_CONNECTION, publishToRedisStream } from '../../api/redisDevTools'
 import { ActiveSubscriptionSummary } from '../merchant/ActiveSubscriptionSummary'
+import { BillingAddressFields } from '../merchant/BillingAddressFields'
 import { NitroActiveSubscriptionWorkspace } from './NitroActiveSubscriptionWorkspace'
 import type {
   ActiveSubscriptionResponse,
+  BillingAddress,
   BillingCycleValue,
   MerchantCartPreview,
   MerchantPlanPurchaseResult,
@@ -47,6 +50,7 @@ import { ApiErrorAlert } from '../ApiErrorAlert'
 import {
   buildInitiatePurchasePayload,
   defaultBillingAddress,
+  isBillingAddressComplete,
   requiresBillingAddressForCheckout,
 } from '../../utils/billingAddress'
 import { buildDefaultCartSelections } from '../../utils/cartBuilder'
@@ -77,6 +81,7 @@ export function NitroMerchantLifecyclePanel() {
   const [lastCompletedStep, setLastCompletedStep] = useState<LifecycleStep>(null)
   const [stepError, setStepError] = useState<unknown>(null)
   const [refreshingSubscription, setRefreshingSubscription] = useState(false)
+  const [billingAddress, setBillingAddress] = useState<BillingAddress>(defaultBillingAddress)
 
   const activePlans = useMemo(
     () => plans.filter((plan) => plan.status === PlanStatus.ACTIVE),
@@ -172,10 +177,13 @@ export function NitroMerchantLifecyclePanel() {
 
       const requiresBilling = requiresBillingAddressForCheckout({
         isTrial: cartPreview.isTrial,
-        grandTotal: cartPreview.pricing.grandTotal,
+        subscriptionAction: cartPreview.subscriptionAction,
       })
       const result = await purchasePlanCart(
-        buildInitiatePurchasePayload(defaultBillingAddress, requiresBilling),
+        buildInitiatePurchasePayload(
+          requiresBilling ? billingAddress : undefined,
+          requiresBilling,
+        ),
       )
       setPurchaseResult(result)
       if (result.paymentHandoff) {
@@ -260,7 +268,17 @@ export function NitroMerchantLifecyclePanel() {
     }
   }
 
-  const canPurchase = Boolean(cartPreview) && busyStep === null
+  const requiresBillingForCart =
+    cartPreview != null &&
+    requiresBillingAddressForCheckout({
+      isTrial: cartPreview.isTrial,
+      subscriptionAction: cartPreview.subscriptionAction,
+    })
+
+  const canPurchase =
+    Boolean(cartPreview) &&
+    busyStep === null &&
+    (!requiresBillingForCart || isBillingAddressComplete(billingAddress))
   const canConfirm = Boolean(purchaseResult?.paymentHandoff) && busyStep === null
   const isTrialCheckout = cartPreview?.isTrial === true
 
@@ -415,6 +433,15 @@ export function NitroMerchantLifecyclePanel() {
                     </>
                   )}
                 </Alert>
+              )}
+
+              {cartPreview && requiresBillingForCart && (
+                <Box>
+                  <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
+                    Billing address (required for purchase)
+                  </Typography>
+                  <BillingAddressFields value={billingAddress} onChange={setBillingAddress} />
+                </Box>
               )}
 
               {purchaseResult && (

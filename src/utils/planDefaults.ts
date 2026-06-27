@@ -161,34 +161,73 @@ export function defaultAttributeConfig(
   }
 }
 
+function finalizeVolumePriceConfig(
+  config: AttributeConfig,
+  attributeCode = '',
+): AttributeConfig {
+  const {
+    minLimit: _min,
+    maxLimit: _max,
+    pricePerUnitMonthly: _pm,
+    pricePerUnitYearly: _py,
+    ...rest
+  } = {
+    ...config,
+    priceType: PriceType.VOLUME_PRICE,
+    volumePrice: config.volumePrice?.length
+      ? config.volumePrice
+      : defaultVolumePriceTiers(attributeCode),
+  }
+
+  if (!rest.isOverageEnabled) {
+    const { overagePricePerUnit: _op, ...withoutOverage } = rest
+    return withoutOverage as AttributeConfig
+  }
+
+  return {
+    ...rest,
+    overagePricePerUnit:
+      rest.overagePricePerUnit ??
+      (attributeCode === 'MONTHLY_ORDER_VOLUME' ? 0.25 : 0),
+  } as AttributeConfig
+}
+
+function finalizePerCountConfig(config: AttributeConfig): AttributeConfig {
+  const { volumePrice: _volumePrice, ...perCountConfig } = config
+
+  if (!perCountConfig.isOverageEnabled) {
+    const { overagePricePerUnit: _op, ...withoutOverage } = perCountConfig
+    return withoutOverage as AttributeConfig
+  }
+
+  return perCountConfig as AttributeConfig
+}
+
 export function applyPriceTypeChange(
   config: AttributeConfig,
   priceType: AttributeConfig['priceType'],
   attributeCode?: string,
 ): AttributeConfig {
   if (priceType === PriceType.VOLUME_PRICE) {
-    return {
-      inclusionType: config.inclusionType,
-      priceType,
-      baseMonthlyPrice: config.baseMonthlyPrice ?? 99.99,
-      baseYearlyPrice: config.baseYearlyPrice ?? 999.99,
-      volumePrice: config.volumePrice?.length
-        ? config.volumePrice
-        : defaultVolumePriceTiers(attributeCode),
-      isProrated: config.isProrated,
-      isOverageEnabled:
-        attributeCode === 'MONTHLY_ORDER_VOLUME' ? true : config.isOverageEnabled,
-      overagePricePerUnit:
-        attributeCode === 'MONTHLY_ORDER_VOLUME'
-          ? (config.overagePricePerUnit ?? 0.25)
-          : config.overagePricePerUnit,
-      addonTrialEnabled: config.addonTrialEnabled,
-      addonTrialPeriod: config.addonTrialPeriod,
-    }
+    return finalizeVolumePriceConfig(
+      {
+        inclusionType: config.inclusionType,
+        priceType,
+        baseMonthlyPrice: config.baseMonthlyPrice ?? 99.99,
+        baseYearlyPrice: config.baseYearlyPrice ?? 999.99,
+        volumePrice: config.volumePrice,
+        isProrated: config.isProrated,
+        isOverageEnabled: config.isOverageEnabled,
+        overagePricePerUnit: config.overagePricePerUnit,
+        addonTrialEnabled: config.addonTrialEnabled,
+        addonTrialPeriod: config.addonTrialPeriod,
+      },
+      attributeCode,
+    )
   }
 
   const limits = randomCountLimits(attributeCode ?? '')
-  return {
+  return finalizePerCountConfig({
     inclusionType: config.inclusionType,
     priceType,
     baseMonthlyPrice: config.baseMonthlyPrice ?? 99.99,
@@ -202,7 +241,7 @@ export function applyPriceTypeChange(
     overagePricePerUnit: config.overagePricePerUnit,
     addonTrialEnabled: config.addonTrialEnabled,
     addonTrialPeriod: config.addonTrialPeriod,
-  }
+  })
 }
 
 export function sanitizeAttributeConfig(
@@ -278,11 +317,10 @@ export function mergeAttributeConfigUpdate(
   const merged = { ...previous, ...patch }
 
   if (merged.priceType === PriceType.VOLUME_PRICE) {
-    return applyPriceTypeChange(merged, PriceType.VOLUME_PRICE, attributeCode)
+    return finalizeVolumePriceConfig(merged, attributeCode)
   }
 
-  const { volumePrice: _volumePrice, ...perCountConfig } = merged
-  return perCountConfig
+  return finalizePerCountConfig(merged)
 }
 
 export function createDefaultPlanForm(): CreatePlanPayload {

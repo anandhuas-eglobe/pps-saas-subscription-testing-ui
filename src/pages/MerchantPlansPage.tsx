@@ -178,7 +178,7 @@ export function MerchantPlansPage() {
       const requiresBilling = cartPreview
         ? requiresBillingAddressForCheckout({
             isTrial: cartPreview.isTrial,
-            grandTotal: cartPreview.pricing.grandTotal,
+            subscriptionAction: cartPreview.subscriptionAction,
           })
         : false
       const result = await purchasePlanCart(
