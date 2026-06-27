@@ -55,6 +55,8 @@ interface UsageSimulationPanelProps {
   initialAttributeCode?: string
   hideCurrentUsageTable?: boolean
   hideAttributePicker?: boolean
+  attributeEmptyLabel?: string
+  contextLabel?: string
 }
 
 function createEntityReferenceId(): string {
@@ -99,6 +101,8 @@ export function UsageSimulationPanel({
   initialAttributeCode = '',
   hideCurrentUsageTable = false,
   hideAttributePicker = false,
+  attributeEmptyLabel = 'No INCLUDED attributes on this subscription',
+  contextLabel,
 }: UsageSimulationPanelProps) {
   const [activeStep, setActiveStep] = useState<SimulationStep>('validate')
   const [attributeCode, setAttributeCode] = useState(initialAttributeCode)
@@ -345,6 +349,7 @@ export function UsageSimulationPanel({
           <Stack spacing={2}>
             <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
               Usage tracking flow
+              {contextLabel ? ` · ${contextLabel}` : ''}
             </Typography>
 
             {!hideCurrentUsageTable && limitsAndUsages.length > 0 && (
@@ -429,7 +434,7 @@ export function UsageSimulationPanel({
                 >
                   {attributeOptions.length === 0 && (
                     <MenuItem value="" disabled>
-                      No INCLUDED attributes on this subscription
+                      {attributeEmptyLabel}
                     </MenuItem>
                   )}
                   {attributeOptions.map((option) => {
@@ -708,7 +713,7 @@ export function UsageSimulationPanel({
               >
                 {attributeOptions.length === 0 && (
                   <MenuItem value="" disabled>
-                    No INCLUDED attributes on this subscription
+                    {attributeEmptyLabel}
                   </MenuItem>
                 )}
                 {limitsAndUsages.map((row) => (

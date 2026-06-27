@@ -41,11 +41,11 @@ export function BillingAddressFields({
         <TextField
           fullWidth
           size="small"
-          label="State / province"
+          label="State"
           required
-          value={value.stateProvince}
+          value={value.state}
           disabled={disabled}
-          onChange={(event) => onChange({ ...value, stateProvince: event.target.value })}
+          onChange={(event) => onChange({ ...value, state: event.target.value })}
         />
       </Grid>
       <Grid size={{ xs: 12, sm: 6 }}>
@@ -54,6 +54,7 @@ export function BillingAddressFields({
           size="small"
           label="Country"
           required
+          helperText="ISO 2-letter country code"
           value={value.country}
           disabled={disabled}
           onChange={(event) => onChange({ ...value, country: event.target.value })}
@@ -63,11 +64,11 @@ export function BillingAddressFields({
         <TextField
           fullWidth
           size="small"
-          label="ZIP / postal code"
+          label="ZIP code"
           required
-          value={value.zipPostalCode}
+          value={value.zipCode}
           disabled={disabled}
-          onChange={(event) => onChange({ ...value, zipPostalCode: event.target.value })}
+          onChange={(event) => onChange({ ...value, zipCode: event.target.value })}
         />
       </Grid>
     </Grid>

@@ -13,7 +13,8 @@ import TableContainer from '@mui/material/TableContainer'
 import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
 import Typography from '@mui/material/Typography'
-import type { BillingAddress, InvoiceDetail } from '../../types/subscription'
+import type { InvoiceDetail } from '../../types/subscription'
+import { formatBillingAddress } from '../../utils/billingAddress'
 import {
   formatDateTime,
   formatMoney,
@@ -34,21 +35,6 @@ function DetailField({ label, value }: DetailFieldProps) {
       <Typography variant="body2">{value}</Typography>
     </Box>
   )
-}
-
-function formatBillingAddress(address: unknown): string {
-  if (!address || typeof address !== 'object') {
-    return '—'
-  }
-  const billing = address as BillingAddress
-  const parts = [
-    billing.street,
-    billing.city,
-    billing.stateProvince,
-    billing.country,
-    billing.zipPostalCode,
-  ].filter(Boolean)
-  return parts.length ? parts.join(', ') : '—'
 }
 
 interface InvoiceDetailViewProps {

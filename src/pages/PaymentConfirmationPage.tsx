@@ -37,10 +37,20 @@ import {
   buildPaymentInvoiceStatusEvent,
   buildRedisStreamPayloadJson,
   createDefaultPaymentConfirmationForm,
+  defaultNewStatusForAction,
   loadLastPaymentHandoff,
+  type InvoiceStatusValue,
   type PaymentConfirmationFormValues,
   type PaymentInvoiceStatusEvent,
 } from '../utils/paymentEventBuilder'
+
+const INVOICE_STATUS_OPTIONS: InvoiceStatusValue[] = [
+  'PENDING',
+  'PROCESSING',
+  'COMPLETED',
+  'FAILED',
+  'REASSIGNED',
+]
 
 const codeBlockSx = {
   m: 0,
@@ -254,6 +264,14 @@ export function PaymentConfirmationPage() {
     setSnackbar({ open: true, message: 'Generated a new event ID.' })
   }
 
+  const handleActionChange = (action: PaymentConfirmationFormValues['action']) => {
+    setForm((current) => ({
+      ...current,
+      action,
+      newStatus: defaultNewStatusForAction(action),
+    }))
+  }
+
   return (
     <Stack spacing={3}>
       <PageHeader
@@ -279,8 +297,9 @@ export function PaymentConfirmationPage() {
       <Alert severity="info" icon={<PaymentIcon />}>
         Use <strong>Publish to Redis</strong> while running <code>npm run dev</code> — the Vite dev server
         connects to Redis on your machine (default <code>localhost:6790</code>). The subscription service
-        must have <code>MESSAGING_PROVIDER=redis</code> to consume the event. Copy the docker command if
-        you prefer the terminal workflow.
+        must have <code>MESSAGING_PROVIDER=redis</code> to consume the event. Payload shape matches{' '}
+        <code>PaymentInvoiceStatusUpdated</code> v1.0: include <code>payload.payment</code> for
+        succeeded/processing actions and <code>payload.failure</code> for failed payments.
       </Alert>
 
       {devToolsAvailable === false && (
@@ -389,12 +408,8 @@ export function PaymentConfirmationPage() {
                         label="Action"
                         value={form.action}
                         onChange={(event) =>
-                          setForm((current) =>
-                            updateFormField(
-                              current,
-                              'action',
-                              event.target.value as PaymentConfirmationFormValues['action'],
-                            ),
+                          handleActionChange(
+                            event.target.value as PaymentConfirmationFormValues['action'],
                           )
                         }
                       >
@@ -405,15 +420,28 @@ export function PaymentConfirmationPage() {
                     </FormControl>
                   </Grid>
                   <Grid size={{ xs: 12, md: 4 }}>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      label="New invoice status"
-                      value={form.newStatus}
-                      onChange={(event) =>
-                        setForm((current) => updateFormField(current, 'newStatus', event.target.value))
-                      }
-                    />
+                    <FormControl fullWidth size="small">
+                      <InputLabel>New invoice status</InputLabel>
+                      <Select
+                        label="New invoice status"
+                        value={form.newStatus}
+                        onChange={(event) =>
+                          setForm((current) =>
+                            updateFormField(
+                              current,
+                              'newStatus',
+                              event.target.value as InvoiceStatusValue,
+                            ),
+                          )
+                        }
+                      >
+                        {INVOICE_STATUS_OPTIONS.map((status) => (
+                          <MenuItem key={status} value={status}>
+                            {status}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
                   </Grid>
                 </Grid>
               </Box>
@@ -564,17 +592,21 @@ export function PaymentConfirmationPage() {
                         />
                       </Grid>
                       <Grid size={{ xs: 12, md: 4 }}>
-                        <TextField
-                          fullWidth
-                          size="small"
-                          label="Payment method"
-                          value={form.paymentMethod}
-                          onChange={(event) =>
-                            setForm((current) =>
-                              updateFormField(current, 'paymentMethod', event.target.value),
-                            )
-                          }
-                        />
+                        <FormControl fullWidth size="small">
+                          <InputLabel>Payment method</InputLabel>
+                          <Select
+                            label="Payment method"
+                            value={form.paymentMethod}
+                            onChange={(event) =>
+                              setForm((current) =>
+                                updateFormField(current, 'paymentMethod', event.target.value),
+                              )
+                            }
+                          >
+                            <MenuItem value="CREDIT_CARD">CREDIT_CARD</MenuItem>
+                            <MenuItem value="DEBIT_CARD">DEBIT_CARD</MenuItem>
+                          </Select>
+                        </FormControl>
                       </Grid>
                       <Grid size={{ xs: 12, md: 4 }}>
                         <TextField
@@ -597,6 +629,58 @@ export function PaymentConfirmationPage() {
                           value={form.paidAt}
                           onChange={(event) =>
                             setForm((current) => updateFormField(current, 'paidAt', event.target.value))
+                          }
+                        />
+                      </Grid>
+                    </Grid>
+                  </Box>
+                </>
+              )}
+
+              {form.action === 'PAYMENT_FAILED' && (
+                <>
+                  <Divider />
+                  <Box>
+                    <Typography variant="subtitle1" sx={{ mb: 1.5, fontWeight: 600 }}>
+                      Payment failure
+                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid size={{ xs: 12, md: 4 }}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="Failure code"
+                          value={form.failureCode}
+                          onChange={(event) =>
+                            setForm((current) =>
+                              updateFormField(current, 'failureCode', event.target.value),
+                            )
+                          }
+                          helperText="Sent as payload.failure.failureCode (nullable)"
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 8 }}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="Failure reason"
+                          value={form.failureReason}
+                          onChange={(event) =>
+                            setForm((current) =>
+                              updateFormField(current, 'failureReason', event.target.value),
+                            )
+                          }
+                          helperText="Sent as payload.failure.failureReason (nullable)"
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="Failed at (ISO 8601)"
+                          value={form.failedAt}
+                          onChange={(event) =>
+                            setForm((current) => updateFormField(current, 'failedAt', event.target.value))
                           }
                         />
                       </Grid>
@@ -634,6 +718,45 @@ export function PaymentConfirmationPage() {
                       onChange={(event) =>
                         setForm((current) => updateFormField(current, 'entityId', event.target.value))
                       }
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 12, md: 6 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Entity name"
+                      value={form.entityName}
+                      onChange={(event) =>
+                        setForm((current) => updateFormField(current, 'entityName', event.target.value))
+                      }
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 12, md: 6 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Metadata source"
+                      value={form.metadataSource}
+                      onChange={(event) =>
+                        setForm((current) =>
+                          updateFormField(current, 'metadataSource', event.target.value),
+                        )
+                      }
+                      helperText="Must be payment-service for the subscription consumer"
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 12, md: 6 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Metadata entity type"
+                      value={form.metadataEntityType}
+                      onChange={(event) =>
+                        setForm((current) =>
+                          updateFormField(current, 'metadataEntityType', event.target.value),
+                        )
+                      }
+                      helperText="Must be invoice for the subscription consumer"
                     />
                   </Grid>
                 </Grid>
@@ -680,12 +803,17 @@ export function PaymentConfirmationPage() {
             <SendIcon color="primary" />
             <Typography variant="h6">Publish</Typography>
             <Chip label="payment.invoice.status.updated" size="small" variant="outlined" />
+            <Chip label="PaymentInvoiceStatusUpdated v1.0" size="small" variant="outlined" />
           </Stack>
 
           {!activeEvent ? (
             <Alert severity="error">Invalid JSON payload. Fix errors before publishing.</Alert>
           ) : (
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+            <>
+              <Box component="pre" sx={{ ...codeBlockSx, maxHeight: 280, mb: 2 }}>
+                {payloadJson}
+              </Box>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
               <Button
                 variant="contained"
                 size="large"
@@ -701,6 +829,7 @@ export function PaymentConfirmationPage() {
                 Copy payload JSON
               </Button>
             </Stack>
+            </>
           )}
         </CardContent>
       </Card>

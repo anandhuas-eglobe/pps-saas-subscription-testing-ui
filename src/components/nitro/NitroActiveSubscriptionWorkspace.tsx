@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -30,13 +30,17 @@ import SpeedIcon from '@mui/icons-material/Speed'
 import TuneIcon from '@mui/icons-material/Tune'
 import {
   getInvoiceById,
+  getActivePlanAddons,
   getMerchantAttributeCart,
   purchaseAttributeCart,
   upsertAttributeCart,
 } from '../../api/merchant'
 import { DEFAULT_REDIS_CONNECTION, publishToRedisStream } from '../../api/redisDevTools'
+import { ApiRequestError } from '../../api/client'
+import { AddonUsageSimulationSection } from '../merchant/AddonUsageSimulationSection'
 import { UsageSimulationPanel } from '../merchant/UsageSimulationPanel'
 import type {
+  ActivePlanAddonItem,
   ActiveSubscriptionResponse,
   MerchantAttributePurchaseResult,
   PlanDetailFeatureAttribute,
@@ -48,6 +52,9 @@ import {
   extractSubscribedPlanAttributes,
   type SubscribedPlanAttributeItem,
 } from '../../utils/attributeChangeBuilder'
+import {
+  isSimulatableAddon,
+} from '../../utils/addonUsageSimulation'
 import {
   defaultAddonAttributeValue,
   validateAddonAttributeValue,
@@ -146,6 +153,43 @@ export function NitroActiveSubscriptionWorkspace({
   const [limitMessage, setLimitMessage] = useState<string | null>(null)
   const [attributePurchaseResult, setAttributePurchaseResult] =
     useState<MerchantAttributePurchaseResult | null>(null)
+  const [addons, setAddons] = useState<ActivePlanAddonItem[] | null>(null)
+  const [addonsLoading, setAddonsLoading] = useState(true)
+  const [addonsError, setAddonsError] = useState<string | null>(null)
+
+  const loadAddons = useCallback(async () => {
+    setAddonsLoading(true)
+    setAddonsError(null)
+
+    try {
+      const result = await getActivePlanAddons()
+      setAddons(result.addons)
+    } catch (error) {
+      const message =
+        error instanceof ApiRequestError
+          ? error.body.message ?? error.message
+          : error instanceof Error
+            ? error.message
+            : 'Failed to load active add-ons'
+      setAddonsError(message)
+      setAddons(null)
+    } finally {
+      setAddonsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadAddons()
+  }, [loadAddons, activeSubscription.subscription.subscriptionId])
+
+  const handleRefreshAll = useCallback(async () => {
+    await Promise.all([onRefresh(), loadAddons()])
+  }, [loadAddons, onRefresh])
+
+  const simulatableAddonCount = useMemo(
+    () => (addons ?? []).filter(isSimulatableAddon).length,
+    [addons],
+  )
 
   const selectedUsageRow = limitsAndUsages.find((row) => row.attributeCode === selectedAttributeCode)
   const selectedPlanItem = selectedUsageRow
@@ -314,35 +358,51 @@ export function NitroActiveSubscriptionWorkspace({
   const canConfirmAttributePayment =
     Boolean(attributePurchaseResult?.paymentHandoff) && !limitBusy && !confirmingPayment
 
-  if (limitsAndUsages.length === 0) {
+  const hasSubscriptionAttributes = limitsAndUsages.length > 0
+
+  if (!hasSubscriptionAttributes && simulatableAddonCount === 0 && !addonsLoading) {
     return (
-      <Alert severity="info">
-        No INCLUDED attribute usage rows on this subscription. Attribute limits and usage simulation
-        appear after the plan includes trackable attributes.
-      </Alert>
+      <Stack spacing={2.5}>
+        <Alert severity="info">
+          No INCLUDED attribute usage rows on this subscription and no active add-on attributes with
+          usage tracking. Attribute limits and usage simulation appear after the plan includes
+          trackable attributes or add-ons are purchased.
+        </Alert>
+        <AddonUsageSimulationSection
+          merchantSubscriptionId={subscription.subscriptionId}
+          addons={addons}
+          loading={addonsLoading}
+          error={addonsError}
+          onRetry={() => void loadAddons()}
+          refreshingUsage={refreshing}
+          onUsageUpdated={handleRefreshAll}
+        />
+      </Stack>
     )
   }
 
   return (
     <Stack spacing={2.5}>
-      <Divider />
+      {hasSubscriptionAttributes && (
+        <>
+          <Divider />
 
-      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-          <SpeedIcon color="primary" fontSize="small" />
-          <Typography variant="h6">Subscription attributes</Typography>
-          <Chip label={`${limitsAndUsages.length} attributes`} size="small" variant="outlined" />
-        </Stack>
-        <Button
-          size="small"
-          variant="outlined"
-          startIcon={refreshing ? <CircularProgress size={14} /> : <RefreshIcon />}
-          onClick={() => void onRefresh()}
-          disabled={refreshing}
-        >
-          Refresh usage
-        </Button>
-      </Stack>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+              <SpeedIcon color="primary" fontSize="small" />
+              <Typography variant="h6">Subscription attributes</Typography>
+              <Chip label={`${limitsAndUsages.length} attributes`} size="small" variant="outlined" />
+            </Stack>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={refreshing ? <CircularProgress size={14} /> : <RefreshIcon />}
+              onClick={() => void handleRefreshAll()}
+              disabled={refreshing || addonsLoading}
+            >
+              Refresh usage
+            </Button>
+          </Stack>
 
       <Typography variant="body2" color="text.secondary">
         Select an attribute to change its limit or run the validate → log → confirm usage lifecycle.
@@ -557,16 +617,31 @@ export function NitroActiveSubscriptionWorkspace({
                   merchantSubscriptionId={subscription.subscriptionId}
                   limitsAndUsages={limitsAndUsages}
                   refreshingUsage={refreshing}
-                  onUsageUpdated={onRefresh}
+                  onUsageUpdated={handleRefreshAll}
                   initialAttributeCode={selectedUsageRow.attributeCode}
                   hideCurrentUsageTable
                   hideAttributePicker
+                  contextLabel="Included in plan"
                 />
               </Stack>
             </CardContent>
           </Card>
         </Stack>
       )}
+        </>
+      )}
+
+      <Divider />
+
+      <AddonUsageSimulationSection
+        merchantSubscriptionId={subscription.subscriptionId}
+        addons={addons}
+        loading={addonsLoading}
+        error={addonsError}
+        onRetry={() => void loadAddons()}
+        refreshingUsage={refreshing}
+        onUsageUpdated={handleRefreshAll}
+      />
     </Stack>
   )
 }

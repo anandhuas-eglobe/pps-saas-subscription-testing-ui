@@ -7,9 +7,53 @@ import type {
 export const defaultBillingAddress: BillingAddress = {
   street: '123 Main St',
   city: 'San Francisco',
-  stateProvince: 'CA',
+  state: 'CA',
   country: 'US',
-  zipPostalCode: '94102',
+  zipCode: '94102',
+}
+
+/**
+ * Normalizes invoice/API billing address JSON into the current TaxAddress shape.
+ * Accepts legacy keys (stateProvince, zipPostalCode) for older stored invoices.
+ */
+export function normalizeBillingAddress(address: unknown): BillingAddress | null {
+  if (!address || typeof address !== 'object') {
+    return null
+  }
+
+  const raw = address as Record<string, unknown>
+  const street = typeof raw.street === 'string' ? raw.street : ''
+  const city = typeof raw.city === 'string' ? raw.city : ''
+  const country = typeof raw.country === 'string' ? raw.country : ''
+  const state =
+    (typeof raw.state === 'string' ? raw.state : '') ||
+    (typeof raw.stateProvince === 'string' ? raw.stateProvince : '')
+  const zipCode =
+    (typeof raw.zipCode === 'string' ? raw.zipCode : '') ||
+    (typeof raw.zipPostalCode === 'string' ? raw.zipPostalCode : '')
+
+  if (!street && !city && !state && !country && !zipCode) {
+    return null
+  }
+
+  return { street, city, state, country, zipCode }
+}
+
+export function formatBillingAddress(address: unknown): string {
+  const billing = normalizeBillingAddress(address)
+  if (!billing) {
+    return '—'
+  }
+
+  const parts = [
+    billing.street,
+    billing.city,
+    billing.state,
+    billing.country,
+    billing.zipCode,
+  ].filter((part) => part.trim() !== '')
+
+  return parts.length ? parts.join(', ') : '—'
 }
 
 export function requiresBillingAddressForCheckout(options: {
@@ -23,9 +67,9 @@ export function isBillingAddressComplete(address: BillingAddress): boolean {
   return (
     address.street.trim() !== '' &&
     address.city.trim() !== '' &&
-    address.stateProvince.trim() !== '' &&
+    address.state.trim() !== '' &&
     address.country.trim() !== '' &&
-    address.zipPostalCode.trim() !== ''
+    address.zipCode.trim() !== ''
   )
 }
 

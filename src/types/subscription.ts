@@ -400,12 +400,16 @@ export interface MerchantCartPreview {
   pricing: CartPricingPreview
 }
 
+/**
+ * Billing address shape aligned with subscription MS `BillingAddressDto` / `TaxAddress`.
+ * Stored on invoices as JSON with keys: street, city, state, country, zipCode.
+ */
 export interface BillingAddress {
   street: string
   city: string
-  stateProvince: string
+  state: string
   country: string
-  zipPostalCode: string
+  zipCode: string
 }
 
 export interface InitiatePlanPurchasePayload {

@@ -3,13 +3,35 @@ export type PaymentInvoiceStatusAction =
   | 'PAYMENT_SUCCEEDED'
   | 'PAYMENT_FAILED'
 
+export type InvoiceStatusValue =
+  | 'PENDING'
+  | 'PROCESSING'
+  | 'COMPLETED'
+  | 'FAILED'
+  | 'REASSIGNED'
+
+export interface PaymentReceiptDetails {
+  transactionId: string
+  paymentReference: string | null
+  paymentGateway: string | null
+  paymentMethod: string
+  cardLast4Digit: string | null
+  paidAt: string
+}
+
+export interface PaymentFailureDetails {
+  failureCode: string | null
+  failureReason: string | null
+  failedAt: string
+}
+
 export interface PaymentConfirmationFormValues {
   eventId: string
   action: PaymentInvoiceStatusAction
   invoiceId: string
   invoiceNumber: string
   merchantId: string
-  newStatus: string
+  newStatus: InvoiceStatusValue
   currency: string
   grandTotal: number
   checkoutCorrelationId: string
@@ -19,7 +41,12 @@ export interface PaymentConfirmationFormValues {
   paymentMethod: string
   cardLast4Digit: string
   paidAt: string
+  failureCode: string
+  failureReason: string
+  failedAt: string
   correlationId: string
+  metadataSource: string
+  metadataEntityType: string
   entityId: string
   entityName: string
   redisContainer: string
@@ -37,18 +64,12 @@ export interface PaymentInvoiceStatusEvent {
     invoiceId: string
     invoiceNumber: string
     merchantId: string
-    newStatus: string
+    newStatus: InvoiceStatusValue
     currency: string
     grandTotal: number
     checkoutCorrelationId: string | null
-    payment?: {
-      transactionId: string
-      paymentReference: string | null
-      paymentGateway: string | null
-      paymentMethod: string
-      cardLast4Digit: string | null
-      paidAt: string
-    }
+    payment?: PaymentReceiptDetails
+    failure?: PaymentFailureDetails
   }
   metadata: {
     timestamp: string
@@ -64,6 +85,19 @@ export interface PaymentInvoiceStatusEvent {
 }
 
 const DEFAULT_MERCHANT_ID = '5f3a2d19-8a4b-4a8d-9d6a-0c1e2f3a4b5c'
+
+export function defaultNewStatusForAction(
+  action: PaymentInvoiceStatusAction,
+): InvoiceStatusValue {
+  switch (action) {
+    case 'PAYMENT_PROCESSING':
+      return 'PROCESSING'
+    case 'PAYMENT_SUCCEEDED':
+      return 'COMPLETED'
+    case 'PAYMENT_FAILED':
+      return 'FAILED'
+  }
+}
 
 export function createDefaultPaymentConfirmationForm(): PaymentConfirmationFormValues {
   return {
@@ -82,7 +116,12 @@ export function createDefaultPaymentConfirmationForm(): PaymentConfirmationFormV
     paymentMethod: 'CREDIT_CARD',
     cardLast4Digit: '4242',
     paidAt: new Date().toISOString(),
+    failureCode: 'card_declined',
+    failureReason: 'Your card was declined.',
+    failedAt: new Date().toISOString(),
     correlationId: 'payment-test-correlation-002',
+    metadataSource: 'payment-service',
+    metadataEntityType: 'invoice',
     entityId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
     entityName: 'INV-2026-0001',
     redisContainer: 'pps-redis',
@@ -97,6 +136,7 @@ export function buildPaymentInvoiceStatusEvent(
 ): PaymentInvoiceStatusEvent {
   const includePayment =
     form.action === 'PAYMENT_SUCCEEDED' || form.action === 'PAYMENT_PROCESSING'
+  const includeFailure = form.action === 'PAYMENT_FAILED'
 
   return {
     eventId: form.eventId,
@@ -123,14 +163,23 @@ export function buildPaymentInvoiceStatusEvent(
             },
           }
         : {}),
+      ...(includeFailure
+        ? {
+            failure: {
+              failureCode: form.failureCode || null,
+              failureReason: form.failureReason || null,
+              failedAt: form.failedAt,
+            },
+          }
+        : {}),
     },
     metadata: {
       timestamp: new Date().toISOString(),
       environment: 'development',
       correlationId: form.correlationId || undefined,
       context: {
-        source: 'payment-service',
-        entityType: 'invoice',
+        source: form.metadataSource || 'payment-service',
+        entityType: form.metadataEntityType || 'invoice',
         entityId: form.entityId,
         entityName: form.entityName || form.invoiceNumber,
       },
@@ -199,7 +248,28 @@ export function buildSucceededPaymentEventFromHandoff(handoff: {
   return buildPaymentInvoiceStatusEvent({
     ...form,
     action: 'PAYMENT_SUCCEEDED',
-    newStatus: 'COMPLETED',
+    newStatus: defaultNewStatusForAction('PAYMENT_SUCCEEDED'),
+  })
+}
+
+export function buildFailedPaymentEventFromHandoff(handoff: {
+  invoiceId: string
+  invoiceNumber: string
+  merchantId?: string
+  currency: string
+  grandTotal: number
+  correlationId?: string
+  failureCode?: string
+  failureReason?: string
+}): PaymentInvoiceStatusEvent {
+  const form = applyPaymentHandoffToForm(createDefaultPaymentConfirmationForm(), handoff)
+  return buildPaymentInvoiceStatusEvent({
+    ...form,
+    action: 'PAYMENT_FAILED',
+    newStatus: defaultNewStatusForAction('PAYMENT_FAILED'),
+    failureCode: handoff.failureCode ?? form.failureCode,
+    failureReason: handoff.failureReason ?? form.failureReason,
+    failedAt: new Date().toISOString(),
   })
 }
 
