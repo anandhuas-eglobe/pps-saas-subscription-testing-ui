@@ -103,6 +103,13 @@ export const RequiredAttributesSection = memo(function RequiredAttributesSection
                   />
                 </Stack>
 
+                {attributeCode === 'MONTHLY_ORDER_VOLUME' && (
+                  <Alert severity="info" sx={{ py: 0.5 }}>
+                    This is the parent attribute for <strong>linkToMonthlyOrderVolume</strong>.
+                    Optional linkable attributes inherit limits from this row.
+                  </Alert>
+                )}
+
                 <Grid container spacing={2}>
                   <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                     <FormControl fullWidth size="small">

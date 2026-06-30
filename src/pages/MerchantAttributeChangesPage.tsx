@@ -26,6 +26,8 @@ import { PageHeader } from '../components/layout/PageHeader'
 import { AttributeCartPreviewPanel } from '../components/merchant/AttributeCartPreviewPanel'
 import { AttributeChangeEditor } from '../components/merchant/AttributeChangeEditor'
 import { ValidationErrorsAlert } from '../components/ValidationErrorsAlert'
+import { ApiTransactionInspector } from '../components/ApiTransactionInspector'
+import { useApiTransaction } from '../hooks/useApiTransaction'
 import type {
   ActiveSubscriptionResponse,
   BillingAddress,
@@ -91,6 +93,8 @@ export function MerchantAttributeChangesPage() {
     severity: 'success',
   })
 
+  const { transaction, execute } = useApiTransaction()
+
   const attributeItems = useMemo(
     () => (subscriptionData ? extractSubscribedPlanAttributes(subscriptionData.plan) : []),
     [subscriptionData],
@@ -108,6 +112,13 @@ export function MerchantAttributeChangesPage() {
 
   const [cancellingAttributeId, setCancellingAttributeId] = useState<string | null>(null)
 
+  const livePayload = useMemo(
+    () => ({
+      features: buildAttributeCartPayload(attributeItems, drafts),
+    }),
+    [attributeItems, drafts],
+  )
+
   const loadSubscription = useCallback(async () => {
     setLoading(true)
     setLoadError(null)
@@ -115,7 +126,11 @@ export function MerchantAttributeChangesPage() {
     setSubscriptionData(null)
 
     try {
-      const result = await getActiveSubscription()
+      const result = await execute(
+        {},
+        () => getActiveSubscription(),
+        'GET /api/v1/merchant/subscription/active',
+      )
       setSubscriptionData(result)
       const items = extractSubscribedPlanAttributes(result.plan)
       setDrafts(createDefaultAttributeDrafts(items))
@@ -141,7 +156,7 @@ export function MerchantAttributeChangesPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [execute])
 
   useEffect(() => {
     void loadSubscription()
@@ -162,7 +177,11 @@ export function MerchantAttributeChangesPage() {
     setFetchError(null)
 
     try {
-      const preview = await getMerchantAttributeCart()
+      const preview = await execute(
+        {},
+        () => getMerchantAttributeCart(),
+        'GET /api/v1/merchant/cart/attribute',
+      )
       setCartPreview(preview)
       setDrafts((current) => applyCartPreviewToDrafts(current, preview))
       setSnackbar({ open: true, message: 'Attribute cart loaded', severity: 'success' })
@@ -215,7 +234,11 @@ export function MerchantAttributeChangesPage() {
         features: buildAttributeCartPayload(attributeItems, drafts),
       }
 
-      const result = await upsertAttributeCart(payload)
+      const result = await execute(
+        payload,
+        () => upsertAttributeCart(payload),
+        'POST /api/v1/merchant/cart/attribute',
+      )
       const preview = await getMerchantAttributeCart()
       setCartPreview(preview)
       setDrafts((current) => applyCartPreviewToDrafts(current, preview))
@@ -235,7 +258,12 @@ export function MerchantAttributeChangesPage() {
   const handleCancelAttributeDowngrade = async (planFeatureAttributeId: string) => {
     setCancellingAttributeId(planFeatureAttributeId)
     try {
-      const result = await cancelAttributeDowngradeSchedule(planFeatureAttributeId)
+      const payload = { planFeatureAttributeId }
+      const result = await execute(
+        payload,
+        () => cancelAttributeDowngradeSchedule(planFeatureAttributeId),
+        'POST /api/v1/merchant/subscription/attribute/downgrade/schedule/cancel',
+      )
       setSnackbar({ open: true, message: result.message, severity: 'success' })
       await loadSubscription()
     } catch (error) {
@@ -255,7 +283,12 @@ export function MerchantAttributeChangesPage() {
     setPurchaseResult(null)
 
     try {
-      const result = await purchaseAttributeCart(buildAttributePurchasePayload(billingAddress))
+      const purchasePayload = buildAttributePurchasePayload(billingAddress)
+      const result = await execute(
+        purchasePayload,
+        () => purchaseAttributeCart(purchasePayload),
+        'POST /api/v1/merchant/subscription/attribute/purchase',
+      )
       setPurchaseResult(result)
       if (result.paymentHandoff) {
         saveLastPaymentHandoff(result.paymentHandoff)
@@ -482,6 +515,12 @@ export function MerchantAttributeChangesPage() {
           </>
         )}
       </Stack>
+
+      <ApiTransactionInspector
+        livePayload={subscriptionData ? livePayload : undefined}
+        transaction={transaction}
+        livePayloadTitle="Request preview"
+      />
 
       <Snackbar
         open={snackbar.open}

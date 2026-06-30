@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Alert from '@mui/material/Alert'
 import Button from '@mui/material/Button'
 import CircularProgress from '@mui/material/CircularProgress'
@@ -7,7 +7,9 @@ import Typography from '@mui/material/Typography'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import { listGuestPlans } from '../api/merchant'
 import { ApiRequestError } from '../api/client'
+import { ApiTransactionInspector } from '../components/ApiTransactionInspector'
 import { PageHeader } from '../components/layout/PageHeader'
+import { useApiTransaction } from '../hooks/useApiTransaction'
 import { PlanDetailView } from '../components/plans/PlanDetailView'
 import type { PlanDetail } from '../types/subscription'
 
@@ -15,12 +17,19 @@ export function MerchantGuestPlansPage() {
   const [plans, setPlans] = useState<PlanDetail[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { transaction, execute } = useApiTransaction()
+
+  const livePayload = useMemo(() => ({}), [])
 
   const loadPlans = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const result = await listGuestPlans()
+      const result = await execute(
+        {},
+        () => listGuestPlans(),
+        'GET /api/v1/merchant/subscription/guest-plans',
+      )
       setPlans(result)
     } catch (err) {
       const message =
@@ -34,7 +43,7 @@ export function MerchantGuestPlansPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [execute])
 
   useEffect(() => {
     void loadPlans()
@@ -88,6 +97,12 @@ export function MerchantGuestPlansPage() {
             <PlanDetailView plan={plan} />
           </Stack>
         ))}
+
+      <ApiTransactionInspector
+        livePayload={livePayload}
+        livePayloadTitle="Guest plans request"
+        transaction={transaction}
+      />
     </Stack>
   )
 }

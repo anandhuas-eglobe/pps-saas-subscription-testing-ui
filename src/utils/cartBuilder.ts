@@ -86,33 +86,27 @@ function syncLinkedAttributeValues(
     }
   }
 
-  for (const feature of includedPlanFeatures(plan)) {
-    if (feature.featureType !== FeatureType.ATTRIBUTE) {
+  const allIncludedAttrs = includedPlanFeatures(plan).flatMap((feature) =>
+    feature.featureType === FeatureType.ATTRIBUTE ? includedAttributesForFeature(feature) : [],
+  )
+  const attrsByCatalogId = new Map(
+    allIncludedAttrs.map((attribute) => [attribute.featureAttributeId, attribute]),
+  )
+
+  for (const attribute of allIncludedAttrs) {
+    if (!attribute.parentFeatureAttributeId) {
       continue
     }
 
-    const attrsByCatalogId = new Map(
-      includedAttributesForFeature(feature).map((attribute) => [
-        attribute.featureAttributeId,
-        attribute,
-      ]),
-    )
+    const parent = attrsByCatalogId.get(attribute.parentFeatureAttributeId)
+    if (!parent) {
+      continue
+    }
 
-    for (const attribute of includedAttributesForFeature(feature)) {
-      if (!attribute.parentFeatureAttributeId) {
-        continue
-      }
-
-      const parent = attrsByCatalogId.get(attribute.parentFeatureAttributeId)
-      if (!parent) {
-        continue
-      }
-
-      const parentValue = valueByAttributeId.get(parent.planFeatureAttributeId) ?? 0
-      const currentValue = valueByAttributeId.get(attribute.planFeatureAttributeId) ?? 0
-      if (currentValue < parentValue) {
-        valueByAttributeId.set(attribute.planFeatureAttributeId, parentValue)
-      }
+    const parentValue = valueByAttributeId.get(parent.planFeatureAttributeId) ?? 0
+    const currentValue = valueByAttributeId.get(attribute.planFeatureAttributeId) ?? 0
+    if (currentValue < parentValue) {
+      valueByAttributeId.set(attribute.planFeatureAttributeId, parentValue)
     }
   }
 
@@ -194,6 +188,45 @@ export function validateCartSelections(plan: PlanDetail, selections: CartFeature
       }
       if (max != null && row.value > max) {
         errors.push(`${label} cannot exceed ${max}.`)
+      }
+    }
+
+    const allIncludedAttrs = includedFeatures.flatMap((feature) =>
+      feature.featureType === FeatureType.ATTRIBUTE ? includedAttributesForFeature(feature) : [],
+    )
+    const attrsByCatalogId = new Map(
+      allIncludedAttrs.map((attribute) => [attribute.featureAttributeId, attribute]),
+    )
+    const valueByPfaId = new Map(
+      selections.flatMap((selection) =>
+        selection.attributes.map((row) => [row.planFeatureAttributeId, row.value] as const),
+      ),
+    )
+
+    for (const attribute of allIncludedAttrs) {
+      if (!attribute.parentFeatureAttributeId) {
+        continue
+      }
+
+      const parent = attrsByCatalogId.get(attribute.parentFeatureAttributeId)
+      if (!parent) {
+        errors.push(
+          `Plan data is inconsistent: "${attribute.attributeName ?? attribute.attributeCode}" references a missing parent attribute.`,
+        )
+        continue
+      }
+
+      const parentValue = valueByPfaId.get(parent.planFeatureAttributeId)
+      const linkedValue = valueByPfaId.get(attribute.planFeatureAttributeId)
+      if (parentValue === undefined || linkedValue === undefined) {
+        continue
+      }
+
+      if (linkedValue < parentValue) {
+        const label = attribute.attributeName ?? attribute.attributeCode ?? 'Attribute'
+        errors.push(
+          `${label} is linked to monthly order volume and must be at least ${parentValue}.`,
+        )
       }
     }
   }

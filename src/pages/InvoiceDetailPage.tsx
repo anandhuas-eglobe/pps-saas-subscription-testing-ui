@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Alert from '@mui/material/Alert'
 import Button from '@mui/material/Button'
 import CircularProgress from '@mui/material/CircularProgress'
@@ -14,8 +14,10 @@ import {
   getReceiptById,
 } from '../api/merchant'
 import { ApiRequestError } from '../api/client'
+import { ApiTransactionInspector } from '../components/ApiTransactionInspector'
 import { InvoiceDetailView } from '../components/invoices/InvoiceDetailView'
 import { PageHeader } from '../components/layout/PageHeader'
+import { useApiTransaction } from '../hooks/useApiTransaction'
 import type { InvoiceDetail, InvoiceReceipt } from '../types/subscription'
 
 export function InvoiceDetailPage() {
@@ -29,6 +31,18 @@ export function InvoiceDetailPage() {
   const [receiptDetail, setReceiptDetail] = useState<InvoiceReceipt | null>(null)
   const [receiptLoading, setReceiptLoading] = useState(false)
   const [receiptError, setReceiptError] = useState<string | null>(null)
+  const { transaction, execute } = useApiTransaction()
+
+  const livePayload = useMemo(() => {
+    if (!invoiceId) {
+      return undefined
+    }
+    const receiptId = invoice?.receipt?.id
+    if (receiptId) {
+      return { invoiceId, receiptId }
+    }
+    return { invoiceId }
+  }, [invoiceId, invoice?.receipt?.id])
 
   const loadInvoice = useCallback(async () => {
     if (!invoiceId) {
@@ -40,7 +54,11 @@ export function InvoiceDetailPage() {
     setLoading(true)
     setError(null)
     try {
-      const detail = await getInvoiceById(invoiceId)
+      const detail = await execute(
+        { invoiceId },
+        () => getInvoiceById(invoiceId),
+        `GET /api/v1/merchant/subscription/invoices/${invoiceId}`,
+      )
       setInvoice(detail)
     } catch (err) {
       const message =
@@ -54,7 +72,7 @@ export function InvoiceDetailPage() {
     } finally {
       setLoading(false)
     }
-  }, [invoiceId])
+  }, [invoiceId, execute])
 
   useEffect(() => {
     void loadInvoice()
@@ -84,7 +102,12 @@ export function InvoiceDetailPage() {
     setReceiptLoading(true)
     setReceiptError(null)
     try {
-      const detail = await getReceiptById(invoice.receipt.id)
+      const receiptId = invoice.receipt.id
+      const detail = await execute(
+        { receiptId },
+        () => getReceiptById(receiptId),
+        `GET /api/v1/merchant/subscription/receipts/${receiptId}`,
+      )
       setReceiptDetail(detail)
     } catch (err) {
       const message =
@@ -201,6 +224,12 @@ export function InvoiceDetailPage() {
       )}
 
       {!loading && invoice && <InvoiceDetailView invoice={invoice} />}
+
+      <ApiTransactionInspector
+        livePayload={livePayload}
+        livePayloadTitle="Invoice API payload"
+        transaction={transaction}
+      />
     </Stack>
   )
 }

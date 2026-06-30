@@ -11,8 +11,10 @@ import { Link as RouterLink } from 'react-router-dom'
 import { getActivePlanAddons, getActiveSubscription } from '../api/merchant'
 import { ApiRequestError } from '../api/client'
 import { PageHeader } from '../components/layout/PageHeader'
+import { ApiTransactionInspector } from '../components/ApiTransactionInspector'
 import { AddonUsageSimulationSection } from '../components/merchant/AddonUsageSimulationSection'
 import { UsageSimulationPanel } from '../components/merchant/UsageSimulationPanel'
+import { useApiTransaction } from '../hooks/useApiTransaction'
 import type { ActivePlanAddonsResponse, ActiveSubscriptionResponse } from '../types/subscription'
 
 export function UsageSimulationPage() {
@@ -24,13 +26,18 @@ export function UsageSimulationPage() {
   const [error, setError] = useState<string | null>(null)
   const [addonsError, setAddonsError] = useState<string | null>(null)
   const [refreshingUsage, setRefreshingUsage] = useState(false)
+  const { transaction, execute } = useApiTransaction()
 
   const loadAddons = useCallback(async () => {
     setAddonsLoading(true)
     setAddonsError(null)
 
     try {
-      const result = await getActivePlanAddons()
+      const result = await execute(
+        {},
+        () => getActivePlanAddons(),
+        'GET /api/v1/merchant/subscription/active-plan/addons',
+      )
       setAddonsData(result)
     } catch (err) {
       const message =
@@ -44,7 +51,7 @@ export function UsageSimulationPage() {
     } finally {
       setAddonsLoading(false)
     }
-  }, [])
+  }, [execute])
 
   const loadSubscription = useCallback(async () => {
     setLoading(true)
@@ -53,7 +60,11 @@ export function UsageSimulationPage() {
     setData(null)
 
     try {
-      const result = await getActiveSubscription()
+      const result = await execute(
+        {},
+        () => getActiveSubscription(),
+        'GET /api/v1/merchant/subscription/active',
+      )
       setData(result)
       await loadAddons()
     } catch (err) {
@@ -72,15 +83,23 @@ export function UsageSimulationPage() {
     } finally {
       setLoading(false)
     }
-  }, [loadAddons])
+  }, [execute, loadAddons])
 
   const refreshUsage = useCallback(async () => {
     setRefreshingUsage(true)
 
     try {
       const [subscriptionResult, addonsResult] = await Promise.all([
-        getActiveSubscription(),
-        getActivePlanAddons(),
+        execute(
+          {},
+          () => getActiveSubscription(),
+          'GET /api/v1/merchant/subscription/active',
+        ),
+        execute(
+          {},
+          () => getActivePlanAddons(),
+          'GET /api/v1/merchant/subscription/active-plan/addons',
+        ),
       ])
       setData(subscriptionResult)
       setAddonsData(addonsResult)
@@ -90,7 +109,7 @@ export function UsageSimulationPage() {
     } finally {
       setRefreshingUsage(false)
     }
-  }, [])
+  }, [execute])
 
   useEffect(() => {
     void loadSubscription()
@@ -190,6 +209,16 @@ export function UsageSimulationPage() {
           />
         </Stack>
       )}
+
+      <ApiTransactionInspector
+        livePayload={{
+          subscription: 'GET /api/v1/merchant/subscription/active',
+          addons: 'GET /api/v1/merchant/subscription/active-plan/addons',
+        }}
+        livePayloadTitle="Page load requests"
+        transaction={transaction}
+        logTitle="Last API interaction"
+      />
     </Stack>
   )
 }

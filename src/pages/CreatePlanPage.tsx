@@ -11,23 +11,22 @@ import RefreshIcon from '@mui/icons-material/Refresh'
 import { Link as RouterLink } from 'react-router-dom'
 import { fetchFeatures } from '../api/features'
 import { createPlan } from '../api/plans'
-import { ApiRequestError } from '../api/client'
-import { ApiLogPanel } from '../components/ApiLogPanel'
+import { ApiTransactionInspector } from '../components/ApiTransactionInspector'
 import { ApiErrorAlert } from '../components/ApiErrorAlert'
 import { CreatePlanDetailsSection } from '../components/plans/CreatePlanDetailsSection'
 import { CreatePlanFeatureCatalogSection } from '../components/plans/CreatePlanFeatureCatalogSection'
-import { CreatePlanPayloadPreview } from '../components/plans/CreatePlanPayloadPreview'
 import { getRequiredAttributeEntries } from '../components/plans/RequiredAttributesSection'
 import { PageHeader } from '../components/layout/PageHeader'
+import { useApiTransaction } from '../hooks/useApiTransaction'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import type {
-  ApiResponse,
   AttributeConfig,
   CatalogFeature,
   CreatePlanPayload,
   FeatureConfig,
 } from '../types/subscription'
 import {
+  applyLinkToMonthlyOrderVolumeFlag,
   buildCreatePlanPayload,
   createDefaultPlanForm,
   defaultAttributeConfig,
@@ -67,9 +66,7 @@ export function CreatePlanPage() {
 
   const [submitting, setSubmitting] = useState(false)
   const [createdPlanId, setCreatedPlanId] = useState<string | null>(null)
-  const [lastPayload, setLastPayload] = useState<CreatePlanPayload | null>(null)
-  const [lastResponse, setLastResponse] = useState<ApiResponse<unknown> | null>(null)
-  const [lastError, setLastError] = useState<unknown>(null)
+  const { transaction, execute, recordSuccess, recordError } = useApiTransaction()
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
     message: '',
@@ -143,23 +140,23 @@ export function CreatePlanPage() {
   }, [catalog])
 
   useEffect(() => {
-    if (lastError != null || lastResponse?.success === false) {
+    if (transaction?.lastError != null || transaction?.lastResponse?.success === false) {
       validationErrorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
-  }, [lastError, lastResponse])
+  }, [transaction])
 
   const loadCatalog = useCallback(async () => {
     setCatalogLoading(true)
     setCatalogError(null)
     try {
-      const features = await fetchFeatures()
+      const features = await execute({}, () => fetchFeatures(), 'GET /api/v1/features')
       setCatalog(features)
     } catch (error) {
       setCatalogError(error instanceof Error ? error.message : 'Failed to load feature catalog')
     } finally {
       setCatalogLoading(false)
     }
-  }, [])
+  }, [execute])
 
   useEffect(() => {
     void loadCatalog()
@@ -318,9 +315,13 @@ export function CreatePlanPage() {
             ...entry,
             configs: {
               ...entry.configs,
-              [attributeId]: mergeAttributeConfigUpdate(
-                entry.configs[attributeId],
-                patch,
+              [attributeId]: applyLinkToMonthlyOrderVolumeFlag(
+                mergeAttributeConfigUpdate(
+                  entry.configs[attributeId],
+                  patch,
+                  attributeCode,
+                ),
+                entry.linkFlags[attributeId] ?? false,
                 attributeCode,
               ),
             },
@@ -337,6 +338,12 @@ export function CreatePlanPage() {
         const entry = current[featureId]
         if (!entry) return current
 
+        const feature = catalog.find((item) => item.id === featureId)
+        const attribute = feature?.featureAttributes.find((item) => item.id === attributeId)
+        const attributeCode = attribute?.attributeCode ?? ''
+        const currentConfig =
+          entry.configs[attributeId] ?? defaultAttributeConfig(attributeCode)
+
         return {
           ...current,
           [featureId]: {
@@ -345,34 +352,32 @@ export function CreatePlanPage() {
               ...entry.linkFlags,
               [attributeId]: value,
             },
+            configs: {
+              ...entry.configs,
+              [attributeId]: applyLinkToMonthlyOrderVolumeFlag(
+                currentConfig,
+                value,
+                attributeCode,
+              ),
+            },
           },
         }
       })
     },
-    [],
+    [catalog],
   )
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     setSubmitting(true)
-    setLastError(null)
-    setLastResponse(null)
-    setLastPayload(submitPayload)
 
     try {
       const result = await createPlan(submitPayload)
-      setLastResponse({
-        success: true,
-        data: result,
-        timestamp: new Date().toISOString(),
-      })
+      recordSuccess(submitPayload, result, 'POST /api/v1/admin/plans/create-plan')
       setCreatedPlanId(result.planId)
       setSnackbar({ open: true, message: result.message, severity: 'success' })
     } catch (error) {
-      setLastError(error)
-      if (error instanceof ApiRequestError) {
-        setLastResponse(error.body)
-      }
+      recordError(submitPayload, error, 'POST /api/v1/admin/plans/create-plan')
       setSnackbar({
         open: true,
         message: getApiErrorSummary(error),
@@ -422,10 +427,10 @@ export function CreatePlanPage() {
           </Alert>
         )}
 
-        {(lastError != null || lastResponse?.success === false) && (
+        {(transaction?.lastError != null || transaction?.lastResponse?.success === false) && (
           <Box ref={validationErrorRef}>
             <ApiErrorAlert
-              error={lastError ?? lastResponse}
+              error={transaction.lastError ?? transaction.lastResponse}
               subtitle="The API rejected this plan payload. Review each item below and update the form."
             />
           </Box>
@@ -457,8 +462,6 @@ export function CreatePlanPage() {
             onSimpleFeatureConfigChange={updateSimpleFeatureConfig}
           />
 
-          <CreatePlanPayloadPreview payload={previewPayload} />
-
           <Stack direction="row" sx={{ justifyContent: 'flex-end' }}>
             <Button
               type="submit"
@@ -478,14 +481,10 @@ export function CreatePlanPage() {
           </Stack>
         </Stack>
 
-        {(lastPayload != null || lastResponse != null || lastError != null) && (
-          <ApiLogPanel
-            title="Last API interaction"
-            payload={lastPayload ?? undefined}
-            response={lastResponse}
-            error={lastError}
-          />
-        )}
+        <ApiTransactionInspector
+          livePayload={previewPayload}
+          transaction={transaction}
+        />
       </Stack>
 
       <Snackbar

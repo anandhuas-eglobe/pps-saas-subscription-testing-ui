@@ -10,6 +10,7 @@ import Typography from '@mui/material/Typography'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import CodeIcon from '@mui/icons-material/Code'
 import type { ApiResponse } from '../types/subscription'
+import { CopyJsonButton } from './CopyJsonButton'
 import { ValidationErrorsAlert } from './ValidationErrorsAlert'
 import {
   extractApiErrorMeta,
@@ -93,7 +94,10 @@ export function ApiLogPanel({ title, payload, response, error }: ApiLogPanelProp
         {payload !== undefined && (
           <Accordion defaultExpanded disableGutters elevation={0} sx={{ border: '1px solid', borderColor: 'divider', mb: 1 }}>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography sx={{ fontWeight: 600 }}>Request payload</Typography>
+              <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', width: '100%', pr: 1 }}>
+                <Typography sx={{ fontWeight: 600, flex: 1 }}>Request payload</Typography>
+                <CopyJsonButton value={payload} label="Copy request payload" />
+              </Stack>
             </AccordionSummary>
             <AccordionDetails>
               <Box component="pre" sx={codeBlockSx}>
@@ -111,13 +115,16 @@ export function ApiLogPanel({ title, payload, response, error }: ApiLogPanelProp
             sx={{ border: '1px solid', borderColor: 'divider', mb: 1 }}
           >
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                <Typography sx={{ fontWeight: 600 }}>Response</Typography>
-                <Chip
-                  label={responseFailed ? 'Failed' : 'Success'}
-                  color={responseFailed ? 'error' : 'success'}
-                  size="small"
-                />
+              <Stack direction="row" spacing={1} sx={{ alignItems: 'center', width: '100%', pr: 1 }}>
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flex: 1 }}>
+                  <Typography sx={{ fontWeight: 600 }}>Response</Typography>
+                  <Chip
+                    label={responseFailed ? 'Failed' : 'Success'}
+                    color={responseFailed ? 'error' : 'success'}
+                    size="small"
+                  />
+                </Stack>
+                <CopyJsonButton value={response} label="Copy response" />
               </Stack>
             </AccordionSummary>
             <AccordionDetails>
@@ -131,7 +138,10 @@ export function ApiLogPanel({ title, payload, response, error }: ApiLogPanelProp
         {error != null && (
           <Accordion disableGutters elevation={0} sx={{ border: '1px solid', borderColor: 'divider', mt: 1 }}>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography sx={{ fontWeight: 600 }}>Raw error response</Typography>
+              <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', width: '100%', pr: 1 }}>
+                <Typography sx={{ fontWeight: 600, flex: 1 }}>Raw error response</Typography>
+                <CopyJsonButton value={formatError(error)} label="Copy error response" />
+              </Stack>
             </AccordionSummary>
             <AccordionDetails>
               <Box component="pre" sx={{ ...codeBlockSx, bgcolor: '#450a0a', maxHeight: 360 }}>

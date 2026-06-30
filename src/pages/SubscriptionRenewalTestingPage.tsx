@@ -42,9 +42,11 @@ import {
 import { ApiRequestError } from '../api/client'
 import { DEFAULT_REDIS_CONNECTION, publishToRedisStream } from '../api/redisDevTools'
 import { ApiErrorAlert } from '../components/ApiErrorAlert'
+import { ApiTransactionInspector } from '../components/ApiTransactionInspector'
 import { PageHeader } from '../components/layout/PageHeader'
 import { BillingAddressFields } from '../components/merchant/BillingAddressFields'
 import { RenewalRedisEventsPanel } from '../components/merchant/RenewalRedisEventsPanel'
+import { useApiTransaction } from '../hooks/useApiTransaction'
 import type {
   ActiveSubscriptionResponse,
   BillingAddress,
@@ -74,6 +76,8 @@ import {
 } from '../utils/renewalScenarios'
 
 const DEFAULT_MOCK_MERCHANT_ID = '00000000-0000-4000-8000-000000000003'
+
+type RenewalPreviewKind = 'extend' | 'renew' | 'redis'
 
 function EligibilityRow({ label, ok, detail }: { label: string; ok: boolean; detail?: string }) {
   return (
@@ -122,6 +126,8 @@ export function SubscriptionRenewalTestingPage() {
   const [paymentError, setPaymentError] = useState<string | null>(null)
 
   const [scenarioFilter, setScenarioFilter] = useState<RenewalScenarioCategory | 'all'>('all')
+  const [previewKind, setPreviewKind] = useState<RenewalPreviewKind>('extend')
+  const { transaction, execute } = useApiTransaction()
 
   const subscription = subscriptionData?.subscription
 
@@ -203,11 +209,18 @@ export function SubscriptionRenewalTestingPage() {
     setExtending(true)
     setExtendError(null)
     setExtendMessage(null)
+    setPreviewKind('extend')
+    const payload = {
+      merchantId: extendMerchantId.trim(),
+      days: parsedDays,
+    }
+
     try {
-      const result = await extendMerchantSubscriptionEndDate({
-        merchantId: extendMerchantId.trim(),
-        days: parsedDays,
-      })
+      const result = await execute(
+        payload,
+        () => extendMerchantSubscriptionEndDate(payload),
+        'POST /api/v1/admin/plans/merchant/extend-subscription-end-date',
+      )
       setExtendMessage(
         `Extended ${result.subscriptionId}: ${formatDateTime(result.previousEndDate)} → ${formatDateTime(result.newEndDate)}`,
       )
@@ -243,9 +256,15 @@ export function SubscriptionRenewalTestingPage() {
     setRenewalResult(null)
     setPaymentMessage(null)
     setPaymentError(null)
+    setPreviewKind('renew')
+    const payload = buildInitiateManualRenewalPayload(billingAddress, includeBillingAddress)
+
     try {
-      const payload = buildInitiateManualRenewalPayload(billingAddress, includeBillingAddress)
-      const result = await initiateManualRenewal(payload)
+      const result = await execute(
+        payload,
+        () => initiateManualRenewal(payload),
+        'POST /api/v1/merchant/subscription/renew',
+      )
       setRenewalResult(result)
       if (result.paymentHandoff) {
         saveLastPaymentHandoff(result.paymentHandoff)
@@ -265,9 +284,15 @@ export function SubscriptionRenewalTestingPage() {
     setConfirmingPayment(true)
     setPaymentError(null)
     setPaymentMessage(null)
+    setPreviewKind('redis')
+    const event = buildSucceededPaymentEventFromHandoff(handoff)
+
     try {
-      const event = buildSucceededPaymentEventFromHandoff(handoff)
-      await publishToRedisStream(event, { redis: DEFAULT_REDIS_CONNECTION })
+      await execute(
+        event,
+        () => publishToRedisStream(event, { redis: DEFAULT_REDIS_CONNECTION }),
+        'POST /dev-tools/redis/publish (payment.invoice.status.updated)',
+      )
       setPaymentMessage(`Published PAYMENT_SUCCEEDED for ${handoff.invoiceNumber}`)
       await loadAll()
     } catch (err) {
@@ -286,6 +311,35 @@ export function SubscriptionRenewalTestingPage() {
   const isEndDatePast = subscription
     ? new Date(subscription.endDate).getTime() <= Date.now()
     : false
+
+  const extendPreviewPayload = useMemo(
+    () => ({
+      merchantId: extendMerchantId.trim(),
+      days: Number(extendDays) || 0,
+    }),
+    [extendMerchantId, extendDays],
+  )
+
+  const renewPreviewPayload = useMemo(
+    () => buildInitiateManualRenewalPayload(billingAddress, includeBillingAddress),
+    [billingAddress, includeBillingAddress],
+  )
+
+  const redisPreviewPayload = useMemo(() => {
+    const handoff = renewalResult?.paymentHandoff
+    if (!handoff) return null
+    return buildSucceededPaymentEventFromHandoff(handoff)
+  }, [renewalResult])
+
+  const livePreview = useMemo(() => {
+    if (previewKind === 'redis' && redisPreviewPayload) {
+      return { title: 'Redis payment event preview', payload: redisPreviewPayload }
+    }
+    if (previewKind === 'renew') {
+      return { title: 'Manual renewal payload preview', payload: renewPreviewPayload }
+    }
+    return { title: 'Extend end date payload preview', payload: extendPreviewPayload }
+  }, [previewKind, redisPreviewPayload, renewPreviewPayload, extendPreviewPayload])
 
   return (
     <Stack spacing={3}>
@@ -519,7 +573,10 @@ export function SubscriptionRenewalTestingPage() {
                   <TextField
                     label="Merchant ID"
                     value={extendMerchantId}
-                    onChange={(event) => setExtendMerchantId(event.target.value)}
+                    onChange={(event) => {
+                      setPreviewKind('extend')
+                      setExtendMerchantId(event.target.value)
+                    }}
                     fullWidth
                     size="small"
                     helperText="Mock merchant in dev: 00000000-0000-4000-8000-000000000003"
@@ -530,7 +587,10 @@ export function SubscriptionRenewalTestingPage() {
                     label="Add days to end date"
                     type="number"
                     value={extendDays}
-                    onChange={(event) => setExtendDays(event.target.value)}
+                    onChange={(event) => {
+                      setPreviewKind('extend')
+                      setExtendDays(event.target.value)
+                    }}
                     fullWidth
                     size="small"
                     slotProps={{ htmlInput: { min: 1 } }}
@@ -634,15 +694,24 @@ export function SubscriptionRenewalTestingPage() {
                 control={
                   <Checkbox
                     checked={includeBillingAddress}
-                    onChange={(event) => setIncludeBillingAddress(event.target.checked)}
+                    onChange={(event) => {
+                      setPreviewKind('renew')
+                      setIncludeBillingAddress(event.target.checked)
+                    }}
                   />
                 }
                 label="Include billing address (required when no prior completed invoice address exists)"
               />
 
               {includeBillingAddress && (
-                <Box sx={{ mt: 2, mb: 2 }}>
-                  <BillingAddressFields value={billingAddress} onChange={setBillingAddress} />
+                <Box sx={{ mt: 2, mb: 2 }} onFocus={() => setPreviewKind('renew')}>
+                  <BillingAddressFields
+                    value={billingAddress}
+                    onChange={(value) => {
+                      setPreviewKind('renew')
+                      setBillingAddress(value)
+                    }}
+                  />
                 </Box>
               )}
 
@@ -831,6 +900,12 @@ export function SubscriptionRenewalTestingPage() {
           ))}
         </CardContent>
       </Card>
+
+      <ApiTransactionInspector
+        livePayload={livePreview.payload}
+        livePayloadTitle={livePreview.title}
+        transaction={transaction}
+      />
     </Stack>
   )
 }

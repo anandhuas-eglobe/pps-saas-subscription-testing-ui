@@ -23,8 +23,9 @@ import VerifiedIcon from '@mui/icons-material/Verified'
 import { getActiveSubscription, listInvoices } from '../api/merchant'
 import { ApiRequestError } from '../api/client'
 import { checkRedisDevToolsHealth, publishEventToRedisStream } from '../api/redisDevTools'
-import { ApiLogPanel } from '../components/ApiLogPanel'
+import { ApiTransactionInspector } from '../components/ApiTransactionInspector'
 import { PageHeader } from '../components/layout/PageHeader'
+import { useApiTransaction } from '../hooks/useApiTransaction'
 import {
   RESELLER_OVERAGE_REQUESTED_STREAM,
   buildResellerOverageDockerRedisXAddCommand,
@@ -67,8 +68,7 @@ export function ResellerOveragePublishPage() {
   const [rawJson, setRawJson] = useState('')
   const [rawJsonError, setRawJsonError] = useState<string | null>(null)
   const [publishing, setPublishing] = useState(false)
-  const [publishResult, setPublishResult] = useState<unknown>(null)
-  const [publishError, setPublishError] = useState<unknown>(null)
+  const { transaction, execute, clear } = useApiTransaction()
   const [devToolsAvailable, setDevToolsAvailable] = useState<boolean | null>(null)
   const [loadingMerchant, setLoadingMerchant] = useState(false)
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string }>({
@@ -172,26 +172,27 @@ export function ResellerOveragePublishPage() {
     }
 
     setPublishing(true)
-    setPublishError(null)
-    setPublishResult(null)
 
     try {
-      const result = await publishEventToRedisStream(activeEvent, {
-        stream: RESELLER_OVERAGE_REQUESTED_STREAM,
-        redis: {
-          host: form.redisHost,
-          port: form.redisPort,
-          password: form.redisPassword,
-          db: 0,
-        },
-      })
-      setPublishResult(result)
+      const result = await execute(
+        activeEvent,
+        () =>
+          publishEventToRedisStream(activeEvent, {
+            stream: RESELLER_OVERAGE_REQUESTED_STREAM,
+            redis: {
+              host: form.redisHost,
+              port: form.redisPort,
+              password: form.redisPassword,
+              db: 0,
+            },
+          }),
+        `POST /dev-tools/redis/publish (${RESELLER_OVERAGE_REQUESTED_STREAM})`,
+      )
       setSnackbar({ open: true, message: result.message })
       if (tab === 0) {
         setForm((current) => ({ ...current, eventId: crypto.randomUUID() }))
       }
     } catch (error) {
-      setPublishError(error)
       setSnackbar({
         open: true,
         message: error instanceof Error ? error.message : 'Failed to publish to Redis stream',
@@ -205,8 +206,7 @@ export function ResellerOveragePublishPage() {
     setForm(createDefaultResellerOveragePublishForm())
     setRawJson('')
     setRawJsonError(null)
-    setPublishResult(null)
-    setPublishError(null)
+    clear()
   }
 
   const handleNewEventId = () => {
@@ -511,19 +511,11 @@ export function ResellerOveragePublishPage() {
         </CardContent>
       </Card>
 
-      <ApiLogPanel
-        title="Publish result"
-        payload={activeEvent ?? undefined}
-        response={
-          publishResult
-            ? {
-                success: true,
-                data: publishResult,
-                timestamp: new Date().toISOString(),
-              }
-            : null
-        }
-        error={publishError}
+      <ApiTransactionInspector
+        livePayload={activeEvent ?? undefined}
+        livePayloadTitle="Redis stream event preview"
+        transaction={transaction}
+        logTitle="Publish result"
       />
 
       <Card>

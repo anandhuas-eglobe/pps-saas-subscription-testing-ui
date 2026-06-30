@@ -19,6 +19,8 @@ import { SubscriptionHistoryPanel } from '../components/merchant/SubscriptionHis
 import { SubscriptionLimitsAndUsagesPanel } from '../components/merchant/SubscriptionLimitsAndUsagesPanel'
 import { SubscriptionManagementPanel } from '../components/merchant/SubscriptionManagementPanel'
 import { PlanDetailView } from '../components/plans/PlanDetailView'
+import { ApiTransactionInspector } from '../components/ApiTransactionInspector'
+import { useApiTransaction } from '../hooks/useApiTransaction'
 import type { ActivePlanAddonsResponse, ActiveSubscriptionResponse } from '../types/subscription'
 
 type ActiveSubscriptionTab = 'overview' | 'limits' | 'addons' | 'manage' | 'history'
@@ -46,12 +48,18 @@ export function ActiveSubscriptionPage() {
   const [error, setError] = useState<string | null>(null)
   const [addonsError, setAddonsError] = useState<string | null>(null)
 
+  const { transaction, execute } = useApiTransaction()
+
   const loadAddons = useCallback(async () => {
     setAddonsLoading(true)
     setAddonsError(null)
 
     try {
-      const result = await getActivePlanAddons()
+      const result = await execute(
+        {},
+        () => getActivePlanAddons(),
+        'GET /api/v1/merchant/subscription/active-plan/addons',
+      )
       setAddonsData(result)
     } catch (err) {
       const message =
@@ -65,7 +73,7 @@ export function ActiveSubscriptionPage() {
     } finally {
       setAddonsLoading(false)
     }
-  }, [])
+  }, [execute])
 
   const loadSubscription = useCallback(async () => {
     setLoading(true)
@@ -76,7 +84,11 @@ export function ActiveSubscriptionPage() {
     setAddonsError(null)
 
     try {
-      const result = await getActiveSubscription()
+      const result = await execute(
+        {},
+        () => getActiveSubscription(),
+        'GET /api/v1/merchant/subscription/active',
+      )
       setData(result)
       void loadAddons()
     } catch (err) {
@@ -95,7 +107,7 @@ export function ActiveSubscriptionPage() {
     } finally {
       setLoading(false)
     }
-  }, [loadAddons])
+  }, [execute, loadAddons])
 
   useEffect(() => {
     void loadSubscription()
@@ -227,6 +239,8 @@ export function ActiveSubscriptionPage() {
           {activeTab === 'history' && <SubscriptionHistoryPanel />}
         </Stack>
       )}
+
+      <ApiTransactionInspector transaction={transaction} showLivePreview={false} />
     </Stack>
   )
 }

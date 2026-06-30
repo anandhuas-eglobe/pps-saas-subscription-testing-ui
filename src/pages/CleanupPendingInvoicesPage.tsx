@@ -22,9 +22,10 @@ import TerminalIcon from '@mui/icons-material/Terminal'
 import { listInvoices } from '../api/merchant'
 import { ApiRequestError } from '../api/client'
 import { checkRedisDevToolsHealth, publishEventToRedisStream } from '../api/redisDevTools'
-import { ApiLogPanel } from '../components/ApiLogPanel'
+import { ApiTransactionInspector } from '../components/ApiTransactionInspector'
 import { PageHeader } from '../components/layout/PageHeader'
 import { InvoicePickerSelect } from '../components/payment/InvoicePickerSelect'
+import { useApiTransaction } from '../hooks/useApiTransaction'
 import { InvoiceStatus, type InvoiceListItem } from '../types/subscription'
 import {
   loadLastPaymentHandoff,
@@ -72,8 +73,7 @@ export function CleanupPendingInvoicesPage() {
   const [rawJson, setRawJson] = useState('')
   const [rawJsonError, setRawJsonError] = useState<string | null>(null)
   const [publishing, setPublishing] = useState(false)
-  const [publishResult, setPublishResult] = useState<unknown>(null)
-  const [publishError, setPublishError] = useState<unknown>(null)
+  const { transaction, execute, clear } = useApiTransaction()
   const [devToolsAvailable, setDevToolsAvailable] = useState<boolean | null>(null)
   const [invoices, setInvoices] = useState<InvoiceListItem[]>([])
   const [loadingInvoices, setLoadingInvoices] = useState(false)
@@ -194,27 +194,28 @@ export function CleanupPendingInvoicesPage() {
     }
 
     setPublishing(true)
-    setPublishError(null)
-    setPublishResult(null)
 
     try {
-      const result = await publishEventToRedisStream(activeEvent, {
-        stream: CLEANUP_PENDING_INVOICES_REQUESTED_STREAM,
-        redis: {
-          host: form.redisHost,
-          port: form.redisPort,
-          password: form.redisPassword,
-          db: 0,
-        },
-      })
-      setPublishResult(result)
+      const result = await execute(
+        activeEvent,
+        () =>
+          publishEventToRedisStream(activeEvent, {
+            stream: CLEANUP_PENDING_INVOICES_REQUESTED_STREAM,
+            redis: {
+              host: form.redisHost,
+              port: form.redisPort,
+              password: form.redisPassword,
+              db: 0,
+            },
+          }),
+        `POST /dev-tools/redis/publish (${CLEANUP_PENDING_INVOICES_REQUESTED_STREAM})`,
+      )
       setSnackbar({ open: true, message: result.message })
       if (tab === 0) {
         setForm((current) => ({ ...current, eventId: crypto.randomUUID() }))
       }
       void loadInvoices()
     } catch (error) {
-      setPublishError(error)
       setSnackbar({
         open: true,
         message: error instanceof Error ? error.message : 'Failed to publish to Redis stream',
@@ -249,8 +250,7 @@ export function CleanupPendingInvoicesPage() {
     setSelectedInvoiceId('')
     setRawJson('')
     setRawJsonError(null)
-    setPublishResult(null)
-    setPublishError(null)
+    clear()
   }
 
   const handleNewEventId = () => {
@@ -576,19 +576,11 @@ export function CleanupPendingInvoicesPage() {
         </CardContent>
       </Card>
 
-      <ApiLogPanel
-        title="Publish result"
-        payload={activeEvent ?? undefined}
-        response={
-          publishResult
-            ? {
-                success: true,
-                data: publishResult,
-                timestamp: new Date().toISOString(),
-              }
-            : null
-        }
-        error={publishError}
+      <ApiTransactionInspector
+        livePayload={activeEvent ?? undefined}
+        livePayloadTitle="Redis stream event preview"
+        transaction={transaction}
+        logTitle="Publish result"
       />
 
       <Card>

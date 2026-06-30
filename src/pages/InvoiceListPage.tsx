@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Alert from '@mui/material/Alert'
 import Button from '@mui/material/Button'
 import Card from '@mui/material/Card'
@@ -26,7 +26,9 @@ import VisibilityIcon from '@mui/icons-material/Visibility'
 import { Link as RouterLink, useNavigate } from 'react-router-dom'
 import { listInvoices } from '../api/merchant'
 import { ApiRequestError } from '../api/client'
+import { ApiTransactionInspector } from '../components/ApiTransactionInspector'
 import { PageHeader } from '../components/layout/PageHeader'
+import { useApiTransaction } from '../hooks/useApiTransaction'
 import { InvoiceStatus, type InvoiceListItem } from '../types/subscription'
 import {
   formatDateTime,
@@ -49,21 +51,31 @@ export function InvoiceListPage() {
   const [dateTo, setDateTo] = useState('')
   const [sortBy, setSortBy] = useState('createdAt')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const { transaction, execute } = useApiTransaction()
+
+  const listQueryPayload = useMemo(
+    () => ({
+      page,
+      limit: 10,
+      status: statusFilter || undefined,
+      subscriptionId: subscriptionIdFilter || undefined,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
+      sortBy,
+      sortOrder,
+    }),
+    [page, statusFilter, subscriptionIdFilter, dateFrom, dateTo, sortBy, sortOrder],
+  )
 
   const loadInvoices = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const result = await listInvoices({
-        page,
-        limit: 10,
-        status: statusFilter || undefined,
-        subscriptionId: subscriptionIdFilter || undefined,
-        dateFrom: dateFrom || undefined,
-        dateTo: dateTo || undefined,
-        sortBy,
-        sortOrder,
-      })
+      const result = await execute(
+        listQueryPayload,
+        () => listInvoices(listQueryPayload),
+        'GET /api/v1/merchant/subscription/invoices',
+      )
       setInvoices(result.invoices)
       setTotalPages(result.pagination.totalPages)
       setTotal(result.pagination.total)
@@ -79,7 +91,7 @@ export function InvoiceListPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, statusFilter, subscriptionIdFilter, dateFrom, dateTo, sortBy, sortOrder])
+  }, [execute, listQueryPayload])
 
   useEffect(() => {
     void loadInvoices()
@@ -291,6 +303,12 @@ export function InvoiceListPage() {
           )}
         </CardContent>
       </Card>
+
+      <ApiTransactionInspector
+        livePayload={listQueryPayload}
+        livePayloadTitle="List invoices query"
+        transaction={transaction}
+      />
     </Stack>
   )
 }

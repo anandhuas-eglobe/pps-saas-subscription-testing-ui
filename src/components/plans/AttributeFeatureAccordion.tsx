@@ -108,6 +108,7 @@ export const AttributeFeatureAccordion = memo(function AttributeFeatureAccordion
                 configs[attribute.id] ?? defaultAttributeConfig(attribute.attributeCode)
               const isVolumePrice = config.priceType === PriceType.VOLUME_PRICE
               const isPerCount = config.priceType === PriceType.PER_COUNT
+              const isLinkedToMonthlyOrderVolume = linkFlags[attribute.id] ?? false
 
               return (
                 <Box
@@ -136,6 +137,9 @@ export const AttributeFeatureAccordion = memo(function AttributeFeatureAccordion
                           <TuneIcon fontSize="small" color="action" />
                           <Typography variant="subtitle2">{attribute.attributeName}</Typography>
                           <Chip label={attribute.attributeCode} size="small" />
+                          {attribute.isLinkable && (
+                            <Chip label="Linkable" size="small" color="info" variant="outlined" />
+                          )}
                         </Stack>
                       }
                       sx={{ m: 0, flex: 1 }}
@@ -194,7 +198,40 @@ export const AttributeFeatureAccordion = memo(function AttributeFeatureAccordion
                         onChange={(patch) => onConfigChange(attribute.id, patch)}
                       />
 
-                      {isPerCount && (
+                      {attribute.isLinkable && isPerCount && (
+                        <Grid size={{ xs: 12 }}>
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                checked={isLinkedToMonthlyOrderVolume}
+                                onChange={(event) =>
+                                  onLinkFlagChange(attribute.id, event.target.checked)
+                                }
+                              />
+                            }
+                            label="Link to monthly order volume"
+                          />
+                        </Grid>
+                      )}
+
+                      {attribute.isLinkable && isVolumePrice && (
+                        <Grid size={{ xs: 12 }}>
+                          <Alert severity="info" sx={{ py: 0.5 }}>
+                            Link to monthly order volume is only available with PER_COUNT pricing.
+                          </Alert>
+                        </Grid>
+                      )}
+
+                      {isLinkedToMonthlyOrderVolume && (
+                        <Grid size={{ xs: 12 }}>
+                          <Alert severity="info" sx={{ py: 0.5 }}>
+                            Limits follow the plan&apos;s required MONTHLY_ORDER_VOLUME attribute.
+                            Set per-unit prices only; min/max limits are omitted from the payload.
+                          </Alert>
+                        </Grid>
+                      )}
+
+                      {isPerCount && !isLinkedToMonthlyOrderVolume && (
                         <>
                           <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                             <TextField
@@ -225,7 +262,11 @@ export const AttributeFeatureAccordion = memo(function AttributeFeatureAccordion
                               }
                             />
                           </Grid>
+                        </>
+                      )}
 
+                      {isPerCount && (
+                        <>
                           <Grid size={{ xs: 12, sm: 6 }}>
                             <TextField
                               fullWidth
@@ -310,30 +351,6 @@ export const AttributeFeatureAccordion = memo(function AttributeFeatureAccordion
                         addonTrialPeriod={config.addonTrialPeriod}
                         onChange={(patch) => onConfigChange(attribute.id, patch)}
                       />
-
-                      {attribute.isLinkable && isPerCount && (
-                        <Grid size={{ xs: 12 }}>
-                          <FormControlLabel
-                            control={
-                              <Switch
-                                checked={linkFlags[attribute.id] ?? false}
-                                onChange={(event) =>
-                                  onLinkFlagChange(attribute.id, event.target.checked)
-                                }
-                              />
-                            }
-                            label="Link to monthly order volume"
-                          />
-                        </Grid>
-                      )}
-
-                      {attribute.isLinkable && isVolumePrice && (
-                        <Grid size={{ xs: 12 }}>
-                          <Alert severity="info" sx={{ py: 0.5 }}>
-                            Link to monthly order volume is only available with PER_COUNT pricing.
-                          </Alert>
-                        </Grid>
-                      )}
                     </Grid>
                   )}
                 </Box>

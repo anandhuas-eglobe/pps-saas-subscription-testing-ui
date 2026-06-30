@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Alert from '@mui/material/Alert'
 import Button from '@mui/material/Button'
 import Card from '@mui/material/Card'
@@ -27,6 +27,8 @@ import { Link as RouterLink } from 'react-router-dom'
 import { initiateManualOveragePayment, listOverageHistory } from '../api/overage'
 import { ApiRequestError } from '../api/client'
 import { PageHeader } from '../components/layout/PageHeader'
+import { ApiTransactionInspector } from '../components/ApiTransactionInspector'
+import { useApiTransaction } from '../hooks/useApiTransaction'
 import {
   MerchantSubscriptionOverageStatus,
   OverageType,
@@ -59,19 +61,39 @@ export function MerchantOveragePage() {
   const [paymentResult, setPaymentResult] = useState<ManualOveragePaymentResult | null>(null)
   const [paymentError, setPaymentError] = useState<string | null>(null)
 
+  const { transaction, execute } = useApiTransaction()
+
+  const livePayload = useMemo(
+    () => ({
+      page,
+      limit: 10,
+      status: statusFilter || undefined,
+      overageType: overageTypeFilter || undefined,
+      attributeCode: attributeCode || undefined,
+      sortBy: 'createdAt',
+      sortOrder: 'desc',
+    }),
+    [page, statusFilter, overageTypeFilter, attributeCode],
+  )
+
   const loadOverage = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const result = await listOverageHistory({
-        page,
-        limit: 10,
-        status: statusFilter || undefined,
-        overageType: overageTypeFilter || undefined,
-        attributeCode: attributeCode || undefined,
-        sortBy: 'createdAt',
-        sortOrder: 'desc',
-      })
+      const result = await execute(
+        livePayload,
+        () =>
+          listOverageHistory({
+            page,
+            limit: 10,
+            status: statusFilter || undefined,
+            overageType: overageTypeFilter || undefined,
+            attributeCode: attributeCode || undefined,
+            sortBy: 'createdAt',
+            sortOrder: 'desc',
+          }),
+        'GET /api/v1/merchant/overage-tracking',
+      )
       setItems(result.items)
       setTotalPages(result.pagination.totalPages)
       setTotal(result.pagination.total)
@@ -87,7 +109,7 @@ export function MerchantOveragePage() {
     } finally {
       setLoading(false)
     }
-  }, [page, statusFilter, overageTypeFilter, attributeCode])
+  }, [execute, livePayload, page, statusFilter, overageTypeFilter, attributeCode])
 
   useEffect(() => {
     void loadOverage()
@@ -98,7 +120,11 @@ export function MerchantOveragePage() {
     setPaymentError(null)
     setPaymentResult(null)
     try {
-      const result = await initiateManualOveragePayment()
+      const result = await execute(
+        {},
+        () => initiateManualOveragePayment(),
+        'POST /api/v1/merchant/overage-tracking/manual-payment',
+      )
       setPaymentResult(result)
       if (result.paymentHandoff) {
         saveLastPaymentHandoff(result.paymentHandoff)
@@ -314,6 +340,12 @@ export function MerchantOveragePage() {
           )}
         </>
       )}
+
+      <ApiTransactionInspector
+        livePayload={livePayload}
+        transaction={transaction}
+        livePayloadTitle="Request preview"
+      />
     </Stack>
   )
 }

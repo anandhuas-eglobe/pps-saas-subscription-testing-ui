@@ -40,8 +40,10 @@ import {
   publishEventToRedisStream,
 } from '../api/redisDevTools'
 import { ApiErrorAlert } from '../components/ApiErrorAlert'
+import { ApiTransactionInspector } from '../components/ApiTransactionInspector'
 import { PageHeader } from '../components/layout/PageHeader'
 import { UsageSimulationPanel } from '../components/merchant/UsageSimulationPanel'
+import { useApiTransaction } from '../hooks/useApiTransaction'
 import type {
   ActiveSubscriptionResponse,
   ManualOveragePaymentResult,
@@ -67,6 +69,10 @@ import {
 } from '../utils/resellerOverageEventBuilder'
 
 const DEFAULT_MOCK_MERCHANT_ID = '00000000-0000-4000-8000-000000000003'
+
+const OVERAGE_LIST_QUERY = { limit: 20, sortBy: 'createdAt' as const, sortOrder: 'desc' as const }
+
+type OveragePreviewKind = 'list' | 'payment' | 'reseller' | 'redis'
 
 function overageStatusColor(status: string): 'success' | 'warning' | 'error' | 'default' {
   if (status === MerchantSubscriptionOverageStatus.PAID) return 'success'
@@ -103,6 +109,8 @@ export function OverageTestingPage() {
   const [paymentConfirmMessage, setPaymentConfirmMessage] = useState<string | null>(null)
 
   const [scenarioFilter, setScenarioFilter] = useState<OverageScenarioCategory | 'all'>('all')
+  const [previewKind, setPreviewKind] = useState<OveragePreviewKind>('list')
+  const { transaction, execute } = useApiTransaction()
 
   const subscription = subscriptionData?.subscription
   const plan = subscriptionData?.plan
@@ -141,10 +149,15 @@ export function OverageTestingPage() {
   const loadAll = useCallback(async () => {
     setLoading(true)
     setError(null)
+    setPreviewKind('list')
     try {
       const [activeSub, historyResult] = await Promise.all([
         getActiveSubscription(),
-        listOverageHistory({ limit: 20, sortBy: 'createdAt', sortOrder: 'desc' }).catch(() => ({
+        execute(
+          OVERAGE_LIST_QUERY,
+          () => listOverageHistory(OVERAGE_LIST_QUERY),
+          'GET /api/v1/merchant/overage-tracking',
+        ).catch(() => ({
           items: [],
           pagination: { total: 0, page: 1, limit: 20, totalPages: 1, hasNext: false, hasPrev: false },
         })),
@@ -166,25 +179,26 @@ export function OverageTestingPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [execute])
 
   const refreshUsage = useCallback(async () => {
     setRefreshingUsage(true)
+    setPreviewKind('list')
     try {
       const activeSub = await getActiveSubscription()
       setSubscriptionData(activeSub)
-      const historyResult = await listOverageHistory({
-        limit: 20,
-        sortBy: 'createdAt',
-        sortOrder: 'desc',
-      })
+      const historyResult = await execute(
+        OVERAGE_LIST_QUERY,
+        () => listOverageHistory(OVERAGE_LIST_QUERY),
+        'GET /api/v1/merchant/overage-tracking',
+      )
       setOverageHistory(historyResult.items)
     } catch {
       // Keep last known snapshot on background refresh failure.
     } finally {
       setRefreshingUsage(false)
     }
-  }, [])
+  }, [execute])
 
   useEffect(() => {
     void loadAll()
@@ -257,24 +271,30 @@ export function OverageTestingPage() {
     setResellerPublishing(true)
     setResellerError(null)
     setResellerMessage(null)
-    try {
-      const event = buildResellerOverageRequestedEvent({
-        eventId: crypto.randomUUID(),
-        merchantId: resellerMerchantId.trim(),
-        overageAmount: parsedAmount,
-        correlationId: `reseller-overage-ui-${Date.now()}`,
-        entityId: crypto.randomUUID(),
-        entityName: 'TEST-ORDER-OVERAGE',
-        redisContainer: 'pps-redis',
-        redisPassword: 'bitnami',
-        redisHost: 'localhost',
-        redisPort: 6790,
-      })
+    setPreviewKind('reseller')
+    const event = buildResellerOverageRequestedEvent({
+      eventId: crypto.randomUUID(),
+      merchantId: resellerMerchantId.trim(),
+      overageAmount: parsedAmount,
+      correlationId: `reseller-overage-ui-${Date.now()}`,
+      entityId: crypto.randomUUID(),
+      entityName: 'TEST-ORDER-OVERAGE',
+      redisContainer: 'pps-redis',
+      redisPassword: 'bitnami',
+      redisHost: 'localhost',
+      redisPort: 6790,
+    })
 
-      await publishEventToRedisStream(event, {
-        stream: RESELLER_OVERAGE_REQUESTED_STREAM,
-        redis: DEFAULT_REDIS_CONNECTION,
-      })
+    try {
+      await execute(
+        event,
+        () =>
+          publishEventToRedisStream(event, {
+            stream: RESELLER_OVERAGE_REQUESTED_STREAM,
+            redis: DEFAULT_REDIS_CONNECTION,
+          }),
+        `POST /dev-tools/redis/publish (${RESELLER_OVERAGE_REQUESTED_STREAM})`,
+      )
 
       setResellerMessage(`Published ResellerOverageRequested (${parsedAmount}) to Redis`)
       await refreshUsage()
@@ -290,8 +310,15 @@ export function OverageTestingPage() {
     setPaymentError(null)
     setPaymentResult(null)
     setPaymentConfirmMessage(null)
+    setPreviewKind('payment')
+    const payload = {}
+
     try {
-      const result = await initiateManualOveragePayment()
+      const result = await execute(
+        payload,
+        () => initiateManualOveragePayment(),
+        'POST /api/v1/merchant/overage-tracking/manual-payment',
+      )
       setPaymentResult(result)
       if (result.paymentHandoff) {
         saveLastPaymentHandoff(result.paymentHandoff)
@@ -312,12 +339,19 @@ export function OverageTestingPage() {
     if (!handoff) return
 
     setConfirmingPayment(true)
+    setPreviewKind('redis')
+    const event = buildSucceededPaymentEventFromHandoff(handoff)
+
     try {
-      const event = buildSucceededPaymentEventFromHandoff(handoff)
-      await publishEventToRedisStream(event, {
-        stream: 'payment.invoice.status.updated',
-        redis: DEFAULT_REDIS_CONNECTION,
-      })
+      await execute(
+        event,
+        () =>
+          publishEventToRedisStream(event, {
+            stream: 'payment.invoice.status.updated',
+            redis: DEFAULT_REDIS_CONNECTION,
+          }),
+        'POST /dev-tools/redis/publish (payment.invoice.status.updated)',
+      )
       setPaymentConfirmMessage(`Published PAYMENT_SUCCEEDED for ${handoff.invoiceNumber}`)
       await refreshUsage()
     } catch (err) {
@@ -333,6 +367,42 @@ export function OverageTestingPage() {
       : overageTestScenarios.filter((scenario) => scenario.category === scenarioFilter)
 
   const failedOverageCount = overageTotals.byStatus.FAILED
+
+  const resellerPreviewPayload = useMemo(
+    () =>
+      buildResellerOverageRequestedEvent({
+        eventId: 'preview-event-id',
+        merchantId: resellerMerchantId.trim(),
+        overageAmount: Number(resellerAmount) || 0,
+        correlationId: 'reseller-overage-ui-preview',
+        entityId: 'preview-order-id',
+        entityName: 'TEST-ORDER-OVERAGE',
+        redisContainer: 'pps-redis',
+        redisPassword: 'bitnami',
+        redisHost: 'localhost',
+        redisPort: 6790,
+      }),
+    [resellerMerchantId, resellerAmount],
+  )
+
+  const redisPreviewPayload = useMemo(() => {
+    const handoff = paymentResult?.paymentHandoff
+    if (!handoff) return null
+    return buildSucceededPaymentEventFromHandoff(handoff)
+  }, [paymentResult])
+
+  const livePreview = useMemo(() => {
+    if (previewKind === 'redis' && redisPreviewPayload) {
+      return { title: 'Redis payment event preview', payload: redisPreviewPayload }
+    }
+    if (previewKind === 'reseller') {
+      return { title: 'Reseller overage event preview', payload: resellerPreviewPayload }
+    }
+    if (previewKind === 'payment') {
+      return { title: 'Manual overage payment preview', payload: {} }
+    }
+    return { title: 'Overage history query preview', payload: OVERAGE_LIST_QUERY }
+  }, [previewKind, redisPreviewPayload, resellerPreviewPayload])
 
   return (
     <Stack spacing={3}>
@@ -573,7 +643,10 @@ export function OverageTestingPage() {
                     size="small"
                     label="Merchant ID"
                     value={resellerMerchantId}
-                    onChange={(event) => setResellerMerchantId(event.target.value)}
+                    onChange={(event) => {
+                      setPreviewKind('reseller')
+                      setResellerMerchantId(event.target.value)
+                    }}
                   />
                 </Grid>
                 <Grid size={{ xs: 12, md: 3 }}>
@@ -583,7 +656,10 @@ export function OverageTestingPage() {
                     label="Overage amount"
                     type="number"
                     value={resellerAmount}
-                    onChange={(event) => setResellerAmount(event.target.value)}
+                    onChange={(event) => {
+                      setPreviewKind('reseller')
+                      setResellerAmount(event.target.value)
+                    }}
                     slotProps={{ htmlInput: { min: 0.01, step: 0.01 } }}
                   />
                 </Grid>
@@ -803,6 +879,12 @@ export function OverageTestingPage() {
           ))}
         </CardContent>
       </Card>
+
+      <ApiTransactionInspector
+        livePayload={livePreview.payload}
+        livePayloadTitle={livePreview.title}
+        transaction={transaction}
+      />
     </Stack>
   )
 }

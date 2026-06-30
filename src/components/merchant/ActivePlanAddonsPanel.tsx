@@ -9,13 +9,15 @@ import Divider from '@mui/material/Divider'
 import Grid from '@mui/material/Grid'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
-import { useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import CancelIcon from '@mui/icons-material/Cancel'
 import ExtensionIcon from '@mui/icons-material/Extension'
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart'
 import { Link as RouterLink } from 'react-router-dom'
 import { cancelAddonSubscription } from '../../api/merchant'
 import { ApiRequestError } from '../../api/client'
+import { ApiTransactionInspector } from '../ApiTransactionInspector'
+import { useApiTransaction } from '../../hooks/useApiTransaction'
 import type { ActivePlanAddonItem } from '../../types/subscription'
 import { FeatureType } from '../../types/subscription'
 import {
@@ -51,10 +53,14 @@ function AddonCard({
   addon,
   planCurrency,
   onCancelled,
+  onCancel,
+  onCancelHover,
 }: {
   addon: ActivePlanAddonItem
   planCurrency: string
   onCancelled?: () => void
+  onCancel?: (addonSubscriptionId: string) => Promise<string | void>
+  onCancelHover?: (addonSubscriptionId: string | null) => void
 }) {
   const [cancelling, setCancelling] = useState(false)
   const [cancelError, setCancelError] = useState<string | null>(null)
@@ -65,8 +71,15 @@ function AddonCard({
     setCancelError(null)
     setCancelMessage(null)
     try {
-      const result = await cancelAddonSubscription(addon.addonSubscriptionId)
-      setCancelMessage(result.message)
+      if (onCancel) {
+        const message = await onCancel(addon.addonSubscriptionId)
+        if (message) {
+          setCancelMessage(message)
+        }
+      } else {
+        const result = await cancelAddonSubscription(addon.addonSubscriptionId)
+        setCancelMessage(result.message)
+      }
       onCancelled?.()
     } catch (err) {
       const message =
@@ -210,6 +223,8 @@ function AddonCard({
               size="small"
               startIcon={<CancelIcon />}
               disabled={cancelling}
+              onMouseEnter={() => onCancelHover?.(addon.addonSubscriptionId)}
+              onMouseLeave={() => onCancelHover?.(null)}
               onClick={() => void handleCancel()}
             >
               {cancelling ? 'Cancelling…' : 'Cancel add-on subscription'}
@@ -229,6 +244,27 @@ export function ActivePlanAddonsPanel({
   onRetry,
   onCancelled,
 }: ActivePlanAddonsPanelProps) {
+  const { transaction, execute } = useApiTransaction()
+  const [cancelPreviewId, setCancelPreviewId] = useState<string | null>(null)
+
+  const livePayload = useMemo(
+    () => (cancelPreviewId ? { addonSubscriptionId: cancelPreviewId } : undefined),
+    [cancelPreviewId],
+  )
+
+  const handleCancelAddon = useCallback(
+    async (addonSubscriptionId: string) => {
+      const payload = { addonSubscriptionId }
+      const result = await execute(
+        payload,
+        () => cancelAddonSubscription(addonSubscriptionId),
+        'POST /api/v1/merchant/subscription/addon/cancel',
+      )
+      return result.message
+    },
+    [execute],
+  )
+
   if (loading) {
     return (
       <Stack sx={{ py: 6, alignItems: 'center' }}>
@@ -292,8 +328,16 @@ export function ActivePlanAddonsPanel({
           addon={addon}
           planCurrency={planCurrency}
           onCancelled={onCancelled}
+          onCancel={handleCancelAddon}
+          onCancelHover={setCancelPreviewId}
         />
       ))}
+
+      <ApiTransactionInspector
+        livePayload={livePayload}
+        transaction={transaction}
+        livePayloadTitle="Request preview"
+      />
     </Stack>
   )
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Alert from '@mui/material/Alert'
 import Button from '@mui/material/Button'
 import CircularProgress from '@mui/material/CircularProgress'
@@ -12,7 +12,9 @@ import RefreshIcon from '@mui/icons-material/Refresh'
 import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom'
 import { getPlanById, updatePlanStatus } from '../api/plans'
 import { ApiRequestError } from '../api/client'
+import { ApiTransactionInspector } from '../components/ApiTransactionInspector'
 import { PageHeader } from '../components/layout/PageHeader'
+import { useApiTransaction } from '../hooks/useApiTransaction'
 import { DeactivatePlanDialog } from '../components/plans/DeactivatePlanDialog'
 import { PlanDetailView } from '../components/plans/PlanDetailView'
 import type { PlanDetail } from '../types/subscription'
@@ -34,6 +36,20 @@ export function PlanDetailPage() {
     message: '',
     severity: 'success',
   })
+  const { transaction, execute } = useApiTransaction()
+
+  const livePayload = useMemo(() => {
+    if (!planId) {
+      return undefined
+    }
+    if (deactivateDialogOpen) {
+      return { status: PlanStatus.INACTIVE }
+    }
+    if (plan && isDraftPlan(plan.status)) {
+      return { status: PlanStatus.ACTIVE }
+    }
+    return { planId }
+  }, [planId, deactivateDialogOpen, plan])
 
   const loadPlan = useCallback(async () => {
     if (!planId) {
@@ -45,7 +61,11 @@ export function PlanDetailPage() {
     setLoading(true)
     setError(null)
     try {
-      const detail = await getPlanById(planId)
+      const detail = await execute(
+        { planId },
+        () => getPlanById(planId),
+        `GET /api/v1/admin/plans/${planId}`,
+      )
       setPlan(detail)
     } catch (err) {
       const message =
@@ -59,7 +79,7 @@ export function PlanDetailPage() {
     } finally {
       setLoading(false)
     }
-  }, [planId])
+  }, [planId, execute])
 
   useEffect(() => {
     void loadPlan()
@@ -71,8 +91,13 @@ export function PlanDetailPage() {
     }
 
     setStatusUpdating(true)
+    const payload = { status: PlanStatus.ACTIVE }
     try {
-      await updatePlanStatus(planId, { status: PlanStatus.ACTIVE })
+      await execute(
+        payload,
+        () => updatePlanStatus(planId, payload),
+        `PATCH /api/v1/admin/plans/${planId}`,
+      )
       setSnackbar({ open: true, message: 'Plan activated successfully', severity: 'success' })
       await loadPlan()
     } catch (err) {
@@ -98,11 +123,16 @@ export function PlanDetailPage() {
     }
 
     setStatusUpdating(true)
+    const payload = {
+      status: PlanStatus.INACTIVE,
+      ...options,
+    }
     try {
-      await updatePlanStatus(planId, {
-        status: PlanStatus.INACTIVE,
-        ...options,
-      })
+      await execute(
+        payload,
+        () => updatePlanStatus(planId, payload),
+        `PATCH /api/v1/admin/plans/${planId}`,
+      )
       setDeactivateDialogOpen(false)
       setSnackbar({ open: true, message: 'Plan deactivated successfully', severity: 'success' })
       await loadPlan()
@@ -209,6 +239,12 @@ export function PlanDetailPage() {
         )}
 
         {!loading && !error && plan && <PlanDetailView plan={plan} />}
+
+        <ApiTransactionInspector
+          livePayload={livePayload}
+          livePayloadTitle="Plan API payload"
+          transaction={transaction}
+        />
       </Stack>
 
       {plan && (

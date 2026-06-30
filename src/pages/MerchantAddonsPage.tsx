@@ -28,6 +28,8 @@ import { PageHeader } from '../components/layout/PageHeader'
 import { AddonCartConfigurator } from '../components/merchant/AddonCartConfigurator'
 import { AddonCartPreviewPanel } from '../components/merchant/AddonCartPreviewPanel'
 import { ValidationErrorsAlert } from '../components/ValidationErrorsAlert'
+import { ApiTransactionInspector } from '../components/ApiTransactionInspector'
+import { useApiTransaction } from '../hooks/useApiTransaction'
 import type {
   ActiveSubscriptionResponse,
   BillingAddress,
@@ -78,6 +80,8 @@ export function MerchantAddonsPage() {
     severity: 'success',
   })
 
+  const { transaction, execute } = useApiTransaction()
+
   const addonItems = useMemo(
     () => (subscriptionData ? extractAddonCatalogItems(subscriptionData.plan) : []),
     [subscriptionData],
@@ -88,6 +92,24 @@ export function MerchantAddonsPage() {
     [addonItems, selectedAddonKey],
   )
 
+  const livePayload = useMemo(() => {
+    if (!selectedAddon) {
+      return undefined
+    }
+    return {
+      planFeatureId: selectedAddon.planFeatureId,
+      isAddonTrial,
+      ...(selectedAddon.planFeatureAttributeId
+        ? { planFeatureAttributeId: selectedAddon.planFeatureAttributeId }
+        : {}),
+      ...(selectedAddon.featureType !== FeatureType.SIMPLE &&
+      selectedAddon.attribute &&
+      !isAddonTrial
+        ? { value: attributeValue }
+        : {}),
+    }
+  }, [selectedAddon, isAddonTrial, attributeValue])
+
   const loadSubscription = useCallback(async () => {
     setLoading(true)
     setLoadError(null)
@@ -95,7 +117,11 @@ export function MerchantAddonsPage() {
     setSubscriptionData(null)
 
     try {
-      const result = await getActiveSubscription()
+      const result = await execute(
+        {},
+        () => getActiveSubscription(),
+        'GET /api/v1/merchant/subscription/active',
+      )
       setSubscriptionData(result)
     } catch (err) {
       if (err instanceof ApiRequestError && err.status === 404) {
@@ -113,7 +139,7 @@ export function MerchantAddonsPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [execute])
 
   useEffect(() => {
     void loadSubscription()
@@ -174,7 +200,11 @@ export function MerchantAddonsPage() {
           : {}),
       }
 
-      const result = await upsertAddonCart(payload)
+      const result = await execute(
+        payload,
+        () => upsertAddonCart(payload),
+        'POST /api/v1/merchant/cart/addon',
+      )
       const preview = await getMerchantAddonCart()
       setCartPreview(preview)
       setSnackbar({ open: true, message: result.message, severity: 'success' })
@@ -201,8 +231,11 @@ export function MerchantAddonsPage() {
             isTrial: cartPreview.isTrial,
           })
         : false
-      const result = await purchaseAddonCart(
-        buildInitiatePurchasePayload(billingAddress, requiresBilling),
+      const purchasePayload = buildInitiatePurchasePayload(billingAddress, requiresBilling)
+      const result = await execute(
+        purchasePayload,
+        () => purchaseAddonCart(purchasePayload),
+        'POST /api/v1/merchant/subscription/addon/purchase',
       )
       setPurchaseResult(result)
       if (result.paymentHandoff) {
@@ -457,6 +490,12 @@ export function MerchantAddonsPage() {
           </>
         )}
       </Stack>
+
+      <ApiTransactionInspector
+        livePayload={livePayload}
+        transaction={transaction}
+        livePayloadTitle="Request preview"
+      />
 
       <Snackbar
         open={snackbar.open}

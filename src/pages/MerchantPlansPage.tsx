@@ -21,6 +21,8 @@ import { PageHeader } from '../components/layout/PageHeader'
 import { CartPreviewPanel } from '../components/merchant/CartPreviewPanel'
 import { PlanCartConfigurator } from '../components/merchant/PlanCartConfigurator'
 import { ApiErrorAlert } from '../components/ApiErrorAlert'
+import { ApiTransactionInspector } from '../components/ApiTransactionInspector'
+import { useApiTransaction } from '../hooks/useApiTransaction'
 import type {
   BillingAddress,
   BillingCycleValue,
@@ -69,16 +71,32 @@ export function MerchantPlansPage() {
     severity: 'success',
   })
 
+  const { transaction, execute } = useApiTransaction()
+
   const selectedPlan = useMemo(
     () => plans.find((plan) => plan.id === selectedPlanId) ?? null,
     [plans, selectedPlanId],
   )
 
+  const livePayload = useMemo(() => {
+    if (!selectedPlan) {
+      return undefined
+    }
+    if (isTrial) {
+      return { planId: selectedPlan.id, isTrial: true }
+    }
+    return {
+      planId: selectedPlan.id,
+      billingCycle,
+      features: selections,
+    }
+  }, [selectedPlan, isTrial, billingCycle, selections])
+
   const loadPlans = useCallback(async () => {
     setLoading(true)
     setLoadError(null)
     try {
-      const result = await listMerchantPlans()
+      const result = await execute({}, () => listMerchantPlans(), 'GET /api/v1/merchant/subscription/plans')
       setPlans(result.plans)
       setActivePlanId(result.activePlanId)
     } catch (err) {
@@ -93,7 +111,7 @@ export function MerchantPlansPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [execute])
 
   useEffect(() => {
     void loadPlans()
@@ -153,7 +171,11 @@ export function MerchantPlansPage() {
             features: selections,
           }
 
-      const result = await upsertMerchantCart(payload)
+      const result = await execute(
+        payload,
+        () => upsertMerchantCart(payload),
+        'POST /api/v1/merchant/cart/plan',
+      )
       const preview = await getMerchantCart()
       setCartPreview(preview)
       setSnackbar({ open: true, message: result.message, severity: 'success' })
@@ -181,8 +203,11 @@ export function MerchantPlansPage() {
             subscriptionAction: cartPreview.subscriptionAction,
           })
         : false
-      const result = await purchasePlanCart(
-        buildInitiatePurchasePayload(billingAddress, requiresBilling),
+      const purchasePayload = buildInitiatePurchasePayload(billingAddress, requiresBilling)
+      const result = await execute(
+        purchasePayload,
+        () => purchasePlanCart(purchasePayload),
+        'POST /api/v1/merchant/subscription/plan/purchase',
       )
       setPurchaseResult(result)
       if (result.paymentHandoff) {
@@ -380,6 +405,12 @@ export function MerchantPlansPage() {
             </Grid>
           )}
         </Grid>
+
+        <ApiTransactionInspector
+          livePayload={livePayload}
+          transaction={transaction}
+          livePayloadTitle="Request preview"
+        />
       </Stack>
 
       <Snackbar

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -47,6 +47,8 @@ import {
   resolveManualRenewalEligibleState,
 } from '../../utils/renewalEligibility'
 import { BillingAddressFields } from './BillingAddressFields'
+import { ApiTransactionInspector } from '../ApiTransactionInspector'
+import { useApiTransaction } from '../../hooks/useApiTransaction'
 
 interface SubscriptionManagementPanelProps {
   subscriptionData: ActiveSubscriptionResponse
@@ -147,15 +149,26 @@ export function SubscriptionManagementPanel({
   const [renewalResult, setRenewalResult] = useState<ManualRenewalResponse | null>(null)
   const [renewalInitError, setRenewalInitError] = useState<string | null>(null)
 
+  const { transaction, execute } = useApiTransaction()
+
   const manualRecoveryState = resolveManualRenewalEligibleState(subscription)
   const manualRecoveryCheck = checkManualRenewalEligibility(subscription)
+
+  const livePayload = useMemo(
+    () => buildInitiateManualRenewalPayload(billingAddress, includeBillingAddress),
+    [billingAddress, includeBillingAddress],
+  )
 
   const loadDowngrade = useCallback(async () => {
     setDowngradeLoading(true)
     setDowngradeError(null)
     setDowngradeNotFound(false)
     try {
-      const result = await getScheduledSubscriptionDowngrade()
+      const result = await execute(
+        {},
+        () => getScheduledSubscriptionDowngrade(),
+        'GET /api/v1/merchant/subscription/downgrade/schedule',
+      )
       setDowngrade(result)
     } catch (err) {
       if (err instanceof ApiRequestError && err.status === 404) {
@@ -174,13 +187,17 @@ export function SubscriptionManagementPanel({
     } finally {
       setDowngradeLoading(false)
     }
-  }, [])
+  }, [execute])
 
   const loadRenewalPreview = useCallback(async () => {
     setRenewalLoading(true)
     setRenewalError(null)
     try {
-      const result = await getManualSubscriptionRenewalPreview()
+      const result = await execute(
+        {},
+        () => getManualSubscriptionRenewalPreview(),
+        'GET /api/v1/merchant/subscription/renewal/preview',
+      )
       setRenewalPreview(result)
     } catch (err) {
       const message =
@@ -194,7 +211,7 @@ export function SubscriptionManagementPanel({
     } finally {
       setRenewalLoading(false)
     }
-  }, [])
+  }, [execute])
 
   useEffect(() => {
     void loadDowngrade()
@@ -206,7 +223,11 @@ export function SubscriptionManagementPanel({
     setActionError(null)
     setActionMessage(null)
     try {
-      const result = await cancelScheduledSubscriptionDowngrade()
+      const result = await execute(
+        {},
+        () => cancelScheduledSubscriptionDowngrade(),
+        'POST /api/v1/merchant/subscription/downgrade/schedule/cancel',
+      )
       setActionMessage(result.message)
       setDowngrade(null)
       setDowngradeNotFound(true)
@@ -230,7 +251,11 @@ export function SubscriptionManagementPanel({
     setActionError(null)
     setActionMessage(null)
     try {
-      const result = await cancelSubscriptionAutoRenew()
+      const result = await execute(
+        {},
+        () => cancelSubscriptionAutoRenew(),
+        'PUT /api/v1/merchant/subscription/auto-renew/cancel',
+      )
       setActionMessage(result.message)
       onChanged?.()
       void loadRenewalPreview()
@@ -255,7 +280,11 @@ export function SubscriptionManagementPanel({
     setActionMessage(null)
     try {
       const payload = buildInitiateManualRenewalPayload(billingAddress, includeBillingAddress)
-      const result = await initiateManualRenewal(payload)
+      const result = await execute(
+        payload,
+        () => initiateManualRenewal(payload),
+        'POST /api/v1/merchant/subscription/renew',
+      )
       setRenewalResult(result)
       setActionMessage(result.message)
       if (result.paymentHandoff) {
@@ -528,6 +557,12 @@ export function SubscriptionManagementPanel({
           )}
         </CardContent>
       </Card>
+
+      <ApiTransactionInspector
+        livePayload={livePayload}
+        transaction={transaction}
+        livePayloadTitle="Request preview"
+      />
     </Stack>
   )
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Alert from '@mui/material/Alert'
 import Button from '@mui/material/Button'
 import Card from '@mui/material/Card'
@@ -29,7 +29,9 @@ import { Link as RouterLink, useNavigate } from 'react-router-dom'
 import { createPlan, getPlanById, listPlans, updatePlanStatus } from '../api/plans'
 import { ApiRequestError } from '../api/client'
 import { ApiErrorAlert } from '../components/ApiErrorAlert'
+import { ApiTransactionInspector } from '../components/ApiTransactionInspector'
 import { PageHeader } from '../components/layout/PageHeader'
+import { useApiTransaction } from '../hooks/useApiTransaction'
 import type { PlanListItem } from '../types/subscription'
 import { PlanStatus, PlanType } from '../types/subscription'
 import { getApiErrorSummary } from '../utils/apiErrors'
@@ -58,20 +60,30 @@ export function ListPlansPage() {
   })
   const [duplicatingPlanId, setDuplicatingPlanId] = useState<string | null>(null)
   const [duplicateError, setDuplicateError] = useState<unknown>(null)
+  const { transaction, execute } = useApiTransaction()
+
+  const listQueryPayload = useMemo(
+    () => ({
+      page,
+      limit: 10,
+      search: search || undefined,
+      status: statusFilter || undefined,
+      planType: planTypeFilter || undefined,
+      sortBy,
+      sortOrder,
+    }),
+    [page, search, statusFilter, planTypeFilter, sortBy, sortOrder],
+  )
 
   const loadPlans = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const result = await listPlans({
-        page,
-        limit: 10,
-        search: search || undefined,
-        status: statusFilter || undefined,
-        planType: planTypeFilter || undefined,
-        sortBy,
-        sortOrder,
-      })
+      const result = await execute(
+        listQueryPayload,
+        () => listPlans(listQueryPayload),
+        'GET /api/v1/admin/plans',
+      )
       setPlans(result.plans)
       setTotalPages(result.pagination.totalPages)
       setTotal(result.pagination.total)
@@ -87,15 +99,20 @@ export function ListPlansPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, search, statusFilter, planTypeFilter, sortBy, sortOrder])
+  }, [execute, listQueryPayload])
 
   useEffect(() => {
     void loadPlans()
   }, [loadPlans])
 
   const handleActivatePlan = async (planId: string) => {
+    const payload = { status: PlanStatus.ACTIVE }
     try {
-      await updatePlanStatus(planId, { status: PlanStatus.ACTIVE })
+      await execute(
+        payload,
+        () => updatePlanStatus(planId, payload),
+        `PATCH /api/v1/admin/plans/${planId}`,
+      )
       setSnackbar({ open: true, message: 'Plan activated successfully', severity: 'success' })
       await loadPlans()
     } catch (err) {
@@ -116,7 +133,11 @@ export function ListPlansPage() {
     try {
       const source = await getPlanById(planId)
       const payload = planDetailToDuplicatePayload(source)
-      const result = await createPlan(payload)
+      const result = await execute(
+        payload,
+        () => createPlan(payload),
+        'POST /api/v1/admin/plans/create-plan',
+      )
       setSnackbar({
         open: true,
         message: `Duplicated as "${payload.planName}"`,
@@ -409,6 +430,12 @@ export function ListPlansPage() {
             )}
           </CardContent>
         </Card>
+
+        <ApiTransactionInspector
+          livePayload={listQueryPayload}
+          livePayloadTitle="List plans query"
+          transaction={transaction}
+        />
       </Stack>
 
       <Snackbar

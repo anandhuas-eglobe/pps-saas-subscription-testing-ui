@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import Alert from '@mui/material/Alert'
 import Button from '@mui/material/Button'
 import Card from '@mui/material/Card'
@@ -10,7 +10,9 @@ import Typography from '@mui/material/Typography'
 import EventAvailableIcon from '@mui/icons-material/EventAvailable'
 import { extendMerchantSubscriptionEndDate } from '../api/plans'
 import { ApiRequestError } from '../api/client'
+import { ApiTransactionInspector } from '../components/ApiTransactionInspector'
 import { PageHeader } from '../components/layout/PageHeader'
+import { useApiTransaction } from '../hooks/useApiTransaction'
 import type { ExtendMerchantSubscriptionEndDateResponse } from '../types/subscription'
 import { formatDateTime } from '../utils/planDisplay'
 
@@ -20,6 +22,14 @@ export function ExtendSubscriptionEndDatePage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<ExtendMerchantSubscriptionEndDateResponse | null>(null)
+  const { transaction, execute } = useApiTransaction()
+
+  const livePayload = useMemo(() => {
+    if (!merchantId.trim() && !days) {
+      return undefined
+    }
+    return { merchantId: merchantId.trim(), days: Number(days) }
+  }, [merchantId, days])
 
   const handleSubmit = async () => {
     const parsedDays = Number(days)
@@ -36,10 +46,12 @@ export function ExtendSubscriptionEndDatePage() {
     setError(null)
     setResult(null)
     try {
-      const response = await extendMerchantSubscriptionEndDate({
-        merchantId: merchantId.trim(),
-        days: parsedDays,
-      })
+      const payload = { merchantId: merchantId.trim(), days: parsedDays }
+      const response = await execute(
+        payload,
+        () => extendMerchantSubscriptionEndDate(payload),
+        'POST /api/v1/admin/plans/merchant/extend-subscription-end-date',
+      )
       setResult(response)
     } catch (err) {
       const message =
@@ -108,6 +120,12 @@ export function ExtendSubscriptionEndDatePage() {
           </Typography>
         </Alert>
       )}
+
+      <ApiTransactionInspector
+        livePayload={livePayload}
+        livePayloadTitle="Extend subscription payload"
+        transaction={transaction}
+      />
     </Stack>
   )
 }

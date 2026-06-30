@@ -244,10 +244,46 @@ export function applyPriceTypeChange(
   })
 }
 
+export function applyLinkToMonthlyOrderVolumeFlag(
+  config: AttributeConfig,
+  linkToMonthlyOrderVolume: boolean,
+  attributeCode = '',
+): AttributeConfig {
+  if (linkToMonthlyOrderVolume) {
+    return sanitizeAttributeConfig(
+      { ...config, priceType: PriceType.PER_COUNT },
+      true,
+    )
+  }
+
+  if (config.priceType !== PriceType.PER_COUNT) {
+    return config
+  }
+
+  const defaults = defaultAttributeConfig(attributeCode, PriceType.PER_COUNT)
+  return {
+    ...config,
+    minLimit: config.minLimit ?? defaults.minLimit,
+    maxLimit: config.maxLimit ?? defaults.maxLimit,
+  }
+}
+
 export function sanitizeAttributeConfig(
   config: AttributeConfig,
   linkToMonthlyOrderVolume = false,
 ): AttributeConfig {
+  const inclusionAddonTrial =
+    config.inclusionType === InclusionType.ADDON
+      ? {
+          addonTrialEnabled: config.addonTrialEnabled,
+          ...(config.addonTrialEnabled
+            ? { addonTrialPeriod: config.addonTrialPeriod ?? 14 }
+            : {}),
+        }
+      : {
+          addonTrialEnabled: false,
+        }
+
   const base = {
     inclusionType: config.inclusionType,
     priceType: linkToMonthlyOrderVolume ? PriceType.PER_COUNT : config.priceType,
@@ -255,7 +291,7 @@ export function sanitizeAttributeConfig(
     baseYearlyPrice: config.baseYearlyPrice ?? 0,
     isProrated: config.isProrated,
     isOverageEnabled: config.isOverageEnabled,
-    addonTrialEnabled: config.addonTrialEnabled,
+    ...inclusionAddonTrial,
   }
 
   if (linkToMonthlyOrderVolume) {
@@ -266,9 +302,6 @@ export function sanitizeAttributeConfig(
       pricePerUnitYearly: config.pricePerUnitYearly ?? 0,
       ...(config.isOverageEnabled
         ? { overagePricePerUnit: config.overagePricePerUnit ?? 0 }
-        : {}),
-      ...(config.addonTrialEnabled
-        ? { addonTrialPeriod: config.addonTrialPeriod ?? 14 }
         : {}),
     }
   }
@@ -282,9 +315,6 @@ export function sanitizeAttributeConfig(
       ...(config.isOverageEnabled
         ? { overagePricePerUnit: config.overagePricePerUnit ?? 0 }
         : {}),
-      ...(config.addonTrialEnabled
-        ? { addonTrialPeriod: config.addonTrialPeriod ?? 14 }
-        : {}),
     }
   }
 
@@ -292,13 +322,10 @@ export function sanitizeAttributeConfig(
     ...base,
     minLimit: config.minLimit,
     maxLimit: config.maxLimit,
-    pricePerUnitMonthly: config.pricePerUnitMonthly,
-    pricePerUnitYearly: config.pricePerUnitYearly,
+    pricePerUnitMonthly: config.pricePerUnitMonthly ?? 0,
+    pricePerUnitYearly: config.pricePerUnitYearly ?? 0,
     ...(config.isOverageEnabled
       ? { overagePricePerUnit: config.overagePricePerUnit ?? 0 }
-      : {}),
-    ...(config.addonTrialEnabled
-      ? { addonTrialPeriod: config.addonTrialPeriod ?? 14 }
       : {}),
   }
 }
@@ -315,6 +342,13 @@ export function mergeAttributeConfigUpdate(
   }
 
   const merged = { ...previous, ...patch }
+
+  if (merged.inclusionType !== InclusionType.ADDON) {
+    merged.addonTrialEnabled = false
+    merged.addonTrialPeriod = null
+  } else if (!merged.addonTrialEnabled) {
+    merged.addonTrialPeriod = null
+  }
 
   if (merged.priceType === PriceType.VOLUME_PRICE) {
     return finalizeVolumePriceConfig(merged, attributeCode)
@@ -391,15 +425,16 @@ export function buildRequiredAttributeFeatures(
 }
 
 export function sanitizeFeatureConfig(config: FeatureConfig): FeatureConfig {
+  const isAddon = config.inclusionType === InclusionType.ADDON
   const sanitized: FeatureConfig = {
     planFeaturePriceMonthly: config.planFeaturePriceMonthly,
     planFeaturePriceYearly: config.planFeaturePriceYearly,
     inclusionType: config.inclusionType,
     isProrated: config.isProrated,
-    addonTrialEnabled: config.addonTrialEnabled,
+    addonTrialEnabled: isAddon ? config.addonTrialEnabled : false,
   }
 
-  if (config.inclusionType === InclusionType.ADDON && config.addonTrialEnabled) {
+  if (isAddon && config.addonTrialEnabled) {
     sanitized.addonTrialPeriod = config.addonTrialPeriod ?? 14
   }
 

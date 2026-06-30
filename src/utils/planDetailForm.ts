@@ -10,7 +10,11 @@ import type {
   UpdatePlanPayload,
 } from '../types/subscription'
 import { FeatureType } from '../types/subscription'
-import { isRequiredAttributeCode, sanitizeCreatePlanPayload } from './planDefaults'
+import {
+  applyLinkToMonthlyOrderVolumeFlag,
+  isRequiredAttributeCode,
+  sanitizeCreatePlanPayload,
+} from './planDefaults'
 
 export type SelectedAttributeFeatureState = {
   featureId: string
@@ -114,10 +118,15 @@ export function planDetailToFormState(plan: PlanDetail): PlanFormEditorState {
       featureId: planFeature.featureId,
       attributeIds: optionalAttributes.map((attribute) => attribute.featureAttributeId),
       configs: Object.fromEntries(
-        optionalAttributes.map((attribute) => [
-          attribute.featureAttributeId,
-          detailAttributeConfigToAttributeConfig(attribute.attributeConfig),
-        ]),
+        optionalAttributes.map((attribute) => {
+          const linked = attribute.parentFeatureAttributeId != null
+          const attributeCode = attribute.attributeCode ?? ''
+          const config = detailAttributeConfigToAttributeConfig(attribute.attributeConfig)
+          return [
+            attribute.featureAttributeId,
+            applyLinkToMonthlyOrderVolumeFlag(config, linked, attributeCode),
+          ]
+        }),
       ),
       linkFlags: Object.fromEntries(
         optionalAttributes.map((attribute) => [

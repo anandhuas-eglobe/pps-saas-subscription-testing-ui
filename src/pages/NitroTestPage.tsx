@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -18,12 +18,13 @@ import RocketLaunchIcon from '@mui/icons-material/RocketLaunch'
 import { fetchFeatures } from '../api/features'
 import { createPlan } from '../api/plans'
 import { ApiRequestError } from '../api/client'
-import { ApiLogPanel } from '../components/ApiLogPanel'
+import { ApiTransactionInspector } from '../components/ApiTransactionInspector'
 import { NitroMerchantLifecyclePanel } from '../components/nitro/NitroMerchantLifecyclePanel'
 import { NitroPlansListPanel } from '../components/nitro/NitroPlansListPanel'
 import { NitroTestHero } from '../components/nitro/NitroTestHero'
 import type { CatalogFeature } from '../types/subscription'
 import { ApiErrorAlert } from '../components/ApiErrorAlert'
+import { useApiTransaction } from '../hooks/useApiTransaction'
 import {
   NITRO_PLAN_TIERS,
   buildNitroTestPlanPayload,
@@ -46,12 +47,13 @@ export function NitroTestPage() {
   const [catalogLoading, setCatalogLoading] = useState(true)
   const [catalogError, setCatalogError] = useState<string | null>(null)
   const [creatingTier, setCreatingTier] = useState<number | null>(null)
+  const [previewTier, setPreviewTier] = useState<NitroPlanTier>(NITRO_PLAN_TIERS[0])
   const [trialEnabledByTier, setTrialEnabledByTier] = useState<Record<number, boolean>>(() =>
     Object.fromEntries(NITRO_PLAN_TIERS.map((tier) => [tier.level, false])),
   )
   const [plansRefreshKey, setPlansRefreshKey] = useState(0)
   const [lastResult, setLastResult] = useState<NitroCreateResult | null>(null)
-  const [lastError, setLastError] = useState<unknown>(null)
+  const { transaction, execute } = useApiTransaction()
 
   const loadCatalog = useCallback(async () => {
     setCatalogLoading(true)
@@ -80,16 +82,28 @@ export function NitroTestPage() {
   const catalogIssues = validateNitroCatalog(catalog)
   const canCreate = catalog.length > 0 && catalogIssues.length === 0 && !catalogLoading
 
+  const previewPayload = useMemo(() => {
+    if (!canCreate) return null
+    return buildNitroTestPlanPayload(catalog, previewTier, {
+      uniqueSuffix: 'preview',
+      trialEnabled: trialEnabledByTier[previewTier.level] ?? false,
+    })
+  }, [canCreate, catalog, previewTier, trialEnabledByTier])
+
   const handleCreatePlan = async (tier: NitroPlanTier) => {
     if (!canCreate) return
 
     setCreatingTier(tier.level)
-    setLastError(null)
+    setPreviewTier(tier)
 
     try {
       const tierTrialEnabled = trialEnabledByTier[tier.level] ?? false
       const payload = buildNitroTestPlanPayload(catalog, tier, { trialEnabled: tierTrialEnabled })
-      const response = await createPlan(payload)
+      const response = await execute(
+        payload,
+        () => createPlan(payload),
+        'POST /api/v1/admin/plans/create-plan',
+      )
       const summary = summarizeNitroPlanPayload(payload)
 
       setLastResult({
@@ -101,8 +115,8 @@ export function NitroTestPage() {
         summary,
       })
       setPlansRefreshKey((current) => current + 1)
-    } catch (error) {
-      setLastError(error)
+    } catch {
+      // Transaction state captures the error for ApiTransactionInspector.
     } finally {
       setCreatingTier(null)
     }
@@ -205,7 +219,11 @@ export function NitroTestPage() {
 
                   return (
                     <Grid key={tier.level} size={{ xs: 12, sm: 6, lg: 4 }}>
-                      <Card variant="outlined" sx={{ height: '100%' }}>
+                      <Card
+                        variant="outlined"
+                        sx={{ height: '100%' }}
+                        onMouseEnter={() => setPreviewTier(tier)}
+                      >
                         <CardContent>
                           <Stack spacing={1.5} sx={{ height: '100%' }}>
                             <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
@@ -230,12 +248,13 @@ export function NitroTestPage() {
                                 <Switch
                                   size="small"
                                   checked={tierTrialEnabled}
-                                  onChange={(event) =>
+                                  onChange={(event) => {
+                                    setPreviewTier(tier)
                                     setTrialEnabledByTier((current) => ({
                                       ...current,
                                       [tier.level]: event.target.checked,
                                     }))
-                                  }
+                                  }}
                                 />
                               }
                               label={
@@ -274,27 +293,21 @@ export function NitroTestPage() {
 
       <NitroMerchantLifecyclePanel />
 
-      {lastError != null && <ApiErrorAlert error={lastError} />}
+      {transaction?.lastError != null && <ApiErrorAlert error={transaction.lastError} />}
 
-      <ApiLogPanel
-        title="Latest create result"
-        payload={
-          lastResult
-            ? {
-                planId: lastResult.planId,
-                planName: lastResult.planName,
-                message: lastResult.message,
-                summary: lastResult.summary,
-              }
-            : undefined
-        }
-        response={
-          lastResult
-            ? { success: true, data: lastResult, timestamp: lastResult.createdAt }
-            : null
-        }
-        error={lastError}
-      />
+      {lastResult && (
+        <Alert severity="success">
+          Created {lastResult.planName} ({lastResult.planId}) — {lastResult.message}
+        </Alert>
+      )}
+
+      {previewPayload && (
+        <ApiTransactionInspector
+          livePayload={previewPayload}
+          livePayloadTitle={`Create plan payload preview (${previewTier.label})`}
+          transaction={transaction}
+        />
+      )}
     </Stack>
   )
 }
