@@ -8,6 +8,7 @@ import CardContent from '@mui/material/CardContent'
 import Chip from '@mui/material/Chip'
 import CircularProgress from '@mui/material/CircularProgress'
 import Grid from '@mui/material/Grid'
+import Pagination from '@mui/material/Pagination'
 import Snackbar from '@mui/material/Snackbar'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
@@ -15,7 +16,8 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart'
 import StorefrontIcon from '@mui/icons-material/Storefront'
-import { getMerchantCart, listMerchantPlans, purchasePlanCart, upsertMerchantCart } from '../api/merchant'
+import { getMerchantCart, getActiveSubscription, listMerchantPlans, purchasePlanCart, upsertMerchantCart } from '../api/merchant'
+import { getPlanById, listPlans } from '../api/plans'
 import { ApiRequestError } from '../api/client'
 import { PageHeader } from '../components/layout/PageHeader'
 import { CartPreviewPanel } from '../components/merchant/CartPreviewPanel'
@@ -30,7 +32,7 @@ import type {
   MerchantPlanPurchaseResult,
   PlanDetail,
 } from '../types/subscription'
-import { BillingCycle } from '../types/subscription'
+import { BillingCycle, PlanStatus, PlanType } from '../types/subscription'
 import {
   getApiErrorSummary,
 } from '../utils/apiErrors'
@@ -46,12 +48,18 @@ import {
 } from '../utils/billingAddress'
 import { saveLastPaymentHandoff } from '../utils/paymentEventBuilder'
 
+const PLANS_PAGE_SIZE = 10
+
 export function MerchantPlansPage() {
   const [plans, setPlans] = useState<PlanDetail[]>([])
   const [activePlanId, setActivePlanId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [total, setTotal] = useState(0)
 
+  const [selectedPlan, setSelectedPlan] = useState<PlanDetail | null>(null)
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
   const [billingCycle, setBillingCycle] = useState<BillingCycleValue>(BillingCycle.MONTHLY)
   const [isTrial, setIsTrial] = useState(false)
@@ -73,10 +81,61 @@ export function MerchantPlansPage() {
 
   const { transaction, execute } = useApiTransaction()
 
-  const selectedPlan = useMemo(
-    () => plans.find((plan) => plan.id === selectedPlanId) ?? null,
-    [plans, selectedPlanId],
+  const listQueryPayload = useMemo(
+    () => ({
+      page,
+      limit: PLANS_PAGE_SIZE,
+      planType: PlanType.PUBLIC,
+      status: PlanStatus.ACTIVE,
+      sortBy: 'baseMonthlyPrice',
+      sortOrder: 'asc' as const,
+    }),
+    [page],
   )
+
+  const loadPlans = useCallback(async () => {
+    setLoading(true)
+    setLoadError(null)
+    try {
+      const [listResult, activeSubscription, merchantPlansResult] = await Promise.all([
+        execute(listQueryPayload, () => listPlans(listQueryPayload), 'GET /api/v1/admin/plans'),
+        getActiveSubscription().catch(() => null),
+        page === 1
+          ? execute({}, () => listMerchantPlans(), 'GET /api/v1/merchant/subscription/plans')
+          : Promise.resolve(null),
+      ])
+
+      const planDetails = await Promise.all(listResult.plans.map((plan) => getPlanById(plan.id)))
+
+      if (page === 1 && merchantPlansResult) {
+        for (const merchantPlan of merchantPlansResult.plans) {
+          if (!planDetails.some((plan) => plan.id === merchantPlan.id)) {
+            planDetails.push(merchantPlan)
+          }
+        }
+      }
+
+      setPlans(planDetails)
+      setTotalPages(listResult.pagination.totalPages)
+      setTotal(listResult.pagination.total)
+      setActivePlanId(
+        activeSubscription?.subscription.planId ??
+          merchantPlansResult?.activePlanId ??
+          null,
+      )
+    } catch (err) {
+      const message =
+        err instanceof ApiRequestError
+          ? err.body.message ?? err.message
+          : err instanceof Error
+            ? err.message
+            : 'Failed to load merchant plans'
+      setLoadError(message)
+      setPlans([])
+    } finally {
+      setLoading(false)
+    }
+  }, [execute, listQueryPayload, page])
 
   const livePayload = useMemo(() => {
     if (!selectedPlan) {
@@ -92,32 +151,12 @@ export function MerchantPlansPage() {
     }
   }, [selectedPlan, isTrial, billingCycle, selections])
 
-  const loadPlans = useCallback(async () => {
-    setLoading(true)
-    setLoadError(null)
-    try {
-      const result = await execute({}, () => listMerchantPlans(), 'GET /api/v1/merchant/subscription/plans')
-      setPlans(result.plans)
-      setActivePlanId(result.activePlanId)
-    } catch (err) {
-      const message =
-        err instanceof ApiRequestError
-          ? err.body.message ?? err.message
-          : err instanceof Error
-            ? err.message
-            : 'Failed to load merchant plans'
-      setLoadError(message)
-      setPlans([])
-    } finally {
-      setLoading(false)
-    }
-  }, [execute])
-
   useEffect(() => {
     void loadPlans()
   }, [loadPlans])
 
   const handleSelectPlan = (plan: PlanDetail) => {
+    setSelectedPlan(plan)
     setSelectedPlanId(plan.id)
     setBillingCycle(BillingCycle.MONTHLY)
     setIsTrial(false)
@@ -337,6 +376,27 @@ export function MerchantPlansPage() {
                   })}
                 </Grid>
               )}
+
+              {!loading && plans.length > 0 && (
+                <Stack
+                  direction={{ xs: 'column', sm: 'row' }}
+                  spacing={2}
+                  sx={{ alignItems: 'center', justifyContent: 'space-between' }}
+                >
+                  <Typography variant="body2" color="text.secondary">
+                    Showing {plans.length} of {total} public active plans
+                    {page === 1 && plans.length > listQueryPayload.limit
+                      ? ' (includes merchant-only plans on page 1)'
+                      : ''}
+                  </Typography>
+                  <Pagination
+                    count={Math.max(totalPages, 1)}
+                    page={page}
+                    onChange={(_, value) => setPage(value)}
+                    color="primary"
+                  />
+                </Stack>
+              )}
             </Stack>
           </Grid>
 
@@ -407,9 +467,9 @@ export function MerchantPlansPage() {
         </Grid>
 
         <ApiTransactionInspector
-          livePayload={livePayload}
+          livePayload={livePayload ?? listQueryPayload}
+          livePayloadTitle={livePayload ? 'Request preview' : 'List plans query'}
           transaction={transaction}
-          livePayloadTitle="Request preview"
         />
       </Stack>
 
