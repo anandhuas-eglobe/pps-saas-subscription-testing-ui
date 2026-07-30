@@ -7,6 +7,12 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      // IAM auth endpoints (login / refresh / logout)
+      '/api/v1/auth': {
+        target: 'http://localhost:3104',
+        changeOrigin: true,
+      },
+      // Subscription service
       '/api': {
         target: 'http://localhost:3112',
         changeOrigin: true,

@@ -1,18 +1,11 @@
 import type { ApiResponse } from '../types/subscription'
+import { getAuthorizationHeader, getValidAccessToken, refreshSession } from '../auth/sessionManager'
+import { clearSession, getAccessToken } from '../auth/tokenStorage'
+import { ApiRequestError } from './errors'
+
+export { ApiRequestError } from './errors'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
-
-export class ApiRequestError extends Error {
-  status: number
-  body: ApiResponse<unknown>
-
-  constructor(status: number, body: ApiResponse<unknown>) {
-    super(body.message ?? `Request failed with status ${status}`)
-    this.name = 'ApiRequestError'
-    this.status = status
-    this.body = body
-  }
-}
 
 async function parseJson<T>(response: Response): Promise<ApiResponse<T>> {
   const text = await response.text()
@@ -27,20 +20,47 @@ async function parseJson<T>(response: Response): Promise<ApiResponse<T>> {
   return JSON.parse(text) as ApiResponse<T>
 }
 
+async function buildAuthHeaders(init?: RequestInit): Promise<HeadersInit> {
+  await getValidAccessToken()
+  const authorization = getAuthorizationHeader()
+
+  return {
+    'Content-Type': 'application/json',
+    ...(authorization ? { Authorization: authorization } : {}),
+    ...(init?.headers ?? {}),
+  }
+}
+
+async function executeRequest(
+  path: string,
+  init: RequestInit | undefined,
+  headers: HeadersInit,
+): Promise<Response> {
+  const url = `${API_BASE}${path}`
+  return fetch(url, {
+    ...init,
+    headers,
+  })
+}
+
 export async function apiRequest<T>(
   path: string,
   init?: RequestInit,
 ): Promise<{ response: Response; body: ApiResponse<T> }> {
-  const url = `${API_BASE}${path}`
-  const response = await fetch(url, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
-  })
+  const headers = await buildAuthHeaders(init)
+  let response = await executeRequest(path, init, headers)
+  let body = await parseJson<T>(response)
 
-  const body = await parseJson<T>(response)
+  if (response.status === 401 && getAccessToken()) {
+    const refreshed = await refreshSession()
+    if (refreshed) {
+      const retryHeaders = await buildAuthHeaders(init)
+      response = await executeRequest(path, init, retryHeaders)
+      body = await parseJson<T>(response)
+    } else {
+      clearSession()
+    }
+  }
 
   if (!response.ok || body.success === false) {
     throw new ApiRequestError(response.status, body)
@@ -50,8 +70,18 @@ export async function apiRequest<T>(
 }
 
 export async function apiDownloadBlob(path: string, fallbackFilename = 'download.pdf'): Promise<void> {
-  const url = `${API_BASE}${path}`
-  const response = await fetch(url)
+  const headers = await buildAuthHeaders()
+  let response = await fetch(`${API_BASE}${path}`, { headers })
+
+  if (response.status === 401 && getAccessToken()) {
+    const refreshed = await refreshSession()
+    if (refreshed) {
+      const retryHeaders = await buildAuthHeaders()
+      response = await fetch(`${API_BASE}${path}`, { headers: retryHeaders })
+    } else {
+      clearSession()
+    }
+  }
 
   if (!response.ok) {
     const text = await response.text()

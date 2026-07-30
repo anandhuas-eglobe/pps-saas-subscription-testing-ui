@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import AppBar from '@mui/material/AppBar'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -9,7 +10,9 @@ import Stack from '@mui/material/Stack'
 import SubscriptionsIcon from '@mui/icons-material/Subscriptions'
 import ScienceIcon from '@mui/icons-material/Science'
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
-import { Link as RouterLink, Outlet, useLocation } from 'react-router-dom'
+import LogoutIcon from '@mui/icons-material/Logout'
+import { Link as RouterLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '../../auth/AuthContext'
 import { RedisCacheFlushButton } from './RedisCacheFlushButton'
 
 const navItems = [
@@ -51,6 +54,25 @@ function isNavItemActive(pathname: string, itemPath: string): boolean {
 
 export function AppLayout() {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { user, logout } = useAuth()
+  const [loggingOut, setLoggingOut] = useState(false)
+
+  async function handleLogout() {
+    setLoggingOut(true)
+    try {
+      await logout()
+      navigate('/login', { replace: true })
+    } finally {
+      setLoggingOut(false)
+    }
+  }
+
+  const displayName =
+    user?.displayName ||
+    [user?.firstName, user?.lastName].filter(Boolean).join(' ') ||
+    user?.email ||
+    'Signed in'
 
   return (
     <Box
@@ -114,6 +136,29 @@ export function AppLayout() {
                 display: { xs: 'none', sm: 'flex' },
               }}
             />
+            <Chip
+              label={displayName}
+              size="small"
+              sx={{
+                bgcolor: 'rgba(255,255,255,0.14)',
+                color: 'white',
+                maxWidth: 180,
+                display: { xs: 'none', md: 'flex' },
+              }}
+            />
+            <Button
+              size="small"
+              color="inherit"
+              startIcon={<LogoutIcon />}
+              onClick={() => void handleLogout()}
+              disabled={loggingOut}
+              sx={{
+                bgcolor: 'rgba(255,255,255,0.08)',
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.12)' },
+              }}
+            >
+              {loggingOut ? 'Signing out…' : 'Logout'}
+            </Button>
           </Stack>
         </Toolbar>
 
