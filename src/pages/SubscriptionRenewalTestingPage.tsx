@@ -62,8 +62,8 @@ import {
 import { formatDateOnly, formatDateTime, formatMoney } from '../utils/planDisplay'
 import {
   buildSucceededPaymentEventFromHandoff,
-  saveLastPaymentHandoff,
 } from '../utils/paymentEventBuilder'
+import { handlePurchaseCheckoutResult } from '../utils/checkoutSession'
 import {
   checkAutoRenewEligibility,
   checkManualRenewalEligibility,
@@ -266,9 +266,7 @@ export function SubscriptionRenewalTestingPage() {
         'POST /api/v1/merchant/subscription/renew',
       )
       setRenewalResult(result)
-      if (result.paymentHandoff) {
-        saveLastPaymentHandoff(result.paymentHandoff)
-      }
+      handlePurchaseCheckoutResult(result)
       await loadAll()
     } catch (err) {
       setRenewalError(err)

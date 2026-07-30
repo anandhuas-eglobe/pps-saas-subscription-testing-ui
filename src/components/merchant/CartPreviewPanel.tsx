@@ -35,11 +35,13 @@ import { formatMoney } from '../../utils/planDisplay'
 import { BillingAddressFields } from './BillingAddressFields'
 import { CartPricingPreviewDetails } from './CartPricingPreviewDetails'
 import { PlanCartPlanDetailsPanel } from './PlanCartPlanDetailsPanel'
+import { CheckoutSessionActions } from '../payment/CheckoutSessionActions'
 
 interface CartPreviewPanelProps {
   cart: MerchantCartPreview
   purchasing?: boolean
   purchaseResult?: MerchantPlanPurchaseResult | null
+  checkoutPopupBlocked?: boolean
   onConfirmPayment: (billingAddress?: BillingAddress) => void
 }
 
@@ -63,6 +65,7 @@ export function CartPreviewPanel({
   cart,
   purchasing = false,
   purchaseResult = null,
+  checkoutPopupBlocked = false,
   onConfirmPayment,
 }: CartPreviewPanelProps) {
   const { pricing, plan, planDetails } = cart
@@ -271,9 +274,10 @@ export function CartPreviewPanel({
                   </Typography>
                 )}
                 {purchaseResult.checkoutUrl && (
-                  <Typography variant="body2" sx={{ mt: 0.5 }}>
-                    Checkout URL: {purchaseResult.checkoutUrl}
-                  </Typography>
+                  <CheckoutSessionActions
+                    checkoutUrl={purchaseResult.checkoutUrl}
+                    popupBlocked={checkoutPopupBlocked}
+                  />
                 )}
               </Alert>
             )}

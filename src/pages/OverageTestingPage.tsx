@@ -61,8 +61,9 @@ import {
 import { formatDateTime, formatMoney } from '../utils/planDisplay'
 import {
   buildSucceededPaymentEventFromHandoff,
-  saveLastPaymentHandoff,
 } from '../utils/paymentEventBuilder'
+import { handlePurchaseCheckoutResult } from '../utils/checkoutSession'
+import { CheckoutSessionActions } from '../components/payment/CheckoutSessionActions'
 import {
   buildResellerOverageRequestedEvent,
   RESELLER_OVERAGE_REQUESTED_STREAM,
@@ -320,9 +321,7 @@ export function OverageTestingPage() {
         'POST /api/v1/merchant/overage-tracking/manual-payment',
       )
       setPaymentResult(result)
-      if (result.paymentHandoff) {
-        saveLastPaymentHandoff(result.paymentHandoff)
-      }
+      handlePurchaseCheckoutResult(result)
       await refreshUsage()
     } catch (err) {
       setPaymentError(err instanceof Error ? err.message : 'Manual overage payment failed')
@@ -742,6 +741,9 @@ export function OverageTestingPage() {
                         </Button>
                       </Stack>
                     </>
+                  )}
+                  {paymentResult.checkoutUrl && (
+                    <CheckoutSessionActions checkoutUrl={paymentResult.checkoutUrl} />
                   )}
                 </Alert>
               )}

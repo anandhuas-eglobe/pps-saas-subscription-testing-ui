@@ -50,7 +50,7 @@ import {
   buildInitiatePurchasePayload,
   requiresBillingAddressForCheckout,
 } from '../utils/billingAddress'
-import { saveLastPaymentHandoff } from '../utils/paymentEventBuilder'
+import { handlePurchaseCheckoutResult } from '../utils/checkoutSession'
 
 const PLANS_PAGE_SIZE = 10
 
@@ -76,6 +76,7 @@ export function MerchantPlansPage() {
   const [purchasing, setPurchasing] = useState(false)
   const [purchaseError, setPurchaseError] = useState<unknown>(null)
   const [purchaseResult, setPurchaseResult] = useState<MerchantPlanPurchaseResult | null>(null)
+  const [checkoutPopupBlocked, setCheckoutPopupBlocked] = useState(false)
 
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
@@ -278,6 +279,7 @@ export function MerchantPlansPage() {
     setPurchasing(true)
     setPurchaseError(null)
     setPurchaseResult(null)
+    setCheckoutPopupBlocked(false)
 
     try {
       const requiresBilling = cartPreview
@@ -293,10 +295,17 @@ export function MerchantPlansPage() {
         'POST /api/v1/merchant/subscription/plan/purchase',
       )
       setPurchaseResult(result)
-      if (result.paymentHandoff) {
-        saveLastPaymentHandoff(result.paymentHandoff)
-      }
-      setSnackbar({ open: true, message: result.message, severity: 'success' })
+      const opened = handlePurchaseCheckoutResult(result)
+      setCheckoutPopupBlocked(Boolean(result.checkoutUrl) && !opened)
+      setSnackbar({
+        open: true,
+        message: result.checkoutUrl
+          ? opened
+            ? 'Checkout session opened in a new tab.'
+            : 'Purchase started. Open the checkout session below if the popup was blocked.'
+          : result.message,
+        severity: 'success',
+      })
       await loadPlans()
     } catch (error) {
       setPurchaseError(error)
@@ -501,6 +510,7 @@ export function MerchantPlansPage() {
                       cart={cartPreview}
                       purchasing={purchasing}
                       purchaseResult={purchaseResult}
+                      checkoutPopupBlocked={checkoutPopupBlocked}
                       onConfirmPayment={(billingAddress) => void handleConfirmPayment(billingAddress)}
                     />
                   </>

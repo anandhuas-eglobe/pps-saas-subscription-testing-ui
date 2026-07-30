@@ -59,7 +59,7 @@ import {
   requiresBillingAddressForCheckout,
 } from '../utils/billingAddress'
 
-import { saveLastPaymentHandoff } from '../utils/paymentEventBuilder'
+import { handlePurchaseCheckoutResult } from '../utils/checkoutSession'
 
 export function MerchantAddonsPage() {
   const [subscriptionData, setSubscriptionData] = useState<ActiveSubscriptionResponse | null>(null)
@@ -78,6 +78,7 @@ export function MerchantAddonsPage() {
   const [purchasing, setPurchasing] = useState(false)
   const [purchaseError, setPurchaseError] = useState<unknown>(null)
   const [purchaseResult, setPurchaseResult] = useState<MerchantAddonPurchaseResult | null>(null)
+  const [checkoutPopupBlocked, setCheckoutPopupBlocked] = useState(false)
   const [clientValidationErrors, setClientValidationErrors] = useState<string[]>([])
 
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
@@ -270,6 +271,7 @@ export function MerchantAddonsPage() {
     setPurchasing(true)
     setPurchaseError(null)
     setPurchaseResult(null)
+    setCheckoutPopupBlocked(false)
 
     try {
       const requiresBilling = cartPreview
@@ -284,10 +286,17 @@ export function MerchantAddonsPage() {
         'POST /api/v1/merchant/subscription/addon/purchase',
       )
       setPurchaseResult(result)
-      if (result.paymentHandoff) {
-        saveLastPaymentHandoff(result.paymentHandoff)
-      }
-      setSnackbar({ open: true, message: result.message, severity: 'success' })
+      const opened = handlePurchaseCheckoutResult(result)
+      setCheckoutPopupBlocked(Boolean(result.checkoutUrl) && !opened)
+      setSnackbar({
+        open: true,
+        message: result.checkoutUrl
+          ? opened
+            ? 'Checkout session opened in a new tab.'
+            : 'Purchase started. Open the checkout session below if the popup was blocked.'
+          : result.message,
+        severity: 'success',
+      })
     } catch (error) {
       setPurchaseError(error)
       setSnackbar({
@@ -523,6 +532,7 @@ export function MerchantAddonsPage() {
                           cart={cartPreview}
                           purchasing={purchasing}
                           purchaseResult={purchaseResult}
+                          checkoutPopupBlocked={checkoutPopupBlocked}
                           onConfirmPayment={(billingAddress) =>
                             void handleConfirmPayment(billingAddress)
                           }

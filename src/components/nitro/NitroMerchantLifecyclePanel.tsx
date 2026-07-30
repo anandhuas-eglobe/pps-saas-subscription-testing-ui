@@ -62,8 +62,9 @@ import {
 import { formatMoney } from '../../utils/planDisplay'
 import {
   buildSucceededPaymentEventFromHandoff,
-  saveLastPaymentHandoff,
 } from '../../utils/paymentEventBuilder'
+import { handlePurchaseCheckoutResult } from '../../utils/checkoutSession'
+import { CheckoutSessionActions } from '../payment/CheckoutSessionActions'
 
 type LifecycleStep = 'cart' | 'purchase' | 'confirm' | 'active' | null
 
@@ -87,6 +88,7 @@ export function NitroMerchantLifecyclePanel() {
   const [stepError, setStepError] = useState<unknown>(null)
   const [refreshingSubscription, setRefreshingSubscription] = useState(false)
   const [billingAddress, setBillingAddress] = useState<BillingAddress>(defaultBillingAddress)
+  const [checkoutPopupBlocked, setCheckoutPopupBlocked] = useState(false)
 
   const activePlans = useMemo(
     () => plans.filter((plan) => plan.status === PlanStatus.ACTIVE),
@@ -209,9 +211,8 @@ export function NitroMerchantLifecyclePanel() {
         ),
       )
       setPurchaseResult(result)
-      if (result.paymentHandoff) {
-        saveLastPaymentHandoff(result.paymentHandoff)
-      }
+      const opened = handlePurchaseCheckoutResult(result)
+      setCheckoutPopupBlocked(Boolean(result.checkoutUrl) && !opened)
       setActiveSubscription(null)
       setLastCompletedStep('purchase')
     } catch (error) {
@@ -480,6 +481,12 @@ export function NitroMerchantLifecyclePanel() {
                       )}
                       )
                     </>
+                  )}
+                  {purchaseResult.checkoutUrl && (
+                    <CheckoutSessionActions
+                      checkoutUrl={purchaseResult.checkoutUrl}
+                      popupBlocked={checkoutPopupBlocked}
+                    />
                   )}
                 </Alert>
               )}

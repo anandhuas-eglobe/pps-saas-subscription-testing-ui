@@ -24,11 +24,13 @@ import {
 } from '../../utils/billingAddress'
 import { formatMoney } from '../../utils/planDisplay'
 import { BillingAddressFields } from './BillingAddressFields'
+import { CheckoutSessionActions } from '../payment/CheckoutSessionActions'
 
 interface AddonCartPreviewPanelProps {
   cart: MerchantAddonCartPreview
   purchasing?: boolean
   purchaseResult?: MerchantAddonPurchaseResult | null
+  checkoutPopupBlocked?: boolean
   onConfirmPayment: (billingAddress?: BillingAddress) => void
 }
 
@@ -36,6 +38,7 @@ export function AddonCartPreviewPanel({
   cart,
   purchasing = false,
   purchaseResult = null,
+  checkoutPopupBlocked = false,
   onConfirmPayment,
 }: AddonCartPreviewPanelProps) {
   const { pricing, addon } = cart
@@ -163,9 +166,10 @@ export function AddonCartPreviewPanel({
                   </Typography>
                 )}
                 {purchaseResult.checkoutUrl && (
-                  <Typography variant="body2" sx={{ mt: 0.5 }}>
-                    Checkout URL: {purchaseResult.checkoutUrl}
-                  </Typography>
+                  <CheckoutSessionActions
+                    checkoutUrl={purchaseResult.checkoutUrl}
+                    popupBlocked={checkoutPopupBlocked}
+                  />
                 )}
               </Alert>
             )}

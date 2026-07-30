@@ -41,7 +41,7 @@ import {
   defaultBillingAddress,
 } from '../../utils/billingAddress'
 import { formatDateOnly, formatMoney } from '../../utils/planDisplay'
-import { saveLastPaymentHandoff } from '../../utils/paymentEventBuilder'
+import { handlePurchaseCheckoutResult } from '../../utils/checkoutSession'
 import {
   checkManualRenewalEligibility,
   resolveManualRenewalEligibleState,
@@ -287,9 +287,7 @@ export function SubscriptionManagementPanel({
       )
       setRenewalResult(result)
       setActionMessage(result.message)
-      if (result.paymentHandoff) {
-        saveLastPaymentHandoff(result.paymentHandoff)
-      }
+      handlePurchaseCheckoutResult(result)
       onChanged?.()
     } catch (err) {
       const message =

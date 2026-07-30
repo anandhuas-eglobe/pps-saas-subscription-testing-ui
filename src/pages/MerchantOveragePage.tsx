@@ -36,7 +36,8 @@ import {
   type OverageHistoryListItem,
 } from '../types/subscription'
 import { formatDateTime, formatMoney } from '../utils/planDisplay'
-import { saveLastPaymentHandoff } from '../utils/paymentEventBuilder'
+import { handlePurchaseCheckoutResult } from '../utils/checkoutSession'
+import { CheckoutSessionActions } from '../components/payment/CheckoutSessionActions'
 
 function overageStatusColor(status: string): 'success' | 'warning' | 'error' | 'default' {
   if (status === MerchantSubscriptionOverageStatus.PAID) return 'success'
@@ -59,6 +60,7 @@ export function MerchantOveragePage() {
 
   const [paying, setPaying] = useState(false)
   const [paymentResult, setPaymentResult] = useState<ManualOveragePaymentResult | null>(null)
+  const [checkoutPopupBlocked, setCheckoutPopupBlocked] = useState(false)
   const [paymentError, setPaymentError] = useState<string | null>(null)
 
   const { transaction, execute } = useApiTransaction()
@@ -119,6 +121,7 @@ export function MerchantOveragePage() {
     setPaying(true)
     setPaymentError(null)
     setPaymentResult(null)
+    setCheckoutPopupBlocked(false)
     try {
       const result = await execute(
         {},
@@ -126,9 +129,8 @@ export function MerchantOveragePage() {
         'POST /api/v1/merchant/overage-tracking/manual-payment',
       )
       setPaymentResult(result)
-      if (result.paymentHandoff) {
-        saveLastPaymentHandoff(result.paymentHandoff)
-      }
+      const opened = handlePurchaseCheckoutResult(result)
+      setCheckoutPopupBlocked(Boolean(result.checkoutUrl) && !opened)
       await loadOverage()
     } catch (err) {
       const message =
@@ -194,9 +196,10 @@ export function MerchantOveragePage() {
             </>
           )}
           {paymentResult.checkoutUrl && (
-            <Typography variant="body2" sx={{ mt: 1 }}>
-              Checkout URL: {paymentResult.checkoutUrl}
-            </Typography>
+            <CheckoutSessionActions
+              checkoutUrl={paymentResult.checkoutUrl}
+              popupBlocked={checkoutPopupBlocked}
+            />
           )}
         </Alert>
       )}

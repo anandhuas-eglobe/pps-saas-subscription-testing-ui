@@ -27,11 +27,13 @@ import { defaultBillingAddress, isBillingAddressComplete } from '../../utils/bil
 import { formatMoney } from '../../utils/planDisplay'
 import { BillingAddressFields } from './BillingAddressFields'
 import { SubscriptionActionChip } from './SubscriptionActionChip'
+import { CheckoutSessionActions } from '../payment/CheckoutSessionActions'
 
 interface AttributeCartPreviewPanelProps {
   cart: MerchantAttributeCartPreview
   purchasing?: boolean
   purchaseResult?: MerchantAttributePurchaseResult | null
+  checkoutPopupBlocked?: boolean
   onConfirmPayment: (billingAddress: BillingAddress) => void
 }
 
@@ -39,6 +41,7 @@ export function AttributeCartPreviewPanel({
   cart,
   purchasing = false,
   purchaseResult = null,
+  checkoutPopupBlocked = false,
   onConfirmPayment,
 }: AttributeCartPreviewPanelProps) {
   const [billingAddress, setBillingAddress] = useState<BillingAddress>(defaultBillingAddress)
@@ -166,9 +169,10 @@ export function AttributeCartPreviewPanel({
                   </Typography>
                 )}
                 {purchaseResult.checkoutUrl && (
-                  <Typography variant="body2" sx={{ mt: 0.5 }}>
-                    Checkout URL: {purchaseResult.checkoutUrl}
-                  </Typography>
+                  <CheckoutSessionActions
+                    checkoutUrl={purchaseResult.checkoutUrl}
+                    popupBlocked={checkoutPopupBlocked}
+                  />
                 )}
               </Alert>
             )}

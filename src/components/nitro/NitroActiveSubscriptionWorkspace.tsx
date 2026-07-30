@@ -64,8 +64,8 @@ import { buildAttributePurchasePayload, defaultBillingAddress } from '../../util
 import { formatDateTime, formatMoney, formatUsageLimit } from '../../utils/planDisplay'
 import {
   buildSucceededPaymentEventFromHandoff,
-  saveLastPaymentHandoff,
 } from '../../utils/paymentEventBuilder'
+import { handlePurchaseCheckoutResult } from '../../utils/checkoutSession'
 
 interface NitroActiveSubscriptionWorkspaceProps {
   activeSubscription: ActiveSubscriptionResponse
@@ -353,9 +353,7 @@ export function NitroActiveSubscriptionWorkspace({
       })
 
       const result = await purchaseAttributeCart(buildAttributePurchasePayload(defaultBillingAddress))
-      if (result.paymentHandoff) {
-        saveLastPaymentHandoff(result.paymentHandoff)
-      }
+      handlePurchaseCheckoutResult(result)
       setAttributePurchaseResult(result)
       setLimitMessage(result.message)
     } catch (error) {
