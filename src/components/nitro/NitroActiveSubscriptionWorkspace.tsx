@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -52,6 +52,7 @@ import {
   extractSubscribedPlanAttributes,
   type SubscribedPlanAttributeItem,
 } from '../../utils/attributeChangeBuilder'
+import { fetchExistingAttributeCart } from '../../utils/cartHydration'
 import {
   isSimulatableAddon,
 } from '../../utils/addonUsageSimulation'
@@ -156,6 +157,7 @@ export function NitroActiveSubscriptionWorkspace({
   const [addons, setAddons] = useState<ActivePlanAddonItem[] | null>(null)
   const [addonsLoading, setAddonsLoading] = useState(true)
   const [addonsError, setAddonsError] = useState<string | null>(null)
+  const hydratingFromCartRef = useRef(false)
 
   const loadAddons = useCallback(async () => {
     setAddonsLoading(true)
@@ -181,6 +183,41 @@ export function NitroActiveSubscriptionWorkspace({
   useEffect(() => {
     void loadAddons()
   }, [loadAddons, activeSubscription.subscription.subscriptionId])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadExistingAttributeCartState() {
+      if (subscription.isTrial) {
+        return
+      }
+
+      try {
+        const cart = await fetchExistingAttributeCart()
+        if (!cart || cancelled || cart.attributeChanges.length === 0) {
+          return
+        }
+
+        const firstChange = cart.attributeChanges[0]
+        const usageRow = limitsAndUsages.find(
+          (row) => row.planFeatureAttributeId === firstChange.planFeatureAttributeId,
+        )
+        if (usageRow) {
+          hydratingFromCartRef.current = true
+          setSelectedAttributeCode(usageRow.attributeCode)
+          setNewLimit(firstChange.newValue)
+        }
+      } catch {
+        // Ignore cart hydration errors in the nitro workspace.
+      }
+    }
+
+    void loadExistingAttributeCartState()
+
+    return () => {
+      cancelled = true
+    }
+  }, [limitsAndUsages, subscription.isTrial, subscription.subscriptionId])
 
   const handleRefreshAll = useCallback(async () => {
     await Promise.all([onRefresh(), loadAddons()])
@@ -210,6 +247,11 @@ export function NitroActiveSubscriptionWorkspace({
 
   useEffect(() => {
     if (!selectedPlanItem || !selectedUsageRow) {
+      return
+    }
+
+    if (hydratingFromCartRef.current) {
+      hydratingFromCartRef.current = false
       return
     }
 

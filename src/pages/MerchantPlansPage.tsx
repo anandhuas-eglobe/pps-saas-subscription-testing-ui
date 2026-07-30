@@ -37,6 +37,10 @@ import {
   getApiErrorSummary,
 } from '../utils/apiErrors'
 import {
+  fetchExistingPlanCart,
+  hydratePlanCartFormState,
+} from '../utils/cartHydration'
+import {
   buildDefaultCartSelections,
   updateAttributeValue,
   validateCartSelections,
@@ -93,6 +97,29 @@ export function MerchantPlansPage() {
     [page],
   )
 
+  const loadExistingPlanCart = useCallback(
+    async (availablePlans: PlanDetail[]) => {
+      const existingCart = await fetchExistingPlanCart()
+      if (!existingCart) {
+        return
+      }
+
+      let plan = availablePlans.find((item) => item.id === existingCart.planId)
+      if (!plan) {
+        plan = await getPlanById(existingCart.planId)
+      }
+
+      const formState = hydratePlanCartFormState(existingCart, plan)
+      setSelectedPlan(plan)
+      setSelectedPlanId(plan.id)
+      setBillingCycle(formState.billingCycle)
+      setIsTrial(formState.isTrial)
+      setSelections(formState.selections)
+      setCartPreview(existingCart)
+    },
+    [],
+  )
+
   const loadPlans = useCallback(async () => {
     setLoading(true)
     setLoadError(null)
@@ -123,6 +150,8 @@ export function MerchantPlansPage() {
           merchantPlansResult?.activePlanId ??
           null,
       )
+
+      await loadExistingPlanCart(planDetails)
     } catch (err) {
       const message =
         err instanceof ApiRequestError
@@ -135,7 +164,7 @@ export function MerchantPlansPage() {
     } finally {
       setLoading(false)
     }
-  }, [execute, listQueryPayload, page])
+  }, [execute, listQueryPayload, loadExistingPlanCart, page])
 
   const livePayload = useMemo(() => {
     if (!selectedPlan) {
@@ -155,17 +184,32 @@ export function MerchantPlansPage() {
     void loadPlans()
   }, [loadPlans])
 
-  const handleSelectPlan = (plan: PlanDetail) => {
+  const handleSelectPlan = async (plan: PlanDetail) => {
     setSelectedPlan(plan)
     setSelectedPlanId(plan.id)
+    setSubmitError(null)
+    setClientValidationErrors([])
+    setPurchaseError(null)
+    setPurchaseResult(null)
+
+    try {
+      const existingCart = await fetchExistingPlanCart()
+      if (existingCart?.planId === plan.id) {
+        const formState = hydratePlanCartFormState(existingCart, plan)
+        setBillingCycle(formState.billingCycle)
+        setIsTrial(formState.isTrial)
+        setSelections(formState.selections)
+        setCartPreview(existingCart)
+        return
+      }
+    } catch {
+      // Fall back to default configuration when cart cannot be loaded.
+    }
+
     setBillingCycle(BillingCycle.MONTHLY)
     setIsTrial(false)
     setSelections(buildDefaultCartSelections(plan))
-    setSubmitError(null)
-    setClientValidationErrors([])
     setCartPreview(null)
-    setPurchaseError(null)
-    setPurchaseResult(null)
   }
 
   const handleAttributeValueChange = (planFeatureAttributeId: string, value: number) => {
@@ -273,7 +317,7 @@ export function MerchantPlansPage() {
           eyebrow="Merchant checkout"
           title="Browse plans & configure cart"
           description="List plans available to the merchant, configure attribute limits and volume tiers, then add the selection to the subscription cart."
-          apiEndpoint="GET /api/v1/merchant/subscription/plans · POST /api/v1/merchant/cart/plan · POST /api/v1/merchant/subscription/plan/purchase"
+          apiEndpoint="GET /api/v1/merchant/cart/plan · GET /api/v1/merchant/subscription/plans · POST /api/v1/merchant/cart/plan · POST /api/v1/merchant/subscription/plan/purchase"
           backTo="/"
           backLabel="Back to home"
           actions={

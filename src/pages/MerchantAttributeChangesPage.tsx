@@ -46,27 +46,12 @@ import {
   validateAttributeCartDrafts,
   type AttributeChangeDraft,
 } from '../utils/attributeChangeBuilder'
+import {
+  applyAttributeCartPreviewToDrafts,
+  fetchExistingAttributeCart,
+} from '../utils/cartHydration'
 import { buildAttributePurchasePayload } from '../utils/billingAddress'
 import { saveLastPaymentHandoff } from '../utils/paymentEventBuilder'
-
-function applyCartPreviewToDrafts(
-  drafts: Record<string, AttributeChangeDraft>,
-  cart: MerchantAttributeCartPreview,
-): Record<string, AttributeChangeDraft> {
-  const next = { ...drafts }
-
-  for (const change of cart.attributeChanges) {
-    const existing = next[change.planFeatureAttributeId]
-    next[change.planFeatureAttributeId] = {
-      selected: true,
-      newValue: change.newValue,
-      previousValue: change.previousValue,
-      ...(existing ? {} : {}),
-    }
-  }
-
-  return next
-}
 
 export function MerchantAttributeChangesPage() {
   const [subscriptionData, setSubscriptionData] = useState<ActiveSubscriptionResponse | null>(null)
@@ -119,6 +104,35 @@ export function MerchantAttributeChangesPage() {
     [attributeItems, drafts],
   )
 
+  const applyExistingAttributeCart = useCallback(
+    async (items: ReturnType<typeof extractSubscribedPlanAttributes>, trackTransaction: boolean) => {
+      try {
+        const preview = trackTransaction
+          ? await execute({}, () => getMerchantAttributeCart(), 'GET /api/v1/merchant/cart/attribute')
+          : await fetchExistingAttributeCart()
+
+        if (!preview) {
+          return null
+        }
+
+        setCartPreview(preview)
+        setDrafts((current) =>
+          applyAttributeCartPreviewToDrafts(
+            Object.keys(current).length > 0 ? current : createDefaultAttributeDrafts(items),
+            preview,
+          ),
+        )
+        return preview
+      } catch (error) {
+        if (error instanceof ApiRequestError && error.status === 404) {
+          return null
+        }
+        throw error
+      }
+    },
+    [execute],
+  )
+
   const loadSubscription = useCallback(async () => {
     setLoading(true)
     setLoadError(null)
@@ -133,13 +147,18 @@ export function MerchantAttributeChangesPage() {
       )
       setSubscriptionData(result)
       const items = extractSubscribedPlanAttributes(result.plan)
-      setDrafts(createDefaultAttributeDrafts(items))
+      const defaultDrafts = createDefaultAttributeDrafts(items)
+      setDrafts(defaultDrafts)
       setCartPreview(null)
       setSubmitError(null)
       setFetchError(null)
       setPurchaseError(null)
       setPurchaseResult(null)
       setClientValidationErrors([])
+
+      if (!result.subscription.isTrial) {
+        await applyExistingAttributeCart(items, false)
+      }
     } catch (err) {
       if (err instanceof ApiRequestError && err.status === 404) {
         setNotFound(true)
@@ -156,7 +175,7 @@ export function MerchantAttributeChangesPage() {
     } finally {
       setLoading(false)
     }
-  }, [execute])
+  }, [applyExistingAttributeCart, execute])
 
   useEffect(() => {
     void loadSubscription()
@@ -173,20 +192,19 @@ export function MerchantAttributeChangesPage() {
   }
 
   const handleFetchCart = async () => {
+    if (!subscriptionData) {
+      return
+    }
+
     setFetchingCart(true)
     setFetchError(null)
 
     try {
-      const preview = await execute(
-        {},
-        () => getMerchantAttributeCart(),
-        'GET /api/v1/merchant/cart/attribute',
+      const preview = await applyExistingAttributeCart(
+        extractSubscribedPlanAttributes(subscriptionData.plan),
+        true,
       )
-      setCartPreview(preview)
-      setDrafts((current) => applyCartPreviewToDrafts(current, preview))
-      setSnackbar({ open: true, message: 'Attribute cart loaded', severity: 'success' })
-    } catch (error) {
-      if (error instanceof ApiRequestError && error.status === 404) {
+      if (!preview) {
         setCartPreview(null)
         setSnackbar({
           open: true,
@@ -196,6 +214,8 @@ export function MerchantAttributeChangesPage() {
         return
       }
 
+      setSnackbar({ open: true, message: 'Attribute cart loaded', severity: 'success' })
+    } catch (error) {
       setFetchError(error)
       setSnackbar({
         open: true,
@@ -241,7 +261,7 @@ export function MerchantAttributeChangesPage() {
       )
       const preview = await getMerchantAttributeCart()
       setCartPreview(preview)
-      setDrafts((current) => applyCartPreviewToDrafts(current, preview))
+      setDrafts((current) => applyAttributeCartPreviewToDrafts(current, preview))
       setSnackbar({ open: true, message: result.message, severity: 'success' })
     } catch (error) {
       setSubmitError(error)
@@ -296,7 +316,7 @@ export function MerchantAttributeChangesPage() {
       setSnackbar({ open: true, message: result.message, severity: 'success' })
       const preview = await getMerchantAttributeCart()
       setCartPreview(preview)
-      setDrafts((current) => applyCartPreviewToDrafts(current, preview))
+      setDrafts((current) => applyAttributeCartPreviewToDrafts(current, preview))
     } catch (error) {
       setPurchaseError(error)
       setSnackbar({
@@ -316,7 +336,7 @@ export function MerchantAttributeChangesPage() {
           eyebrow="Attribute changes"
           title="Upgrade or downgrade limits"
           description="View all included and add-on attributes on your subscribed plan, change limits, upsert the attribute cart, and fetch pricing preview."
-          apiEndpoint="POST /api/v1/merchant/cart/attribute · POST /api/v1/merchant/subscription/attribute/purchase · POST /api/v1/merchant/subscription/attribute/downgrade/schedule/cancel"
+          apiEndpoint="GET /api/v1/merchant/cart/attribute · POST /api/v1/merchant/cart/attribute · POST /api/v1/merchant/subscription/attribute/purchase · POST /api/v1/merchant/subscription/attribute/downgrade/schedule/cancel"
           backTo="/"
           backLabel="Back to home"
           actions={

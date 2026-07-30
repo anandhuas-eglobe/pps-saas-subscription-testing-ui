@@ -50,9 +50,15 @@ import {
 } from '../utils/addonBuilder'
 import { formatMoney } from '../utils/planDisplay'
 import {
+  fetchExistingAddonCart,
+  findAddonCatalogItem,
+  hydrateAddonCartFormState,
+} from '../utils/cartHydration'
+import {
   buildInitiatePurchasePayload,
   requiresBillingAddressForCheckout,
 } from '../utils/billingAddress'
+
 import { saveLastPaymentHandoff } from '../utils/paymentEventBuilder'
 
 export function MerchantAddonsPage() {
@@ -110,6 +116,27 @@ export function MerchantAddonsPage() {
     }
   }, [selectedAddon, isAddonTrial, attributeValue])
 
+  const loadExistingAddonCart = useCallback(async (items: AddonCatalogItem[]) => {
+    const existingCart = await fetchExistingAddonCart()
+    if (!existingCart) {
+      return
+    }
+
+    const formState = hydrateAddonCartFormState(existingCart)
+    const matchingAddon = findAddonCatalogItem(items, formState.addonKey)
+    if (!matchingAddon) {
+      setCartPreview(existingCart)
+      return
+    }
+
+    setSelectedAddonKey(matchingAddon.key)
+    setIsAddonTrial(formState.isAddonTrial)
+    setAttributeValue(
+      matchingAddon.attribute ? formState.attributeValue : 1,
+    )
+    setCartPreview(existingCart)
+  }, [])
+
   const loadSubscription = useCallback(async () => {
     setLoading(true)
     setLoadError(null)
@@ -123,6 +150,8 @@ export function MerchantAddonsPage() {
         'GET /api/v1/merchant/subscription/active',
       )
       setSubscriptionData(result)
+      const items = extractAddonCatalogItems(result.plan)
+      await loadExistingAddonCart(items)
     } catch (err) {
       if (err instanceof ApiRequestError && err.status === 404) {
         setNotFound(true)
@@ -139,20 +168,37 @@ export function MerchantAddonsPage() {
     } finally {
       setLoading(false)
     }
-  }, [execute])
+  }, [execute, loadExistingAddonCart])
 
   useEffect(() => {
     void loadSubscription()
   }, [loadSubscription])
 
-  const handleSelectAddon = (addon: AddonCatalogItem) => {
+  const handleSelectAddon = async (addon: AddonCatalogItem) => {
     setSelectedAddonKey(addon.key)
-    setIsAddonTrial(false)
-    setAttributeValue(addon.attribute ? defaultAddonAttributeValue(addon.attribute) : 1)
     setSubmitError(null)
     setPurchaseError(null)
     setPurchaseResult(null)
     setClientValidationErrors([])
+
+    try {
+      const existingCart = await fetchExistingAddonCart()
+      if (existingCart) {
+        const formState = hydrateAddonCartFormState(existingCart)
+        const matchingAddon = findAddonCatalogItem(addonItems, formState.addonKey)
+        if (matchingAddon?.key === addon.key) {
+          setIsAddonTrial(formState.isAddonTrial)
+          setAttributeValue(addon.attribute ? formState.attributeValue : 1)
+          setCartPreview(existingCart)
+          return
+        }
+      }
+    } catch {
+      // Fall back to default configuration when cart cannot be loaded.
+    }
+
+    setIsAddonTrial(false)
+    setAttributeValue(addon.attribute ? defaultAddonAttributeValue(addon.attribute) : 1)
     setCartPreview(null)
   }
 
@@ -261,7 +307,7 @@ export function MerchantAddonsPage() {
           eyebrow="Merchant add-ons"
           title="Purchase plan add-ons"
           description="Browse add-ons available on your active subscription plan, configure limits or trials, add to cart, and complete checkout. View purchased add-ons on the active subscription page."
-          apiEndpoint="GET /api/v1/merchant/subscription/active · GET /api/v1/merchant/subscription/active-plan/addons · POST /api/v1/merchant/cart/addon · POST /api/v1/merchant/subscription/addon/purchase"
+          apiEndpoint="GET /api/v1/merchant/cart/addon · GET /api/v1/merchant/subscription/active · POST /api/v1/merchant/cart/addon · POST /api/v1/merchant/subscription/addon/purchase"
           backTo="/"
           backLabel="Back to home"
           actions={

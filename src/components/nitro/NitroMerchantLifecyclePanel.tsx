@@ -32,6 +32,7 @@ import {
   purchasePlanCart,
   upsertMerchantCart,
 } from '../../api/merchant'
+import { getPlanById } from '../../api/plans'
 import { ApiRequestError } from '../../api/client'
 import { DEFAULT_REDIS_CONNECTION, publishToRedisStream } from '../../api/redisDevTools'
 import { ActiveSubscriptionSummary } from '../merchant/ActiveSubscriptionSummary'
@@ -54,6 +55,10 @@ import {
   requiresBillingAddressForCheckout,
 } from '../../utils/billingAddress'
 import { buildDefaultCartSelections } from '../../utils/cartBuilder'
+import {
+  fetchExistingPlanCart,
+  hydratePlanCartFormState,
+} from '../../utils/cartHydration'
 import { formatMoney } from '../../utils/planDisplay'
 import {
   buildSucceededPaymentEventFromHandoff,
@@ -106,6 +111,24 @@ export function NitroMerchantLifecyclePanel() {
         const firstActive = result.plans.find((plan) => plan.status === PlanStatus.ACTIVE)
         return firstActive?.id ?? ''
       })
+
+      const existingCart = await fetchExistingPlanCart()
+      if (existingCart) {
+        let plan = result.plans.find((item) => item.id === existingCart.planId)
+        if (!plan) {
+          plan = await getPlanById(existingCart.planId)
+          setPlans((current) =>
+            current.some((item) => item.id === plan!.id) ? current : [...current, plan!],
+          )
+        }
+
+        const formState = hydratePlanCartFormState(existingCart, plan)
+        setSelectedPlanId(plan.id)
+        setBillingCycle(formState.billingCycle)
+        setUseTrial(formState.isTrial)
+        setCartPreview(existingCart)
+        setLastCompletedStep('cart')
+      }
     } catch (error) {
       const message =
         error instanceof ApiRequestError
