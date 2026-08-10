@@ -109,7 +109,10 @@ export function AddonCartConfigurator({
               <Switch
                 checked={isAddonTrial}
                 onChange={(event) => onTrialChange(event.target.checked)}
-                disabled={!addon.addonTrialEnabled || subscriptionIsTrial}
+                disabled={
+                  !addon.addonTrialEnabled ||
+                  (subscriptionIsTrial && addon.addonTrialEnabled)
+                }
               />
             }
             label={
@@ -118,9 +121,16 @@ export function AddonCartConfigurator({
                 : 'Add-on trial not available'
             }
           />
-          {subscriptionIsTrial && (
+          {subscriptionIsTrial && addon.addonTrialEnabled && (
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-              Paid add-ons are unavailable while the plan subscription is in trial.
+              During plan trial, only the add-on trial can be added to cart (paid purchase is
+              unavailable until the plan trial ends).
+            </Typography>
+          )}
+          {subscriptionIsTrial && !addon.addonTrialEnabled && (
+            <Typography variant="caption" color="error" sx={{ display: 'block' }}>
+              Paid add-ons are unavailable while the plan subscription is in trial, and this
+              add-on does not offer a trial.
             </Typography>
           )}
         </Grid>

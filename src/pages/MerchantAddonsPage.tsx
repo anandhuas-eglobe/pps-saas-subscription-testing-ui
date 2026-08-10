@@ -99,6 +99,16 @@ export function MerchantAddonsPage() {
     [addonItems, selectedAddonKey],
   )
 
+  const subscriptionIsTrial = subscriptionData?.subscription.isTrial ?? false
+
+  const defaultAddonTrialSelection = useCallback(
+    (addon: AddonCatalogItem) => subscriptionIsTrial && addon.addonTrialEnabled,
+    [subscriptionIsTrial],
+  )
+
+  const addonCartBlockedOnPlanTrial =
+    Boolean(selectedAddon) && subscriptionIsTrial && !selectedAddon!.addonTrialEnabled
+
   const livePayload = useMemo(() => {
     if (!selectedAddon) {
       return undefined
@@ -175,6 +185,14 @@ export function MerchantAddonsPage() {
     void loadSubscription()
   }, [loadSubscription])
 
+  useEffect(() => {
+    if (!selectedAddon || !subscriptionIsTrial || !selectedAddon.addonTrialEnabled) {
+      return
+    }
+
+    setIsAddonTrial(true)
+  }, [selectedAddon, subscriptionIsTrial])
+
   const handleSelectAddon = async (addon: AddonCatalogItem) => {
     setSelectedAddonKey(addon.key)
     setSubmitError(null)
@@ -198,7 +216,7 @@ export function MerchantAddonsPage() {
       // Fall back to default configuration when cart cannot be loaded.
     }
 
-    setIsAddonTrial(false)
+    setIsAddonTrial(defaultAddonTrialSelection(addon))
     setAttributeValue(addon.attribute ? defaultAddonAttributeValue(addon.attribute) : 1)
     setCartPreview(null)
   }
@@ -209,6 +227,16 @@ export function MerchantAddonsPage() {
     }
 
     const errors: string[] = []
+    if (subscriptionIsTrial && !selectedAddon.addonTrialEnabled) {
+      errors.push(
+        'This add-on cannot be purchased during plan trial because it does not offer an add-on trial.',
+      )
+    } else if (subscriptionIsTrial && !isAddonTrial) {
+      errors.push(
+        'Paid add-on purchase is not available while your plan is in trial. Enable add-on trial instead.',
+      )
+    }
+
     if (
       selectedAddon.featureType !== FeatureType.SIMPLE &&
       selectedAddon.attribute &&
@@ -469,7 +497,7 @@ export function MerchantAddonsPage() {
                           currency={subscriptionData.plan.baseCurrency}
                           isAddonTrial={isAddonTrial}
                           attributeValue={attributeValue}
-                          subscriptionIsTrial={subscriptionData.subscription.isTrial}
+                          subscriptionIsTrial={subscriptionIsTrial}
                           onTrialChange={setIsAddonTrial}
                           onAttributeValueChange={setAttributeValue}
                         />
@@ -501,13 +529,20 @@ export function MerchantAddonsPage() {
                       />
                     )}
 
+                    {addonCartBlockedOnPlanTrial && (
+                      <Alert severity="warning">
+                        This add-on cannot be added while your plan is in trial because it does not
+                        offer an add-on trial.
+                      </Alert>
+                    )}
+
                     <Button
                       variant="contained"
                       size="large"
                       startIcon={
                         submitting ? <CircularProgress size={18} color="inherit" /> : <ShoppingCartIcon />
                       }
-                      disabled={submitting}
+                      disabled={submitting || addonCartBlockedOnPlanTrial}
                       onClick={() => void handleAddToCart()}
                     >
                       Add to cart
