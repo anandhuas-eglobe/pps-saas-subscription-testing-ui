@@ -17,42 +17,47 @@ import {
 } from './nitroTestPlanBuilder'
 import { buildSucceededPaymentEventFromHandoff } from './paymentEventBuilder'
 
-export type TrialAllocatedEmailTestStepId =
-  | 'flush-cache'
-  | 'create-plan'
-  | 'activate-plan'
-  | 'add-to-cart'
-  | 'confirm-payment'
-
 export type EmailTemplateTestStepStatus = 'pending' | 'running' | 'done' | 'skipped' | 'error'
 
 export interface EmailTemplateTestStepState {
-  id: TrialAllocatedEmailTestStepId
+  id: string
   label: string
   status: EmailTemplateTestStepStatus
   detail?: string
 }
 
-export const TRIAL_ALLOCATED_EMAIL_TEST_STEPS: EmailTemplateTestStepState[] = [
+export type EmailTemplateTestStepUpdater = (
+  stepId: string,
+  update: Partial<Pick<EmailTemplateTestStepState, 'status' | 'detail'>>,
+) => void
+
+export interface EmailTemplateTestFlowDefinition {
+  steps: EmailTemplateTestStepState[]
+  run: (onStepUpdate: EmailTemplateTestStepUpdater) => Promise<EmailTemplateTestFlowResult>
+}
+
+export interface EmailTemplateTestFlowResult {
+  summary: string
+  details?: Record<string, string | boolean | number>
+}
+
+export interface TrialAllocatedEmailTestResult extends EmailTemplateTestFlowResult {
+  details: {
+    planId: string
+    planName: string
+    purchaseMessage: string
+    trialCheckout: boolean
+    paymentConfirmed: boolean
+  }
+}
+
+const TRIAL_ALLOCATED_EMAIL_TEST_STEPS: EmailTemplateTestStepState[] = [
   { id: 'flush-cache', label: 'Flush Redis cache', status: 'pending' },
   { id: 'create-plan', label: 'Create plan with trial', status: 'pending' },
   { id: 'activate-plan', label: 'Activate plan', status: 'pending' },
   { id: 'add-to-cart', label: 'Add trial plan to cart', status: 'pending' },
   { id: 'confirm-payment', label: 'Confirm payment / complete checkout', status: 'pending' },
 ]
-
-export interface TrialAllocatedEmailTestResult {
-  planId: string
-  planName: string
-  purchaseMessage: string
-  trialCheckout: boolean
-  paymentConfirmed: boolean
-}
-
-export type TrialAllocatedEmailTestStepUpdater = (
-  stepId: TrialAllocatedEmailTestStepId,
-  update: Partial<Pick<EmailTemplateTestStepState, 'status' | 'detail'>>,
-) => void
 
 async function loadValidatedCatalog(): Promise<CatalogFeature[]> {
   const catalog = await fetchFeatures()
@@ -63,8 +68,8 @@ async function loadValidatedCatalog(): Promise<CatalogFeature[]> {
   return catalog
 }
 
-export async function runTrialAllocatedEmailTestFlow(
-  onStepUpdate: TrialAllocatedEmailTestStepUpdater,
+async function runTrialAllocatedEmailTestFlow(
+  onStepUpdate: EmailTemplateTestStepUpdater,
 ): Promise<TrialAllocatedEmailTestResult> {
   const tier = NITRO_PLAN_TIERS[0]
 
@@ -136,10 +141,21 @@ export async function runTrialAllocatedEmailTestFlow(
   }
 
   return {
-    planId: createResult.planId,
-    planName: payload.planName,
-    purchaseMessage: purchaseResult.message,
-    trialCheckout: cartPreview.isTrial,
-    paymentConfirmed,
+    summary: `Trial checkout completed for ${payload.planName}. Notification should be sent to the signed-in merchant email.`,
+    details: {
+      planId: createResult.planId,
+      planName: payload.planName,
+      purchaseMessage: purchaseResult.message,
+      trialCheckout: cartPreview.isTrial,
+      paymentConfirmed,
+    },
   }
+}
+
+/** Registry of automated test flows keyed by template catalog id. */
+export const EMAIL_TEMPLATE_TEST_FLOWS: Record<string, EmailTemplateTestFlowDefinition> = {
+  'trial-allocated': {
+    steps: TRIAL_ALLOCATED_EMAIL_TEST_STEPS,
+    run: runTrialAllocatedEmailTestFlow,
+  },
 }
