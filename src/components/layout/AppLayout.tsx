@@ -14,6 +14,7 @@ import LogoutIcon from '@mui/icons-material/Logout'
 import { Link as RouterLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
 import { CopyAccessTokenButton } from './CopyAccessTokenButton'
+import { DatabaseResetButton } from './DatabaseResetButton'
 import { RedisCacheFlushButton } from './RedisCacheFlushButton'
 
 const navItems = [
@@ -126,6 +127,7 @@ export function AppLayout() {
             sx={{ flexShrink: 0, alignItems: 'center' }}
           >
             <CopyAccessTokenButton />
+            <DatabaseResetButton />
             <RedisCacheFlushButton />
             <Chip
               icon={<ScienceIcon sx={{ fontSize: '16px !important' }} />}

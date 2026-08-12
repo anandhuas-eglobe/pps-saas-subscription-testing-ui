@@ -1,9 +1,10 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { databaseDevToolsPlugin } from './vite-plugin-database-dev-tools'
 import { redisDevToolsPlugin } from './vite-plugin-redis-dev-tools'
 
 export default defineConfig({
-  plugins: [react(), redisDevToolsPlugin()],
+  plugins: [react(), redisDevToolsPlugin(), databaseDevToolsPlugin()],
   server: {
     port: 5173,
     proxy: {
