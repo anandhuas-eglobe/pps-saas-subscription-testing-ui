@@ -15,6 +15,7 @@ import PublicIcon from '@mui/icons-material/Public'
 import AutorenewIcon from '@mui/icons-material/Autorenew'
 import EventAvailableIcon from '@mui/icons-material/EventAvailable'
 import BoltIcon from '@mui/icons-material/Bolt'
+import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined'
 import type { SvgIconComponent } from '@mui/icons-material'
 
 export interface OperationLink {
@@ -165,6 +166,15 @@ export const operations: OperationLink[] = [
     path: '/dev/reseller-overage',
     icon: LocalMallIcon,
     apiEndpoint: 'Redis stream order.reseller.overage.requested',
+    available: true,
+  },
+  {
+    title: 'Email Templates',
+    description:
+      'One-click flows to trigger subscription notification emails — trial allocation, and more as they are added.',
+    path: '/dev/email-templates',
+    icon: EmailOutlinedIcon,
+    apiEndpoint: 'Plan lifecycle + subscription.trial.allocated.email',
     available: true,
   },
   {

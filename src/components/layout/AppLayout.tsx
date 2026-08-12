@@ -35,6 +35,7 @@ const navItems = [
   { label: 'Confirm Payment', path: '/dev/payment-confirm' },
   { label: 'Cleanup Pending', path: '/dev/cleanup-pending-invoices' },
   { label: 'Reseller Overage', path: '/dev/reseller-overage' },
+  { label: 'Email Templates', path: '/dev/email-templates' },
 ]
 
 function isNavItemActive(pathname: string, itemPath: string): boolean {

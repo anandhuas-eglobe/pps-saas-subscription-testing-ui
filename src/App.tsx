@@ -23,6 +23,7 @@ import { NitroTestPage } from './pages/NitroTestPage'
 import { MerchantOveragePage } from './pages/MerchantOveragePage'
 import { OverageTestingPage } from './pages/OverageTestingPage'
 import { SubscriptionRenewalTestingPage } from './pages/SubscriptionRenewalTestingPage'
+import { EmailTemplatesTestingPage } from './pages/EmailTemplatesTestingPage'
 
 const router = createBrowserRouter([
   {
@@ -57,6 +58,7 @@ const router = createBrowserRouter([
           { path: 'dev/payment-confirm', element: <PaymentConfirmationPage /> },
           { path: 'dev/cleanup-pending-invoices', element: <CleanupPendingInvoicesPage /> },
           { path: 'dev/reseller-overage', element: <ResellerOveragePublishPage /> },
+          { path: 'dev/email-templates', element: <EmailTemplatesTestingPage /> },
           { path: '*', element: <Navigate to="/" replace /> },
         ],
       },
