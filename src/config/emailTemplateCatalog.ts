@@ -183,11 +183,12 @@ export const SUBSCRIPTION_EMAIL_TEMPLATES: EmailTemplateDefinition[] = [
   {
     id: 'addon-trial-allocated',
     title: 'Add-on trial allocated',
-    description: 'Sent when an add-on trial is activated on the subscription.',
+    description:
+      'Sent when an add-on trial is activated during plan trial. Creates a Growth plan with trial-enabled add-ons, starts plan trial, then checks out add-on trial.',
     category: 'addons',
     eventType: 'subscription.addon.trial.allocated.email',
     templateId: 'subscription/addon-trial-allocated',
-    automated: false,
+    automated: true,
   },
   {
     id: 'addon-trial-expired',
@@ -210,11 +211,12 @@ export const SUBSCRIPTION_EMAIL_TEMPLATES: EmailTemplateDefinition[] = [
   {
     id: 'payment-success-subscription-purchase',
     title: 'Payment success — plan purchase',
-    description: 'Receipt after a new paid plan subscription is purchased.',
+    description:
+      'Receipt after a new paid plan subscription is purchased. Creates a plan, checks out, and opens the payment page for manual completion.',
     category: 'payment-success',
     eventType: 'subscription.payment.success.subscription.purchase.email',
     templateId: 'subscription/payment-success-subscription-purchase',
-    automated: false,
+    automated: true,
   },
   {
     id: 'payment-success-subscription-upgrade',

@@ -20,6 +20,7 @@ import {
   type EmailTemplateTestFlowResult,
   type EmailTemplateTestStepState,
 } from '../../utils/emailTemplateTestFlows'
+import { CheckoutSessionActions } from '../payment/CheckoutSessionActions'
 import { ApiErrorAlert } from '../ApiErrorAlert'
 import { EmailTemplateStepList } from './EmailTemplateStepList'
 
@@ -215,8 +216,14 @@ export function EmailTemplateTestCard({ template }: EmailTemplateTestCardProps) 
         {error != null && <ApiErrorAlert error={error} />}
 
         {result && (
-          <Alert severity="success" sx={{ mt: 'auto' }}>
+          <Alert severity={result.checkoutUrl ? 'info' : 'success'} sx={{ mt: 'auto' }}>
             {result.summary}
+            {result.checkoutUrl && (
+              <CheckoutSessionActions
+                checkoutUrl={result.checkoutUrl}
+                popupBlocked={result.checkoutPopupBlocked}
+              />
+            )}
           </Alert>
         )}
       </CardContent>
