@@ -221,20 +221,22 @@ export const SUBSCRIPTION_EMAIL_TEMPLATES: EmailTemplateDefinition[] = [
   {
     id: 'payment-success-subscription-upgrade',
     title: 'Payment success — plan upgrade',
-    description: 'Receipt after upgrading to a higher plan tier.',
+    description:
+      'Receipt after upgrading to a higher plan tier. Requires an active paid subscription from the plan purchase test first, then creates Nitro Enterprise and opens upgrade checkout.',
     category: 'payment-success',
     eventType: 'subscription.payment.success.subscription.upgrade.email',
     templateId: 'subscription/payment-success-subscription-upgrade',
-    automated: false,
+    automated: true,
   },
   {
     id: 'payment-success-addon-purchase',
     title: 'Payment success — add-on purchase',
-    description: 'Receipt after purchasing a paid add-on.',
+    description:
+      'Receipt after purchasing a paid add-on. Creates a Growth plan with add-ons, opens plan checkout, then continues to add-on checkout after you confirm plan payment.',
     category: 'payment-success',
     eventType: 'subscription.payment.success.addon.purchase.email',
     templateId: 'subscription/payment-success-addon-purchase',
-    automated: false,
+    automated: true,
   },
   {
     id: 'payment-success-attribute-upgrade',

@@ -13,6 +13,7 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import ScheduleIcon from '@mui/icons-material/Schedule'
+import SkipNextIcon from '@mui/icons-material/SkipNext'
 import type { EmailTemplateDefinition } from '../../config/emailTemplateCatalog'
 import { getEmailTemplateCategoryMeta } from '../../config/emailTemplateCatalog'
 import {
@@ -37,8 +38,11 @@ export function EmailTemplateTestCard({ template }: EmailTemplateTestCardProps) 
     flow ? flow.steps.map((step) => ({ ...step })) : [],
   )
   const [running, setRunning] = useState(false)
+  const [continuing, setContinuing] = useState(false)
   const [error, setError] = useState<unknown>(null)
   const [result, setResult] = useState<EmailTemplateTestFlowResult | null>(null)
+
+  const awaitingContinue = Boolean(result?.awaitingContinue && flow?.continueRun)
 
   const completedCount = useMemo(
     () => steps.filter((step) => step.status === 'done' || step.status === 'skipped').length,
@@ -61,6 +65,7 @@ export function EmailTemplateTestCard({ template }: EmailTemplateTestCardProps) 
 
     setExpanded(true)
     setRunning(true)
+    setContinuing(false)
     setError(null)
     setResult(null)
     resetSteps()
@@ -92,7 +97,42 @@ export function EmailTemplateTestCard({ template }: EmailTemplateTestCardProps) 
     }
   }
 
-  const showSteps = expanded && flow && (running || completedCount > 0 || error != null)
+  const handleContinue = async () => {
+    if (!flow?.continueRun) return
+
+    setExpanded(true)
+    setContinuing(true)
+    setError(null)
+
+    try {
+      const flowResult = await flow.continueRun((stepId, update) => {
+        updateStep(stepId, update)
+      })
+      setResult(flowResult)
+    } catch (err) {
+      setError(err)
+      setSteps((current) => {
+        const runningStep = current.find((step) => step.status === 'running')
+        if (!runningStep) {
+          return current
+        }
+        return current.map((step) =>
+          step.id === runningStep.id
+            ? {
+                ...step,
+                status: 'error',
+                detail: err instanceof Error ? err.message : 'Step failed',
+              }
+            : step,
+        )
+      })
+    } finally {
+      setContinuing(false)
+    }
+  }
+
+  const showSteps = expanded && flow && (running || continuing || completedCount > 0 || error != null)
+  const isBusy = running || continuing
 
   return (
     <Card
@@ -177,13 +217,41 @@ export function EmailTemplateTestCard({ template }: EmailTemplateTestCardProps) 
                 startIcon={
                   running ? <CircularProgress size={14} color="inherit" /> : <PlayArrowIcon />
                 }
-                disabled={running}
+                disabled={isBusy || awaitingContinue}
                 onClick={() => void handleRun()}
               >
                 {running ? `Running (${completedCount}/${steps.length})…` : 'Run test'}
               </Button>
-              {!running && completedCount > 0 && (
-                <Button size="small" variant="text" onClick={resetSteps}>
+              {awaitingContinue && (
+                <Button
+                  size="small"
+                  variant="contained"
+                  color="secondary"
+                  startIcon={
+                    continuing ? (
+                      <CircularProgress size={14} color="inherit" />
+                    ) : (
+                      <SkipNextIcon />
+                    )
+                  }
+                  disabled={isBusy}
+                  onClick={() => void handleContinue()}
+                >
+                  {continuing
+                    ? 'Continuing…'
+                    : (result?.continueLabel ?? 'Continue')}
+                </Button>
+              )}
+              {!isBusy && completedCount > 0 && (
+                <Button
+                  size="small"
+                  variant="text"
+                  onClick={() => {
+                    resetSteps()
+                    setResult(null)
+                    setError(null)
+                  }}
+                >
                   Reset
                 </Button>
               )}

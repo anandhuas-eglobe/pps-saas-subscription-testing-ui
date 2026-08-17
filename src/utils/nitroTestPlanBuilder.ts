@@ -12,7 +12,6 @@ import {
   defaultFeatureConfig,
   getOptionalFeatureAttributes,
   isSimpleFeature,
-  randomCountLimits,
 } from './planDefaults'
 
 export interface NitroPlanTier {
@@ -96,12 +95,42 @@ function scaleVolumeTiers(
   }))
 }
 
+/** Deterministic PER_COUNT limits that always increase with Nitro tier (avoids false downgrades on upgrade). */
+function perCountLimitsForNitroTier(
+  attributeCode: string,
+  tier: number,
+  scale = 1,
+): { minLimit: number; maxLimit: number } {
+  const profiles: Record<
+    string,
+    { minBase: number; minStep: number; maxBase: number; maxStep: number }
+  > = {
+    NUM_USERS: { minBase: 2, minStep: 2, maxBase: 10, maxStep: 15 },
+    ECOM_CHANNELS: { minBase: 1, minStep: 2, maxBase: 6, maxStep: 12 },
+    FULFILLMENT_STATIONS: { minBase: 1, minStep: 2, maxBase: 8, maxStep: 14 },
+    SHIPPING_CARRIERS: { minBase: 1, minStep: 2, maxBase: 5, maxStep: 10 },
+    PACKING_BOXES: { minBase: 2, minStep: 2, maxBase: 10, maxStep: 15 },
+    NUM_WAREHOUSES: { minBase: 1, minStep: 1, maxBase: 4, maxStep: 8 },
+    SHIPPING_MAPPING_RULES: { minBase: 1, minStep: 2, maxBase: 8, maxStep: 14 },
+    ORDER_SPLITTING_RULES: { minBase: 1, minStep: 2, maxBase: 6, maxStep: 12 },
+  }
+
+  const profile = profiles[attributeCode] ?? { minBase: 1, minStep: 2, maxBase: 6, maxStep: 12 }
+  const minLimit = Math.max(1, Math.round((profile.minBase + (tier - 1) * profile.minStep) * scale))
+  const maxLimit = Math.max(
+    minLimit + 1,
+    Math.round((profile.maxBase + tier * profile.maxStep) * scale),
+  )
+
+  return { minLimit, maxLimit }
+}
+
 function buildRequiredConfigs(catalog: CatalogFeature[], tier: number): Record<string, AttributeConfig> {
   const configs: Record<string, AttributeConfig> = {}
 
   const users = findAttributeByCode(catalog, 'NUM_USERS')
   if (users) {
-    const userLimits = randomCountLimits('NUM_USERS', tier)
+    const userLimits = perCountLimitsForNitroTier('NUM_USERS', tier)
     configs[users.attribute.id] = {
       ...defaultAttributeConfig('NUM_USERS', PriceType.PER_COUNT),
       inclusionType: InclusionType.INCLUDED,
@@ -198,7 +227,7 @@ function buildOptionalAttributeConfig(
   }
 
   const base = defaultAttributeConfig(attributeCode, PriceType.PER_COUNT)
-  const countLimits = randomCountLimits(attributeCode, tier, scale)
+  const countLimits = perCountLimitsForNitroTier(attributeCode, tier, scale)
   return {
     ...base,
     inclusionType: spec.inclusionType,
