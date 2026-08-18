@@ -13,7 +13,10 @@ import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
 import LogoutIcon from '@mui/icons-material/Logout'
 import { Link as RouterLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
+import { NotificationBell } from '../notifications/NotificationBell'
+import { NotificationDrawer } from '../notifications/NotificationDrawer'
 import { CopyAccessTokenButton } from './CopyAccessTokenButton'
+import { CopyMerchantIdButton } from './CopyMerchantIdButton'
 import { DatabaseResetButton } from './DatabaseResetButton'
 import { RedisCacheFlushButton } from './RedisCacheFlushButton'
 
@@ -36,6 +39,7 @@ const navItems = [
   { label: 'Cleanup Pending', path: '/dev/cleanup-pending-invoices' },
   { label: 'Reseller Overage', path: '/dev/reseller-overage' },
   { label: 'Email Templates', path: '/dev/email-templates' },
+  { label: 'Notifications', path: '/notifications' },
 ]
 
 function isNavItemActive(pathname: string, itemPath: string): boolean {
@@ -127,7 +131,9 @@ export function AppLayout() {
             spacing={1}
             sx={{ flexShrink: 0, alignItems: 'center' }}
           >
+            <NotificationBell />
             <CopyAccessTokenButton />
+            <CopyMerchantIdButton />
             <DatabaseResetButton />
             <RedisCacheFlushButton />
             <Chip
@@ -204,6 +210,7 @@ export function AppLayout() {
       <Container maxWidth="xl" sx={{ py: 3, flex: 1, minWidth: 0, maxWidth: '100%' }}>
         <Outlet />
       </Container>
+      <NotificationDrawer />
     </Box>
   )
 }

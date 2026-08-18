@@ -16,6 +16,7 @@ import AutorenewIcon from '@mui/icons-material/Autorenew'
 import EventAvailableIcon from '@mui/icons-material/EventAvailable'
 import BoltIcon from '@mui/icons-material/Bolt'
 import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined'
+import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive'
 import type { SvgIconComponent } from '@mui/icons-material'
 
 export interface OperationLink {
@@ -175,6 +176,15 @@ export const operations: OperationLink[] = [
     path: '/dev/email-templates',
     icon: EmailOutlinedIcon,
     apiEndpoint: 'Plan lifecycle + subscription.trial.allocated.email',
+    available: true,
+  },
+  {
+    title: 'Notifications',
+    description:
+      'Inbox from the notifications microservice — live socket push, desktop alerts, and a full listing with read/unread filters.',
+    path: '/notifications',
+    icon: NotificationsActiveIcon,
+    apiEndpoint: 'GET /api/v1/notifications · WS notification:new',
     available: true,
   },
   {

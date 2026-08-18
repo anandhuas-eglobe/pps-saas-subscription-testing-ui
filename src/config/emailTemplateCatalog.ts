@@ -284,15 +284,6 @@ export const SUBSCRIPTION_EMAIL_TEMPLATES: EmailTemplateDefinition[] = [
     automated: false,
   },
   {
-    id: 'payment-failure-subscription-renewal',
-    title: 'Payment failure — renewal',
-    description: 'Sent when automatic renewal payment fails.',
-    category: 'payment-failure',
-    eventType: 'subscription.payment.failure.subscription.renewal.email',
-    templateId: 'subscription/payment-failure-subscription-renewal',
-    automated: false,
-  },
-  {
     id: 'payment-failure-subscription-downgrade',
     title: 'Payment failure — downgrade',
     description: 'Sent when a downgrade-related payment fails.',

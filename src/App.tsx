@@ -24,6 +24,8 @@ import { MerchantOveragePage } from './pages/MerchantOveragePage'
 import { OverageTestingPage } from './pages/OverageTestingPage'
 import { SubscriptionRenewalTestingPage } from './pages/SubscriptionRenewalTestingPage'
 import { EmailTemplatesTestingPage } from './pages/EmailTemplatesTestingPage'
+import { NotificationsPage } from './pages/NotificationsPage'
+import { NotificationProvider } from './notifications/NotificationContext'
 
 const router = createBrowserRouter([
   {
@@ -35,9 +37,14 @@ const router = createBrowserRouter([
     children: [
       {
         path: '/',
-        element: <AppLayout />,
+        element: (
+          <NotificationProvider>
+            <AppLayout />
+          </NotificationProvider>
+        ),
         children: [
           { index: true, element: <HomePage /> },
+          { path: 'notifications', element: <NotificationsPage /> },
           { path: 'nitro-test', element: <NitroTestPage /> },
           { path: 'plans/create', element: <CreatePlanPage /> },
           { path: 'plans/:planId/edit', element: <EditPlanPage /> },

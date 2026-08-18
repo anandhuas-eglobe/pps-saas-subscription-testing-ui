@@ -35,8 +35,9 @@ async function executeRequest(
   path: string,
   init: RequestInit | undefined,
   headers: HeadersInit,
+  baseUrl = API_BASE,
 ): Promise<Response> {
-  const url = `${API_BASE}${path}`
+  const url = `${baseUrl}${path}`
   return fetch(url, {
     ...init,
     headers,
@@ -46,16 +47,18 @@ async function executeRequest(
 export async function apiRequest<T>(
   path: string,
   init?: RequestInit,
+  options?: { baseUrl?: string },
 ): Promise<{ response: Response; body: ApiResponse<T> }> {
+  const baseUrl = options?.baseUrl ?? API_BASE
   const headers = await buildAuthHeaders(init)
-  let response = await executeRequest(path, init, headers)
+  let response = await executeRequest(path, init, headers, baseUrl)
   let body = await parseJson<T>(response)
 
   if (response.status === 401 && getAccessToken()) {
     const refreshed = await refreshSession()
     if (refreshed) {
       const retryHeaders = await buildAuthHeaders(init)
-      response = await executeRequest(path, init, retryHeaders)
+      response = await executeRequest(path, init, retryHeaders, baseUrl)
       body = await parseJson<T>(response)
     } else {
       clearSession()
