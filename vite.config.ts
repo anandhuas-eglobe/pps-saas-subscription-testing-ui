@@ -18,8 +18,21 @@ export default defineConfig({
         target: 'http://localhost:3107',
         changeOrigin: true,
       },
+      // Merchant service signup/profile (must be before the generic /api proxy)
+      '/api/v1/merchants': {
+        target: 'http://localhost:3105',
+        changeOrigin: true,
+      },
+      '/api/v1/industries': {
+        target: 'http://localhost:3105',
+        changeOrigin: true,
+      },
       // Notifications service (must be before the generic /api proxy)
       '/api/v1/notifications': {
+        target: 'http://localhost:3108',
+        changeOrigin: true,
+      },
+      '/api/v1/email-logs': {
         target: 'http://localhost:3108',
         changeOrigin: true,
       },

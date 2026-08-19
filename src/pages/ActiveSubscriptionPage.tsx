@@ -22,6 +22,7 @@ import { PlanDetailView } from '../components/plans/PlanDetailView'
 import { ApiTransactionInspector } from '../components/ApiTransactionInspector'
 import { useApiTransaction } from '../hooks/useApiTransaction'
 import type { ActivePlanAddonsResponse, ActiveSubscriptionResponse } from '../types/subscription'
+import { resolveManualRenewalEligibleState } from '../utils/renewalEligibility'
 
 type ActiveSubscriptionTab = 'overview' | 'limits' | 'addons' | 'manage' | 'history'
 
@@ -113,6 +114,14 @@ export function ActiveSubscriptionPage() {
     void loadSubscription()
   }, [loadSubscription])
 
+  const recoveryState = data ? resolveManualRenewalEligibleState(data.subscription) : null
+
+  useEffect(() => {
+    if (recoveryState && activeTab === 'overview' && !searchParams.get('tab')) {
+      setSearchParams({ tab: 'manage' })
+    }
+  }, [recoveryState, activeTab, searchParams, setSearchParams])
+
   return (
     <Stack spacing={3}>
       <PageHeader
@@ -174,6 +183,13 @@ export function ActiveSubscriptionPage() {
 
       {!loading && !error && !notFound && data && (
         <Stack spacing={3}>
+          {recoveryState && (
+            <Alert severity="warning">
+              Subscription is in <strong>{recoveryState}</strong> state. Use the Manage tab to preview
+              recovery pricing and initiate manual renewal checkout (POST /renew).
+            </Alert>
+          )}
+
           <ActiveSubscriptionSummary subscription={data.subscription} planName={data.plan.planName} />
 
           <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>

@@ -949,6 +949,8 @@ export interface ManualRenewalResponse {
   renewalType: SubscriptionRenewalType
   message: string
   invoice: ManualRenewalInvoice
+  checkoutUrl?: string
+  stripeCheckoutUrl?: string
   paymentHandoff?: {
     invoiceId: string
     invoiceNumber: string

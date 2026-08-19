@@ -153,6 +153,7 @@ export function SubscriptionManagementPanel({
 
   const manualRecoveryState = resolveManualRenewalEligibleState(subscription)
   const manualRecoveryCheck = checkManualRenewalEligibility(subscription)
+  const isRecoveryPreview = manualRecoveryCheck.eligible
 
   const livePayload = useMemo(
     () => buildInitiateManualRenewalPayload(billingAddress, includeBillingAddress),
@@ -440,6 +441,9 @@ export function SubscriptionManagementPanel({
           </Stack>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             GET /api/v1/merchant/subscription/renewal/preview
+            {isRecoveryPreview
+              ? ' — recovery pricing for RENEWAL_FAILED, grace period, or cancelled subscriptions.'
+              : ' — proactive pricing when auto-renew is disabled.'}
           </Typography>
 
           {renewalLoading && (
@@ -490,7 +494,11 @@ export function SubscriptionManagementPanel({
               </Grid>
               <PricingPreviewCard
                 pricing={renewalPreview.pricing}
-                title="Estimated renewal cost for next billing cycle"
+                title={
+                  isRecoveryPreview
+                    ? 'Estimated recovery renewal cost'
+                    : 'Estimated renewal cost for next billing cycle'
+                }
               />
             </Stack>
           )}

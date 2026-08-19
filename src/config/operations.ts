@@ -18,6 +18,7 @@ import BoltIcon from '@mui/icons-material/Bolt'
 import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined'
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive'
 import CreditCardIcon from '@mui/icons-material/CreditCard'
+import PersonAddOutlinedIcon from '@mui/icons-material/PersonAddOutlined'
 import type { SvgIconComponent } from '@mui/icons-material'
 
 export interface OperationLink {
@@ -118,6 +119,16 @@ export const operations: OperationLink[] = [
     path: '/merchant/attributes',
     icon: TuneIcon,
     apiEndpoint: 'POST /api/v1/merchant/subscription/attribute/purchase',
+    available: true,
+  },
+  {
+    title: 'Merchant Signup',
+    description:
+      'Initiate merchant self-registration, resolve the verification token from notification email logs, and complete the profile form.',
+    path: '/merchant/signup',
+    icon: PersonAddOutlinedIcon,
+    apiEndpoint:
+      'POST /merchants/signup/initiate · GET /email-logs · POST /merchants/complete-your-profile',
     available: true,
   },
   {

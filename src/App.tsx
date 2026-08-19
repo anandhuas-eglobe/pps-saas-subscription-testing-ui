@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom'
 import { RequireAuth } from './components/auth/RequireAuth'
 import { AppLayout } from './components/layout/AppLayout'
+import { PublicPageShell } from './components/layout/PublicPageShell'
 import { ActiveSubscriptionPage } from './pages/ActiveSubscriptionPage'
 import { CreatePlanPage } from './pages/CreatePlanPage'
 import { EditPlanPage } from './pages/EditPlanPage'
@@ -20,6 +21,8 @@ import { CleanupPendingInvoicesPage } from './pages/CleanupPendingInvoicesPage'
 import { ExtendSubscriptionEndDatePage } from './pages/ExtendSubscriptionEndDatePage'
 import { MerchantGuestPlansPage } from './pages/MerchantGuestPlansPage'
 import { NitroTestPage } from './pages/NitroTestPage'
+import { MerchantRegistrationPage } from './pages/MerchantRegistrationPage'
+import { MerchantSignupPage } from './pages/MerchantSignupPage'
 import { MerchantOveragePage } from './pages/MerchantOveragePage'
 import { OverageTestingPage } from './pages/OverageTestingPage'
 import { SubscriptionRenewalTestingPage } from './pages/SubscriptionRenewalTestingPage'
@@ -32,6 +35,22 @@ const router = createBrowserRouter([
   {
     path: '/login',
     element: <LoginPage />,
+  },
+  {
+    path: '/merchant/signup',
+    element: (
+      <PublicPageShell>
+        <MerchantSignupPage />
+      </PublicPageShell>
+    ),
+  },
+  {
+    path: '/register',
+    element: (
+      <PublicPageShell>
+        <MerchantRegistrationPage />
+      </PublicPageShell>
+    ),
   },
   {
     element: <RequireAuth />,

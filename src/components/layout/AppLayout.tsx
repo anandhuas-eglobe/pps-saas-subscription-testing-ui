@@ -33,6 +33,7 @@ const navItems = [
   { label: 'Overage Testing', path: '/merchant/overage-testing' },
   { label: 'Overage', path: '/merchant/overage' },
   { label: 'Usage Simulation', path: '/merchant/usage-simulation' },
+  { label: 'Merchant Signup', path: '/merchant/signup' },
   { label: 'Invoices', path: '/merchant/invoices' },
   { label: 'Saved Cards', path: '/merchant/cards' },
   { label: 'Extend Subscription', path: '/admin/extend-subscription' },
@@ -48,16 +49,20 @@ function isNavItemActive(pathname: string, itemPath: string): boolean {
     return pathname === '/'
   }
 
-  if (itemPath === '/plans') {
-    return (
-      pathname === '/plans' ||
-      pathname.startsWith('/plans/') &&
-        pathname !== '/plans/create' &&
-        !pathname.endsWith('/edit')
-    )
-  }
+    if (itemPath === '/plans') {
+      return (
+        pathname === '/plans' ||
+        pathname.startsWith('/plans/') &&
+          pathname !== '/plans/create' &&
+          !pathname.endsWith('/edit')
+      )
+    }
 
-  return pathname === itemPath || pathname.startsWith(`${itemPath}/`)
+    if (itemPath === '/merchant/signup') {
+      return pathname === '/merchant/signup' || pathname === '/register'
+    }
+
+    return pathname === itemPath || pathname.startsWith(`${itemPath}/`)
 }
 
 export function AppLayout() {

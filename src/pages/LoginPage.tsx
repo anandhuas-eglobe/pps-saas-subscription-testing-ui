@@ -10,6 +10,7 @@ import FormControlLabel from '@mui/material/FormControlLabel'
 import IconButton from '@mui/material/IconButton'
 import InputLabel from '@mui/material/InputLabel'
 import MenuItem from '@mui/material/MenuItem'
+import Link from '@mui/material/Link'
 import Paper from '@mui/material/Paper'
 import Select from '@mui/material/Select'
 import Stack from '@mui/material/Stack'
@@ -20,7 +21,7 @@ import BookmarkAddOutlinedIcon from '@mui/icons-material/BookmarkAddOutlined'
 import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined'
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined'
 import SubscriptionsIcon from '@mui/icons-material/Subscriptions'
-import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Link as RouterLink, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { formatAuthError, useAuth } from '../auth/AuthContext'
 import {
   deleteSavedCredential,
@@ -334,6 +335,13 @@ export function LoginPage() {
           >
             {submitting ? 'Signing in…' : 'Sign in'}
           </Button>
+
+          <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
+            Need a new merchant account?{' '}
+            <Link component={RouterLink} to="/merchant/signup">
+              Start merchant signup
+            </Link>
+          </Typography>
         </Stack>
       </Paper>
     </Box>
