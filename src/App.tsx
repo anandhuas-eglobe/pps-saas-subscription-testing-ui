@@ -25,6 +25,7 @@ import { OverageTestingPage } from './pages/OverageTestingPage'
 import { SubscriptionRenewalTestingPage } from './pages/SubscriptionRenewalTestingPage'
 import { EmailTemplatesTestingPage } from './pages/EmailTemplatesTestingPage'
 import { NotificationsPage } from './pages/NotificationsPage'
+import { SavedCardsPage } from './pages/SavedCardsPage'
 import { NotificationProvider } from './notifications/NotificationContext'
 
 const router = createBrowserRouter([
@@ -62,6 +63,7 @@ const router = createBrowserRouter([
           { path: 'admin/extend-subscription', element: <ExtendSubscriptionEndDatePage /> },
           { path: 'merchant/invoices/:invoiceId', element: <InvoiceDetailPage /> },
           { path: 'merchant/invoices', element: <InvoiceListPage /> },
+          { path: 'merchant/cards', element: <SavedCardsPage /> },
           { path: 'dev/payment-confirm', element: <PaymentConfirmationPage /> },
           { path: 'dev/cleanup-pending-invoices', element: <CleanupPendingInvoicesPage /> },
           { path: 'dev/reseller-overage', element: <ResellerOveragePublishPage /> },

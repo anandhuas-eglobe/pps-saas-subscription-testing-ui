@@ -17,6 +17,7 @@ import EventAvailableIcon from '@mui/icons-material/EventAvailable'
 import BoltIcon from '@mui/icons-material/Bolt'
 import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined'
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive'
+import CreditCardIcon from '@mui/icons-material/CreditCard'
 import type { SvgIconComponent } from '@mui/icons-material'
 
 export interface OperationLink {
@@ -125,6 +126,14 @@ export const operations: OperationLink[] = [
     path: '/merchant/invoices',
     icon: ReceiptLongIcon,
     apiEndpoint: 'GET /api/v1/merchant/subscription/invoices',
+    available: true,
+  },
+  {
+    title: 'Saved Cards',
+    description: 'List, save, set default, and delete merchant saved Stripe cards via the payment microservice.',
+    path: '/merchant/cards',
+    icon: CreditCardIcon,
+    apiEndpoint: 'GET · POST · PUT /default · DELETE /api/v1/cards',
     available: true,
   },
   {

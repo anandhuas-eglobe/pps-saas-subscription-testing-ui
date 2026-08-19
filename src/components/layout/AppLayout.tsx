@@ -34,6 +34,7 @@ const navItems = [
   { label: 'Overage', path: '/merchant/overage' },
   { label: 'Usage Simulation', path: '/merchant/usage-simulation' },
   { label: 'Invoices', path: '/merchant/invoices' },
+  { label: 'Saved Cards', path: '/merchant/cards' },
   { label: 'Extend Subscription', path: '/admin/extend-subscription' },
   { label: 'Confirm Payment', path: '/dev/payment-confirm' },
   { label: 'Cleanup Pending', path: '/dev/cleanup-pending-invoices' },

@@ -13,6 +13,11 @@ export default defineConfig({
         target: 'http://localhost:3104',
         changeOrigin: true,
       },
+      // Payment service cards (must be before the generic /api proxy)
+      '/api/v1/cards': {
+        target: 'http://localhost:3107',
+        changeOrigin: true,
+      },
       // Notifications service (must be before the generic /api proxy)
       '/api/v1/notifications': {
         target: 'http://localhost:3108',
