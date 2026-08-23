@@ -27,6 +27,10 @@ import { ApiRequestError } from '../api/client'
 import { ApiTransactionInspector } from '../components/ApiTransactionInspector'
 import { PageHeader } from '../components/layout/PageHeader'
 import { setSession } from '../auth/tokenStorage'
+import {
+  setLastSelectedCredentialId,
+  upsertSavedCredential,
+} from '../auth/savedCredentialsStorage'
 import { useApiTransaction } from '../hooks/useApiTransaction'
 import type { CompleteMerchantProfileResult, IndustryDropdownItem } from '../types/merchantSignup'
 
@@ -181,6 +185,13 @@ export function MerchantRegistrationPage() {
           role: response.user.role,
         },
       })
+
+      const savedCredential = upsertSavedCredential({
+        label: firstName.trim() || response.user.email,
+        email: response.user.email,
+        password,
+      })
+      setLastSelectedCredentialId(savedCredential.id)
     } catch (err) {
       const message =
         err instanceof ApiRequestError
@@ -337,7 +348,8 @@ export function MerchantRegistrationPage() {
             Merchant account created for {result.merchant.businessName}
           </Typography>
           <Typography variant="body2" gutterBottom>
-            Signed in as {result.user.email} ({result.user.role ?? 'Merchant Admin'}).
+            Signed in as {result.user.email} ({result.user.role ?? 'Merchant Admin'}). Credentials
+            saved for quick login.
           </Typography>
           <Button variant="outlined" size="small" onClick={() => navigate('/', { replace: true })}>
             Go to test UI home
