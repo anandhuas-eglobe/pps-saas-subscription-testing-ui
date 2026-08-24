@@ -29,6 +29,13 @@ import { SubscriptionRenewalTestingPage } from './pages/SubscriptionRenewalTesti
 import { EmailTemplatesTestingPage } from './pages/EmailTemplatesTestingPage'
 import { NotificationsPage } from './pages/NotificationsPage'
 import { SavedCardsPage } from './pages/SavedCardsPage'
+import { AdminCouponsPage } from './pages/AdminCouponsPage'
+import { CreateCouponPage, EditCouponPage } from './pages/CouponEditorPage'
+import { CouponDetailPage } from './pages/CouponDetailPage'
+import { AdminDiscountPrivilegesPage } from './pages/AdminDiscountPrivilegesPage'
+import { CreateDiscountPrivilegePage, EditDiscountPrivilegePage } from './pages/PrivilegeEditorPage'
+import { DiscountPrivilegeDetailPage } from './pages/DiscountPrivilegeDetailPage'
+import { MerchantCommercialPage } from './pages/MerchantCommercialPage'
 import { NotificationProvider } from './notifications/NotificationContext'
 
 const router = createBrowserRouter([
@@ -80,6 +87,15 @@ const router = createBrowserRouter([
           { path: 'merchant/guest-plans', element: <MerchantGuestPlansPage /> },
           { path: 'merchant/usage-simulation', element: <UsageSimulationPage /> },
           { path: 'admin/extend-subscription', element: <ExtendSubscriptionEndDatePage /> },
+          { path: 'admin/coupons/create', element: <CreateCouponPage /> },
+          { path: 'admin/coupons/:couponId/edit', element: <EditCouponPage /> },
+          { path: 'admin/coupons/:couponId', element: <CouponDetailPage /> },
+          { path: 'admin/coupons', element: <AdminCouponsPage /> },
+          { path: 'admin/discount-privileges/create', element: <CreateDiscountPrivilegePage /> },
+          { path: 'admin/discount-privileges/:privilegeId/edit', element: <EditDiscountPrivilegePage /> },
+          { path: 'admin/discount-privileges/:privilegeId', element: <DiscountPrivilegeDetailPage /> },
+          { path: 'admin/discount-privileges', element: <AdminDiscountPrivilegesPage /> },
+          { path: 'merchant/commercial', element: <MerchantCommercialPage /> },
           { path: 'merchant/invoices/:invoiceId', element: <InvoiceDetailPage /> },
           { path: 'merchant/invoices', element: <InvoiceListPage /> },
           { path: 'merchant/cards', element: <SavedCardsPage /> },

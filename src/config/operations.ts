@@ -19,6 +19,9 @@ import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined'
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive'
 import CreditCardIcon from '@mui/icons-material/CreditCard'
 import PersonAddOutlinedIcon from '@mui/icons-material/PersonAddOutlined'
+import LocalOfferOutlinedIcon from '@mui/icons-material/LocalOfferOutlined'
+import WorkspacePremiumOutlinedIcon from '@mui/icons-material/WorkspacePremiumOutlined'
+import DiscountOutlinedIcon from '@mui/icons-material/DiscountOutlined'
 import type { SvgIconComponent } from '@mui/icons-material'
 
 export interface OperationLink {
@@ -163,6 +166,30 @@ export const operations: OperationLink[] = [
     path: '/admin/extend-subscription',
     icon: EventAvailableIcon,
     apiEndpoint: 'POST /api/v1/admin/plans/merchant/extend-subscription-end-date',
+    available: true,
+  },
+  {
+    title: 'Admin Coupons',
+    description: 'Create, list, update, and expire coupons. Inspect benefits, restrictions, and redemptions.',
+    path: '/admin/coupons',
+    icon: LocalOfferOutlinedIcon,
+    apiEndpoint: 'GET · POST · PUT · PATCH /api/v1/admin/coupons',
+    available: true,
+  },
+  {
+    title: 'Discount Privileges',
+    description: 'Create merchant discount privileges and assign or unassign them to merchants.',
+    path: '/admin/discount-privileges',
+    icon: WorkspacePremiumOutlinedIcon,
+    apiEndpoint: 'GET · POST · PUT · PATCH /api/v1/admin/discount-privileges',
+    available: true,
+  },
+  {
+    title: 'Merchant Offers',
+    description: 'View eligible auto-apply coupons and assigned privileges, then preview a coupon against a subtotal.',
+    path: '/merchant/commercial',
+    icon: DiscountOutlinedIcon,
+    apiEndpoint: 'GET /offers · POST /coupons/preview',
     available: true,
   },
   {

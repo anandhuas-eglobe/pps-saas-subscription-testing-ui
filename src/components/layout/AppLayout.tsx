@@ -37,6 +37,9 @@ const navItems = [
   { label: 'Invoices', path: '/merchant/invoices' },
   { label: 'Saved Cards', path: '/merchant/cards' },
   { label: 'Extend Subscription', path: '/admin/extend-subscription' },
+  { label: 'Coupons', path: '/admin/coupons' },
+  { label: 'Privileges', path: '/admin/discount-privileges' },
+  { label: 'Offers', path: '/merchant/commercial' },
   { label: 'Confirm Payment', path: '/dev/payment-confirm' },
   { label: 'Cleanup Pending', path: '/dev/cleanup-pending-invoices' },
   { label: 'Reseller Overage', path: '/dev/reseller-overage' },
@@ -55,6 +58,15 @@ function isNavItemActive(pathname: string, itemPath: string): boolean {
         pathname.startsWith('/plans/') &&
           pathname !== '/plans/create' &&
           !pathname.endsWith('/edit')
+      )
+    }
+
+    if (itemPath === '/admin/coupons' || itemPath === '/admin/discount-privileges') {
+      return (
+        pathname === itemPath ||
+        (pathname.startsWith(`${itemPath}/`) &&
+          pathname !== `${itemPath}/create` &&
+          !pathname.endsWith('/edit'))
       )
     }
 
