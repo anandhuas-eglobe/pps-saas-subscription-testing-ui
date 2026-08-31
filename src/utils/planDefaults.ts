@@ -7,6 +7,7 @@ import type {
   PlanFeatureAttribute,
 } from '../types/subscription'
 import { FeatureType, InclusionType, PlanType, PriceType } from '../types/subscription'
+import { normalizeCreatePlanPayloadForApi } from './planValidation'
 
 export const REQUIRED_ATTRIBUTE_CODES = ['NUM_USERS', 'MONTHLY_ORDER_VOLUME'] as const
 
@@ -519,46 +520,7 @@ export function mergePlanFeatures(features: PlanFeature[]): PlanFeature[] {
 }
 
 export function sanitizeCreatePlanPayload(payload: CreatePlanPayload): CreatePlanPayload {
-  const sanitized: CreatePlanPayload = {
-    ...payload,
-    features: payload.features.map((feature) => {
-      if (feature.featureType === FeatureType.SIMPLE && feature.featureConfig) {
-        return {
-          ...feature,
-          featureConfig: sanitizeFeatureConfig(feature.featureConfig),
-        }
-      }
-
-      if (feature.featureType !== FeatureType.ATTRIBUTE || !feature.attributes) {
-        return feature
-      }
-
-      return {
-        ...feature,
-        attributes: feature.attributes.map((attribute) => ({
-          ...attribute,
-          attributeConfig: sanitizeAttributeConfig(
-            attribute.attributeConfig,
-            attribute.linkToMonthlyOrderVolume ?? false,
-          ),
-        })),
-      }
-    }),
-  }
-
-  if (sanitized.isTrialPeriodEnabled) {
-    sanitized.trialPeriod = Math.max(1, sanitized.trialPeriod ?? 14)
-  } else {
-    delete sanitized.trialPeriod
-  }
-
-  if (sanitized.isGracePeriodEnabled) {
-    sanitized.gracePeriod = Math.max(1, sanitized.gracePeriod ?? 15)
-  } else {
-    delete sanitized.gracePeriod
-  }
-
-  return sanitized
+  return normalizeCreatePlanPayloadForApi(payload)
 }
 
 export function buildCreatePlanPayload(

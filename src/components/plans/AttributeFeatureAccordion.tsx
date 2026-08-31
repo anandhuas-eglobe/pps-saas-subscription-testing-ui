@@ -316,6 +316,7 @@ export const AttributeFeatureAccordion = memo(function AttributeFeatureAccordion
                           control={
                             <Switch
                               checked={config.isOverageEnabled}
+                              disabled={!attribute.isMonthlyLimit}
                               onChange={(event) =>
                                 onConfigChange(attribute.id, {
                                   isOverageEnabled: event.target.checked,
@@ -327,7 +328,16 @@ export const AttributeFeatureAccordion = memo(function AttributeFeatureAccordion
                         />
                       </Grid>
 
-                      {config.isOverageEnabled && (
+                      {!attribute.isMonthlyLimit && (
+                        <Grid size={{ xs: 12 }}>
+                          <Alert severity="info" sx={{ py: 0.5 }}>
+                            Overage is only allowed on monthly-limit attributes (
+                            {attribute.attributeCode} cannot enable overage).
+                          </Alert>
+                        </Grid>
+                      )}
+
+                      {config.isOverageEnabled && attribute.isMonthlyLimit && (
                         <Grid size={{ xs: 12, sm: 6 }}>
                           <TextField
                             fullWidth

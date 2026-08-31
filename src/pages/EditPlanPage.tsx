@@ -48,6 +48,8 @@ import {
   getApiErrorSummary,
   getApiErrorTitle,
 } from '../utils/apiErrors'
+import { validateCreatePlanPayload } from '../utils/planValidation'
+import type { ApiErrorItem } from '../types/subscription'
 
 export function EditPlanPage() {
   const { planId } = useParams<{ planId: string }>()
@@ -80,6 +82,7 @@ export function EditPlanPage() {
     message: '',
     severity: 'success',
   })
+  const [clientValidationErrors, setClientValidationErrors] = useState<ApiErrorItem[]>([])
   const validationErrorRef = useRef<HTMLDivElement | null>(null)
 
   const attributeFeatures = useMemo(() => catalog.filter(isAttributeFeature), [catalog])
@@ -136,7 +139,7 @@ export function EditPlanPage() {
     )
   }, [debouncedPayloadSnapshot])
 
-  const validationErrors = useMemo(() => {
+  const apiValidationErrors = useMemo(() => {
     const fromError = extractApiErrors(transaction?.lastError)
     const fromResponse =
       transaction?.lastResponse?.success === false
@@ -153,10 +156,18 @@ export function EditPlanPage() {
     )
   }, [transaction])
 
+  const validationErrors = useMemo(
+    () =>
+      clientValidationErrors.length > 0 ? clientValidationErrors : apiValidationErrors,
+    [apiValidationErrors, clientValidationErrors],
+  )
+
   const validationErrorCode =
-    (transaction?.lastError instanceof ApiRequestError
-      ? transaction.lastError.body.errorCode
-      : undefined) ?? transaction?.lastResponse?.errorCode
+    clientValidationErrors.length > 0
+      ? 'CLIENT_VALIDATION'
+      : (transaction?.lastError instanceof ApiRequestError
+          ? transaction.lastError.body.errorCode
+          : undefined) ?? transaction?.lastResponse?.errorCode
 
   useEffect(() => {
     if (validationErrors.length > 0) {
@@ -456,10 +467,25 @@ export function EditPlanPage() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
-    if (!planId || !submitPayload) {
+    if (!planId || !submitPayload || !form) {
       return
     }
 
+    const validationIssues = validateCreatePlanPayload(
+      { ...form, features: submitPayload.features },
+      catalog,
+    )
+    if (validationIssues.length > 0) {
+      setClientValidationErrors(validationIssues)
+      setSnackbar({
+        open: true,
+        message: `Fix ${validationIssues.length} validation issue(s) before saving the plan.`,
+        severity: 'error',
+      })
+      return
+    }
+
+    setClientValidationErrors([])
     setSubmitting(true)
     const endpoint = `PUT /api/v1/admin/plans/${planId}`
 

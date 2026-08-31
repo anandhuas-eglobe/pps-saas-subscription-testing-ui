@@ -147,11 +147,11 @@ export const CreatePlanFeatureCatalogSection = memo(function CreatePlanFeatureCa
         )}
 
         <Alert icon={<InfoOutlinedIcon />} severity="info" sx={{ mb: 2 }}>
-          Required attributes are always included with <strong>INCLUDED</strong> pricing. Optional
-          attribute features and simple features support INCLUDED or ADDON pricing, proration, and
-          add-on trials. Linkable attributes can set{' '}
-          <strong>linkToMonthlyOrderVolume</strong> to inherit limits from the required{' '}
-          <strong>MONTHLY_ORDER_VOLUME</strong> attribute.
+          Required attributes (<strong>NUM_USERS</strong>, <strong>MONTHLY_ORDER_VOLUME</strong>)
+          are always included with <strong>INCLUDED</strong> pricing. PER_COUNT rows require
+          per-unit monthly/yearly prices; VOLUME_PRICE rows require at least one tier and must omit
+          count limits. Overage is only available on monthly-limit attributes. Linkable attributes
+          can set <strong>linkToMonthlyOrderVolume</strong> (PER_COUNT only, no min/max limits).
         </Alert>
 
         <Typography variant="subtitle2" sx={{ mb: 1.5 }}>

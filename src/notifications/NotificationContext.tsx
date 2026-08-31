@@ -16,6 +16,7 @@ import {
 import { AUTH_SESSION_CLEARED_EVENT, AUTH_SESSION_UPDATED_EVENT } from '../auth/tokenStorage'
 import { getMerchantIdFromAccessToken } from '../auth/jwtClaims'
 import { useAuth } from '../auth/AuthContext'
+import { getNotificationsWsUrl } from '../config/api'
 import type { InAppNotification } from '../types/notifications'
 import { isNotificationUnread, normalizeNotification } from '../utils/notifications'
 import {
@@ -50,8 +51,7 @@ interface NotificationContextValue {
 const NotificationContext = createContext<NotificationContextValue | null>(null)
 
 function getSocketUrl(): string {
-  const configured = import.meta.env.VITE_NOTIFICATIONS_WS_URL ?? ''
-  return configured ? `${configured.replace(/\/$/, '')}/notifications` : '/notifications'
+  return getNotificationsWsUrl()
 }
 
 export function NotificationProvider({ children }: { children: ReactNode }) {

@@ -7,8 +7,6 @@ import type {
 } from '../types/merchantSignup'
 import { apiRequest } from './client'
 
-const MERCHANT_BASE = import.meta.env.VITE_MERCHANT_BASE_URL ?? ''
-
 export async function initiateMerchantSignup(
   payload: InitiateMerchantSignupPayload,
 ): Promise<InitiateMerchantSignupResult> {
@@ -18,7 +16,6 @@ export async function initiateMerchantSignup(
       method: 'POST',
       body: JSON.stringify(payload),
     },
-    { baseUrl: MERCHANT_BASE },
   )
 
   return {
@@ -35,7 +32,6 @@ export async function completeMerchantProfile(
       method: 'POST',
       body: JSON.stringify(payload),
     },
-    { baseUrl: MERCHANT_BASE },
   )
   return body.data!
 }
@@ -43,8 +39,6 @@ export async function completeMerchantProfile(
 export async function listIndustryDropdown(): Promise<IndustryDropdownItem[]> {
   const { body } = await apiRequest<IndustryDropdownItem[]>(
     '/api/v1/industries/dropdown',
-    undefined,
-    { baseUrl: MERCHANT_BASE },
   )
   return body.data ?? []
 }

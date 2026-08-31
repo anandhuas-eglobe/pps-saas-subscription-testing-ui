@@ -11,8 +11,9 @@ import RefreshIcon from '@mui/icons-material/Refresh'
 import { Link as RouterLink } from 'react-router-dom'
 import { fetchFeatures } from '../api/features'
 import { createPlan } from '../api/plans'
+import { ApiRequestError } from '../api/client'
 import { ApiTransactionInspector } from '../components/ApiTransactionInspector'
-import { ApiErrorAlert } from '../components/ApiErrorAlert'
+import { ValidationErrorsAlert } from '../components/ValidationErrorsAlert'
 import { CreatePlanDetailsSection } from '../components/plans/CreatePlanDetailsSection'
 import { CreatePlanFeatureCatalogSection } from '../components/plans/CreatePlanFeatureCatalogSection'
 import { getRequiredAttributeEntries } from '../components/plans/RequiredAttributesSection'
@@ -39,7 +40,11 @@ import {
 } from '../utils/planDefaults'
 import {
   getApiErrorSummary,
+  extractApiErrors,
+  getApiErrorTitle,
 } from '../utils/apiErrors'
+import { validateCreatePlanPayload } from '../utils/planValidation'
+import type { ApiErrorItem } from '../types/subscription'
 
 type SelectedAttributeFeature = {
   featureId: string
@@ -72,6 +77,7 @@ export function CreatePlanPage() {
     message: '',
     severity: 'success',
   })
+  const [clientValidationErrors, setClientValidationErrors] = useState<ApiErrorItem[]>([])
   const validationErrorRef = useRef<HTMLDivElement | null>(null)
 
   const attributeFeatures = useMemo(() => catalog.filter(isAttributeFeature), [catalog])
@@ -140,10 +146,37 @@ export function CreatePlanPage() {
   }, [catalog])
 
   useEffect(() => {
-    if (transaction?.lastError != null || transaction?.lastResponse?.success === false) {
+    if (
+      clientValidationErrors.length > 0 ||
+      transaction?.lastError != null ||
+      transaction?.lastResponse?.success === false
+    ) {
       validationErrorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
+  }, [clientValidationErrors, transaction])
+
+  const apiValidationErrors = useMemo(() => {
+    const fromError = extractApiErrors(transaction?.lastError)
+    const fromResponse =
+      transaction?.lastResponse?.success === false
+        ? extractApiErrors(transaction.lastResponse)
+        : []
+    return [...fromError, ...fromResponse].filter(
+      (item, index, list) =>
+        list.findIndex(
+          (other) =>
+            other.field === item.field &&
+            other.message === item.message &&
+            other.code === item.code,
+        ) === index,
+    )
   }, [transaction])
+
+  const validationErrors = useMemo(
+    () =>
+      clientValidationErrors.length > 0 ? clientValidationErrors : apiValidationErrors,
+    [apiValidationErrors, clientValidationErrors],
+  )
 
   const loadCatalog = useCallback(async () => {
     setCatalogLoading(true)
@@ -369,6 +402,19 @@ export function CreatePlanPage() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
+
+    const validationIssues = validateCreatePlanPayload(submitPayload, catalog)
+    if (validationIssues.length > 0) {
+      setClientValidationErrors(validationIssues)
+      setSnackbar({
+        open: true,
+        message: `Fix ${validationIssues.length} validation issue(s) before creating the plan.`,
+        severity: 'error',
+      })
+      return
+    }
+
+    setClientValidationErrors([])
     setSubmitting(true)
 
     try {
@@ -427,11 +473,25 @@ export function CreatePlanPage() {
           </Alert>
         )}
 
-        {(transaction?.lastError != null || transaction?.lastResponse?.success === false) && (
+        {(validationErrors.length > 0 ||
+          transaction?.lastError != null ||
+          transaction?.lastResponse?.success === false) && (
           <Box ref={validationErrorRef}>
-            <ApiErrorAlert
-              error={transaction.lastError ?? transaction.lastResponse}
-              subtitle="The API rejected this plan payload. Review each item below and update the form."
+            <ValidationErrorsAlert
+              title={
+                clientValidationErrors.length > 0
+                  ? 'Plan payload validation failed'
+                  : getApiErrorTitle(transaction?.lastError ?? transaction?.lastResponse)
+              }
+              errors={validationErrors}
+              errorCode={
+                clientValidationErrors.length > 0
+                  ? 'CLIENT_VALIDATION'
+                  : transaction?.lastError instanceof ApiRequestError
+                    ? transaction.lastError.body.errorCode
+                    : transaction?.lastResponse?.errorCode
+              }
+              subtitle="The create-plan API rules require the fixes below. Update the form and submit again."
             />
           </Box>
         )}

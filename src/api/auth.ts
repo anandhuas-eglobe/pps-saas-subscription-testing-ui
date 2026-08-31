@@ -1,7 +1,9 @@
 import type { AuthUser } from '../auth/tokenStorage'
+import { getApiBaseUrl } from '../config/api'
 import { ApiRequestError } from './errors'
+import { fetchWithRateLimitRetry } from './rateLimitRetry'
 
-const IAM_BASE = import.meta.env.VITE_IAM_BASE_URL ?? ''
+const API_BASE = getApiBaseUrl()
 
 export interface LoginRequest {
   email: string
@@ -53,13 +55,15 @@ async function iamRequest<T>(
   path: string,
   init?: RequestInit,
 ): Promise<{ response: Response; body: IamEnvelope<T> }> {
-  const response = await fetch(`${IAM_BASE}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
-  })
+  const response = await fetchWithRateLimitRetry(() =>
+    fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(init?.headers ?? {}),
+      },
+    }),
+  )
 
   const body = await parseIamJson<T>(response)
 

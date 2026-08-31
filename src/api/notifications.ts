@@ -6,8 +6,6 @@ import type {
 } from '../types/notifications'
 import { apiRequest } from './client'
 
-const NOTIFICATIONS_BASE = import.meta.env.VITE_NOTIFICATIONS_BASE_URL ?? ''
-
 function buildQuery(userId: string, params: FetchNotificationsParams = {}): string {
   const search = new URLSearchParams()
   search.set('userId', userId)
@@ -42,7 +40,6 @@ export async function fetchNotifications(
   const { body } = await apiRequest<FetchNotificationsResult>(
     `/api/v1/notifications?${query}`,
     withUser(userId),
-    { baseUrl: NOTIFICATIONS_BASE },
   )
   return body.data!
 }
@@ -58,7 +55,6 @@ export async function markNotificationRead(
       method: 'PATCH',
       ...withUser(userId),
     },
-    { baseUrl: NOTIFICATIONS_BASE },
   )
   return body.data!
 }
@@ -75,7 +71,6 @@ export async function bulkMarkNotificationsRead(
       ...withUser(userId),
       body: JSON.stringify({ notificationIds }),
     },
-    { baseUrl: NOTIFICATIONS_BASE },
   )
   return body.data!
 }

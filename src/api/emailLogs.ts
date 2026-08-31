@@ -1,8 +1,6 @@
 import type { EmailLogsResult } from '../types/merchantSignup'
 import { apiRequest } from './client'
 
-const NOTIFICATIONS_BASE = import.meta.env.VITE_NOTIFICATIONS_BASE_URL ?? ''
-
 export interface FetchEmailLogsParams {
   page?: number
   limit?: number
@@ -35,8 +33,6 @@ function buildQuery(params: FetchEmailLogsParams = {}): string {
 export async function fetchEmailLogs(params: FetchEmailLogsParams = {}): Promise<EmailLogsResult> {
   const { body } = await apiRequest<EmailLogsResult>(
     `/api/v1/email-logs${buildQuery(params)}`,
-    undefined,
-    { baseUrl: NOTIFICATIONS_BASE },
   )
   return body.data!
 }

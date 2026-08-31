@@ -1,11 +1,13 @@
 import type { ApiResponse } from '../types/subscription'
 import { getAuthorizationHeader, getValidAccessToken, refreshSession } from '../auth/sessionManager'
 import { clearSession, getAccessToken } from '../auth/tokenStorage'
+import { getApiBaseUrl } from '../config/api'
 import { ApiRequestError } from './errors'
+import { fetchWithRateLimitRetry } from './rateLimitRetry'
 
 export { ApiRequestError } from './errors'
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
+const API_BASE = getApiBaseUrl()
 
 async function parseJson<T>(response: Response): Promise<ApiResponse<T>> {
   const text = await response.text()
@@ -38,10 +40,12 @@ async function executeRequest(
   baseUrl = API_BASE,
 ): Promise<Response> {
   const url = `${baseUrl}${path}`
-  return fetch(url, {
-    ...init,
-    headers,
-  })
+  return fetchWithRateLimitRetry(() =>
+    fetch(url, {
+      ...init,
+      headers,
+    }),
+  )
 }
 
 export async function apiRequest<T>(
@@ -74,13 +78,17 @@ export async function apiRequest<T>(
 
 export async function apiDownloadBlob(path: string, fallbackFilename = 'download.pdf'): Promise<void> {
   const headers = await buildAuthHeaders()
-  let response = await fetch(`${API_BASE}${path}`, { headers })
+  let response = await fetchWithRateLimitRetry(() =>
+    fetch(`${API_BASE}${path}`, { headers }),
+  )
 
   if (response.status === 401 && getAccessToken()) {
     const refreshed = await refreshSession()
     if (refreshed) {
       const retryHeaders = await buildAuthHeaders()
-      response = await fetch(`${API_BASE}${path}`, { headers: retryHeaders })
+      response = await fetchWithRateLimitRetry(() =>
+        fetch(`${API_BASE}${path}`, { headers: retryHeaders }),
+      )
     } else {
       clearSession()
     }

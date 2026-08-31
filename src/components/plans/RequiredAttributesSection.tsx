@@ -24,7 +24,6 @@ import {
 } from '../../utils/planDefaults'
 import { VolumePriceTiersEditor } from './VolumePriceTiersEditor'
 import { AttributeBasePriceFields } from './AttributeBasePriceFields'
-import { ProrationAddonTrialFields } from './ProrationAddonTrialFields'
 
 export interface RequiredAttributeEntry {
   feature: CatalogFeature
@@ -80,6 +79,8 @@ export const RequiredAttributesSection = memo(function RequiredAttributesSection
   return (
     <Stack spacing={1.5}>
       {entries.map(({ feature, attributeId, attributeCode, attributeName }) => {
+        const attribute = feature.featureAttributes.find((item) => item.id === attributeId)
+        const isMonthlyLimit = attribute?.isMonthlyLimit ?? true
         const config = configs[attributeId] ?? defaultAttributeConfig(attributeCode)
         const isVolumePrice = config.priceType === PriceType.VOLUME_PRICE
         const isPerCount = config.priceType === PriceType.PER_COUNT
@@ -198,46 +199,63 @@ export const RequiredAttributesSection = memo(function RequiredAttributesSection
                     />
                   )}
 
+                  {isMonthlyLimit ? (
+                    <>
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              checked={config.isOverageEnabled}
+                              onChange={(event) =>
+                                onConfigChange(attributeId, {
+                                  isOverageEnabled: event.target.checked,
+                                })
+                              }
+                            />
+                          }
+                          label="Overage enabled"
+                        />
+                      </Grid>
+
+                      {config.isOverageEnabled && (
+                        <Grid size={{ xs: 12, sm: 6 }}>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            label="Overage price / unit"
+                            type="number"
+                            value={config.overagePricePerUnit ?? 0}
+                            onChange={(event) =>
+                              onConfigChange(attributeId, {
+                                overagePricePerUnit: Number(event.target.value),
+                              })
+                            }
+                          />
+                        </Grid>
+                      )}
+                    </>
+                  ) : (
+                    <Grid size={{ xs: 12 }}>
+                      <Alert severity="info" sx={{ py: 0.5 }}>
+                        Overage is only allowed on monthly-limit attributes. This attribute cannot
+                        enable overage billing.
+                      </Alert>
+                    </Grid>
+                  )}
+
                   <Grid size={{ xs: 12, sm: 6 }}>
                     <FormControlLabel
                       control={
                         <Switch
-                          checked={config.isOverageEnabled}
+                          checked={config.isProrated}
                           onChange={(event) =>
-                            onConfigChange(attributeId, {
-                              isOverageEnabled: event.target.checked,
-                            })
+                            onConfigChange(attributeId, { isProrated: event.target.checked })
                           }
                         />
                       }
-                      label="Overage enabled"
+                      label="Prorated"
                     />
                   </Grid>
-
-                  {config.isOverageEnabled && (
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="Overage price / unit"
-                        type="number"
-                        value={config.overagePricePerUnit ?? 0}
-                        onChange={(event) =>
-                          onConfigChange(attributeId, {
-                            overagePricePerUnit: Number(event.target.value),
-                          })
-                        }
-                      />
-                    </Grid>
-                  )}
-
-                  <ProrationAddonTrialFields
-                    inclusionType={config.inclusionType}
-                    isProrated={config.isProrated}
-                    addonTrialEnabled={config.addonTrialEnabled}
-                    addonTrialPeriod={config.addonTrialPeriod}
-                    onChange={(patch) => onConfigChange(attributeId, patch)}
-                  />
                 </Grid>
               </Stack>
             </CardContent>
