@@ -8,6 +8,8 @@ export default defineConfig(({ mode }) => {
   const gatewayUrl =
     env.VITE_API_GATEWAY_URL?.replace(/\/$/, '') ||
     'https://saasppsgateway.eglobeitsolutions.org'
+  const notificationsWsUrl =
+    env.VITE_NOTIFICATIONS_WS_URL?.replace(/\/$/, '') || 'http://localhost:3108'
 
   return {
     plugins: [react(), redisDevToolsPlugin(), databaseDevToolsPlugin()],
@@ -19,10 +21,11 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           secure: true,
         },
+        // Socket.io must bypass the API gateway — it only proxies HTTP under /api/*
         '/socket.io': {
-          target: gatewayUrl,
+          target: notificationsWsUrl,
           changeOrigin: true,
-          secure: true,
+          secure: false,
           ws: true,
         },
       },

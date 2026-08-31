@@ -39,6 +39,7 @@ interface NotificationContextValue {
   error: string | null
   drawerOpen: boolean
   socketConnected: boolean
+  socketError: string | null
   desktopPermission: DesktopPermission
   openDrawer: () => void
   closeDrawer: () => void
@@ -64,6 +65,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [socketConnected, setSocketConnected] = useState(false)
+  const [socketError, setSocketError] = useState<string | null>(null)
   const [desktopPermission, setDesktopPermission] = useState<DesktopPermission>(getDesktopPermission)
 
   const closeDrawer = useCallback(() => {
@@ -210,13 +212,18 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
     const onConnect = () => {
       setSocketConnected(true)
+      setSocketError(null)
       void refreshPreview()
     }
     const onDisconnect = () => {
       setSocketConnected(false)
     }
-    const onConnectError = () => {
+    const onConnectError = (error: Error) => {
       setSocketConnected(false)
+      setSocketError(
+        error.message ||
+          'Live socket failed — check VITE_NOTIFICATIONS_WS_URL and that the notifications service is running.',
+      )
     }
 
     socket.on('connect', onConnect)
@@ -265,6 +272,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       error,
       drawerOpen,
       socketConnected,
+      socketError,
       desktopPermission,
       openDrawer,
       closeDrawer,
@@ -281,6 +289,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       error,
       drawerOpen,
       socketConnected,
+      socketError,
       desktopPermission,
       openDrawer,
       closeDrawer,

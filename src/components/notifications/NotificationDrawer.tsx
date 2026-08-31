@@ -30,6 +30,7 @@ export function NotificationDrawer() {
     error,
     drawerOpen,
     socketConnected,
+    socketError,
     desktopPermission,
     closeDrawer,
     refreshPreview,
@@ -141,6 +142,16 @@ export function NotificationDrawer() {
         {desktopPermission === 'unsupported' && (
           <Box sx={{ px: 2, pb: 1.5 }}>
             <Alert severity="info">This browser does not support desktop notifications.</Alert>
+          </Box>
+        )}
+
+        {!socketConnected && socketError && (
+          <Box sx={{ px: 2, pb: 1.5 }}>
+            <Alert severity="warning">
+              Live push unavailable ({socketError}). Falling back to polling every 60s — verify{' '}
+              <code>VITE_NOTIFICATIONS_WS_URL</code> points at the notifications service, not the
+              API gateway.
+            </Alert>
           </Box>
         )}
 
