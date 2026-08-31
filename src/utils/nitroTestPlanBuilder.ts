@@ -125,6 +125,21 @@ function perCountLimitsForNitroTier(
   return { minLimit, maxLimit }
 }
 
+function overageForAttribute(
+  attribute: FeatureAttributeRow,
+  enabled: boolean,
+  overagePricePerUnit?: number,
+): Pick<AttributeConfig, 'isOverageEnabled' | 'overagePricePerUnit'> {
+  if (!attribute.isMonthlyLimit || !enabled) {
+    return { isOverageEnabled: false }
+  }
+
+  return {
+    isOverageEnabled: true,
+    overagePricePerUnit: overagePricePerUnit ?? 0,
+  }
+}
+
 function buildRequiredConfigs(catalog: CatalogFeature[], tier: number): Record<string, AttributeConfig> {
   const configs: Record<string, AttributeConfig> = {}
 
@@ -138,8 +153,7 @@ function buildRequiredConfigs(catalog: CatalogFeature[], tier: number): Record<s
       maxLimit: userLimits.maxLimit,
       pricePerUnitMonthly: 2 + tier * 2,
       pricePerUnitYearly: 20 + tier * 20,
-      isOverageEnabled: tier >= 3,
-      overagePricePerUnit: tier >= 3 ? 1 + tier * 0.5 : undefined,
+      ...overageForAttribute(users.attribute, tier >= 3, 1 + tier * 0.5),
       isProrated: tier >= 2,
       addonTrialEnabled: false,
       addonTrialPeriod: null,
@@ -160,8 +174,7 @@ function buildRequiredConfigs(catalog: CatalogFeature[], tier: number): Record<s
         { count: 1000, monthlyPrice: 150, yearlyPrice: 1500 },
         { count: 2500, monthlyPrice: 280, yearlyPrice: 2800 },
       ]),
-      isOverageEnabled: true,
-      overagePricePerUnit: 0.1 + tier * 0.05,
+      ...overageForAttribute(orderVolume.attribute, true, 0.1 + tier * 0.05),
       isProrated: true,
       addonTrialEnabled: false,
       addonTrialPeriod: null,
@@ -184,7 +197,7 @@ type InclusionTypeValue = (typeof InclusionType)[keyof typeof InclusionType]
 type PriceTypeValue = (typeof PriceType)[keyof typeof PriceType]
 
 function buildOptionalAttributeConfig(
-  attributeCode: string,
+  attribute: FeatureAttributeRow,
   spec: OptionalAttributeSpec,
   tier: number,
 ): AttributeConfig {
@@ -200,8 +213,7 @@ function buildOptionalAttributeConfig(
       pricePerUnitMonthly: (0.05 + tier * 0.02) * scale,
       pricePerUnitYearly: (0.5 + tier * 0.2) * scale,
       isProrated: spec.inclusionType === InclusionType.ADDON,
-      isOverageEnabled: tier >= 4,
-      overagePricePerUnit: tier >= 4 ? 0.02 + tier * 0.01 : undefined,
+      ...overageForAttribute(attribute, tier >= 4, 0.02 + tier * 0.01),
       addonTrialEnabled: spec.addonTrial ?? false,
       addonTrialPeriod: spec.addonTrial ? 7 + tier * 2 : null,
     }
@@ -219,15 +231,14 @@ function buildOptionalAttributeConfig(
         { count: 500, monthlyPrice: 110, yearlyPrice: 1100 },
       ]),
       isProrated: spec.inclusionType === InclusionType.ADDON,
-      isOverageEnabled: true,
-      overagePricePerUnit: 0.08 + tier * 0.02,
+      ...overageForAttribute(attribute, true, 0.08 + tier * 0.02),
       addonTrialEnabled: spec.addonTrial ?? false,
       addonTrialPeriod: spec.addonTrial ? 7 + tier * 2 : null,
     }
   }
 
-  const base = defaultAttributeConfig(attributeCode, PriceType.PER_COUNT)
-  const countLimits = perCountLimitsForNitroTier(attributeCode, tier, scale)
+  const base = defaultAttributeConfig(spec.attributeCode, PriceType.PER_COUNT)
+  const countLimits = perCountLimitsForNitroTier(spec.attributeCode, tier, scale)
   return {
     ...base,
     inclusionType: spec.inclusionType,
@@ -237,8 +248,7 @@ function buildOptionalAttributeConfig(
     pricePerUnitMonthly: (1.5 + tier) * scale,
     pricePerUnitYearly: (15 + tier * 10) * scale,
     isProrated: spec.inclusionType === InclusionType.ADDON,
-    isOverageEnabled: tier >= 4,
-    overagePricePerUnit: tier >= 4 ? 0.5 + tier * 0.25 : undefined,
+    ...overageForAttribute(attribute, tier >= 4, 0.5 + tier * 0.25),
     addonTrialEnabled: spec.addonTrial ?? false,
     addonTrialPeriod: spec.addonTrial ? 7 + tier * 2 : null,
   }
@@ -351,7 +361,7 @@ function buildOptionalAttributeFeatures(
     }
 
     entry.attributeIds.push(attribute.id)
-    entry.configs[attribute.id] = buildOptionalAttributeConfig(attribute.attributeCode, spec, tier)
+    entry.configs[attribute.id] = buildOptionalAttributeConfig(attribute, spec, tier)
     entry.linkFlags[attribute.id] = spec.linkToMonthlyOrderVolume ?? false
     selected[feature.id] = entry
   }

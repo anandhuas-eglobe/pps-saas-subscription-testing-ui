@@ -406,7 +406,10 @@ export function validateCreatePlanPayload(
 export function normalizeAttributeConfigForApi(
   config: AttributeConfig,
   linkToMonthlyOrderVolume = false,
+  isMonthlyLimit = true,
 ): AttributeConfig {
+  const overageAllowed = isMonthlyLimit && config.isOverageEnabled
+
   const inclusionAddonTrial =
     config.inclusionType === InclusionType.ADDON
       ? {
@@ -419,7 +422,7 @@ export function normalizeAttributeConfigForApi(
           addonTrialEnabled: false,
         }
 
-  const overageFields = config.isOverageEnabled
+  const overageFields = overageAllowed
     ? { isOverageEnabled: true as const, overagePricePerUnit: config.overagePricePerUnit ?? 0 }
     : { isOverageEnabled: false as const }
 
@@ -461,7 +464,22 @@ export function normalizeAttributeConfigForApi(
   }
 }
 
-export function normalizePlanFeatureForApi(feature: PlanFeature): PlanFeature {
+export function buildAttributeMonthlyLimitMap(
+  catalog: CatalogFeature[],
+): Record<string, boolean> {
+  const limits: Record<string, boolean> = {}
+  for (const feature of catalog) {
+    for (const attribute of feature.featureAttributes) {
+      limits[attribute.id] = attribute.isMonthlyLimit
+    }
+  }
+  return limits
+}
+
+export function normalizePlanFeatureForApi(
+  feature: PlanFeature,
+  attributeMonthlyLimits: Record<string, boolean> = {},
+): PlanFeature {
   if (feature.featureType === FeatureType.SIMPLE) {
     const config = feature.featureConfig!
     const normalizedConfig = {
@@ -491,15 +509,26 @@ export function normalizePlanFeatureForApi(feature: PlanFeature): PlanFeature {
       attributeConfig: normalizeAttributeConfigForApi(
         attribute.attributeConfig,
         attribute.linkToMonthlyOrderVolume ?? false,
+        attributeMonthlyLimits[attribute.featureAttributeId] ?? true,
       ),
     })),
   }
 }
 
-export function normalizeCreatePlanPayloadForApi(payload: CreatePlanPayload): CreatePlanPayload {
+export function normalizeCreatePlanPayloadForApi(
+  payload: CreatePlanPayload,
+  catalog: CatalogFeature[] = [],
+  attributeMonthlyLimitsOverride?: Record<string, boolean>,
+): CreatePlanPayload {
+  const attributeMonthlyLimits =
+    attributeMonthlyLimitsOverride ??
+    (catalog.length > 0 ? buildAttributeMonthlyLimitMap(catalog) : {})
+
   const normalized: CreatePlanPayload = {
     ...payload,
-    features: payload.features.map(normalizePlanFeatureForApi),
+    features: payload.features.map((feature) =>
+      normalizePlanFeatureForApi(feature, attributeMonthlyLimits),
+    ),
   }
 
   if (normalized.isTrialPeriodEnabled) {

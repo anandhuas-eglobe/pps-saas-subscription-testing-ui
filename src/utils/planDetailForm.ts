@@ -13,8 +13,8 @@ import { FeatureType } from '../types/subscription'
 import {
   applyLinkToMonthlyOrderVolumeFlag,
   isRequiredAttributeCode,
-  sanitizeCreatePlanPayload,
 } from './planDefaults'
+import { normalizeCreatePlanPayloadForApi } from './planValidation'
 
 export type SelectedAttributeFeatureState = {
   featureId: string
@@ -195,19 +195,30 @@ export function planDetailToDuplicatePayload(
   const suffix = options?.nameSuffix ?? ' Copy'
   const uniqueSuffix = options?.uniqueSuffix ?? String(Date.now()).slice(-6)
 
-  return sanitizeCreatePlanPayload({
-    planName: `${plan.planName}${suffix} ${uniqueSuffix}`.trim(),
-    planDescription: plan.planDescription,
-    planType: plan.planType,
-    baseMonthlyPrice: plan.baseMonthlyPrice,
-    baseYearlyPrice: plan.baseYearlyPrice,
-    baseCurrency: plan.baseCurrency,
-    isTrialPeriodEnabled: plan.trial.enabled,
-    trialPeriod: plan.trial.days,
-    isGracePeriodEnabled: plan.grace.enabled,
-    gracePeriod: plan.grace.days,
-    overageAutoChargeAmount: plan.overageAutoChargeAmount,
-    overageMaxAllowedAmount: plan.overageMaxAllowedAmount,
-    features: (plan.features ?? []).map(planDetailFeatureToCreateFeature),
-  })
+  return normalizeCreatePlanPayloadForApi(
+    {
+      planName: `${plan.planName}${suffix} ${uniqueSuffix}`.trim(),
+      planDescription: plan.planDescription,
+      planType: plan.planType,
+      baseMonthlyPrice: plan.baseMonthlyPrice,
+      baseYearlyPrice: plan.baseYearlyPrice,
+      baseCurrency: plan.baseCurrency,
+      isTrialPeriodEnabled: plan.trial.enabled,
+      trialPeriod: plan.trial.days,
+      isGracePeriodEnabled: plan.grace.enabled,
+      gracePeriod: plan.grace.days,
+      overageAutoChargeAmount: plan.overageAutoChargeAmount,
+      overageMaxAllowedAmount: plan.overageMaxAllowedAmount,
+      features: (plan.features ?? []).map(planDetailFeatureToCreateFeature),
+    },
+    [],
+    Object.fromEntries(
+      (plan.features ?? []).flatMap((feature) =>
+        feature.attributes.map((attribute) => [
+          attribute.featureAttributeId,
+          attribute.isMonthlyLimit,
+        ]),
+      ),
+    ),
+  )
 }

@@ -519,8 +519,11 @@ export function mergePlanFeatures(features: PlanFeature[]): PlanFeature[] {
   return [...merged.values()]
 }
 
-export function sanitizeCreatePlanPayload(payload: CreatePlanPayload): CreatePlanPayload {
-  return normalizeCreatePlanPayloadForApi(payload)
+export function sanitizeCreatePlanPayload(
+  payload: CreatePlanPayload,
+  catalog: CatalogFeature[] = [],
+): CreatePlanPayload {
+  return normalizeCreatePlanPayloadForApi(payload, catalog)
 }
 
 export function buildCreatePlanPayload(
@@ -557,5 +560,5 @@ export function buildCreatePlanPayload(
   )
   const features = mergePlanFeatures([...required, ...optional, ...simple])
 
-  return sanitizeCreatePlanPayload({ ...form, features })
+  return sanitizeCreatePlanPayload({ ...form, features }, catalog)
 }
