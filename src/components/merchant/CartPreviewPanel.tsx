@@ -246,7 +246,13 @@ export function CartPreviewPanel({
             disabled={!canConfirm}
             onClick={handleConfirm}
           >
-            Confirm payment
+            {purchasing
+              ? isDowngrade
+                ? 'Confirming downgrade…'
+                : 'Confirming…'
+              : isDowngrade
+                ? 'Confirm downgrade'
+                : 'Confirm payment'}
           </Button>
 
           <Typography variant="caption" color="text.secondary">
