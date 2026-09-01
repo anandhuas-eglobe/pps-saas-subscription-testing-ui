@@ -25,6 +25,7 @@ import StorefrontIcon from '@mui/icons-material/Storefront'
 import VerifiedIcon from '@mui/icons-material/Verified'
 import { Link as RouterLink } from 'react-router-dom'
 import {
+  cancelMerchantCheckout,
   getActiveSubscription,
   getInvoiceById,
   getMerchantCart,
@@ -89,6 +90,7 @@ export function NitroMerchantLifecyclePanel() {
   const [refreshingSubscription, setRefreshingSubscription] = useState(false)
   const [billingAddress, setBillingAddress] = useState<BillingAddress>(defaultBillingAddress)
   const [checkoutPopupBlocked, setCheckoutPopupBlocked] = useState(false)
+  const [cancellingCheckout, setCancellingCheckout] = useState(false)
 
   const activePlans = useMemo(
     () => plans.filter((plan) => plan.status === PlanStatus.ACTIVE),
@@ -250,6 +252,23 @@ export function NitroMerchantLifecyclePanel() {
       setStepError(error)
     } finally {
       setBusyStep(null)
+    }
+  }
+
+  const handleCancelCheckout = async () => {
+    setCancellingCheckout(true)
+    setStepError(null)
+
+    try {
+      await cancelMerchantCheckout()
+      setPurchaseResult(null)
+      setCheckoutPopupBlocked(false)
+      const preview = await getMerchantCart().catch(() => null)
+      setCartPreview(preview)
+    } catch (error) {
+      setStepError(error)
+    } finally {
+      setCancellingCheckout(false)
     }
   }
 
@@ -486,6 +505,8 @@ export function NitroMerchantLifecyclePanel() {
                     <CheckoutSessionActions
                       checkoutUrl={purchaseResult.checkoutUrl}
                       popupBlocked={checkoutPopupBlocked}
+                      onCancelCheckout={() => void handleCancelCheckout()}
+                      cancellingCheckout={cancellingCheckout}
                     />
                   )}
                 </Alert>

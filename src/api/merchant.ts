@@ -29,7 +29,7 @@ import type {
   UpsertMerchantCartPayload,
 } from '../types/subscription'
 import type { PlanDetail } from '../types/subscription'
-import { apiDownloadBlob, apiRequest } from './client'
+import { apiDownloadBlob, apiRequest, ApiRequestError } from './client'
 
 export async function listMerchantPlans(): Promise<MerchantPlanListResponse> {
   const { body } = await apiRequest<MerchantPlanListResponse>(
@@ -64,6 +64,14 @@ export async function purchasePlanCart(
     },
   )
   return body.data!
+}
+
+export async function cancelMerchantCheckout(): Promise<CancelMessageResult> {
+  const { body } = await apiRequest<CancelMessageResult>(
+    '/api/v1/merchant/subscription/checkout/cancel',
+    { method: 'POST' },
+  )
+  return body.data ?? { message: body.message ?? 'Checkout cancelled and cart unlocked successfully.' }
 }
 
 export async function getActiveSubscription(): Promise<ActiveSubscriptionResponse> {
@@ -170,6 +178,28 @@ export async function getScheduledSubscriptionDowngrade(): Promise<ScheduledSubs
     '/api/v1/merchant/subscription/downgrade/schedule',
   )
   return body.data!
+}
+
+/** Returns null when the merchant has no scheduled downgrade (API 400/404). */
+export function isNoScheduledDowngradeError(err: unknown): boolean {
+  return (
+    err instanceof ApiRequestError &&
+    (err.status === 404 ||
+      (err.status === 400 &&
+        typeof err.body.message === 'string' &&
+        err.body.message.toLowerCase().includes('no scheduled plan downgrade')))
+  )
+}
+
+export async function fetchScheduledSubscriptionDowngrade(): Promise<ScheduledSubscriptionDowngradeResponse | null> {
+  try {
+    return await getScheduledSubscriptionDowngrade()
+  } catch (err) {
+    if (isNoScheduledDowngradeError(err)) {
+      return null
+    }
+    throw err
+  }
 }
 
 export async function cancelScheduledSubscriptionDowngrade(): Promise<CancelMessageResult> {

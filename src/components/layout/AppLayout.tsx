@@ -17,6 +17,7 @@ import { NotificationBell } from '../notifications/NotificationBell'
 import { NotificationDrawer } from '../notifications/NotificationDrawer'
 import { CopyAccessTokenButton } from './CopyAccessTokenButton'
 import { CopyMerchantIdButton } from './CopyMerchantIdButton'
+import { CronJobsMenu } from './CronJobsMenu'
 import { DatabaseResetButton } from './DatabaseResetButton'
 import { RedisCacheFlushButton } from './RedisCacheFlushButton'
 
@@ -140,6 +141,7 @@ export function AppLayout() {
             <NotificationBell />
             <CopyAccessTokenButton />
             <CopyMerchantIdButton />
+            <CronJobsMenu />
             <DatabaseResetButton />
             <RedisCacheFlushButton />
             <Chip

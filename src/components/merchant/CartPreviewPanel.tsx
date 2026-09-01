@@ -43,6 +43,8 @@ interface CartPreviewPanelProps {
   purchaseResult?: MerchantPlanPurchaseResult | null
   checkoutPopupBlocked?: boolean
   onConfirmPayment: (billingAddress?: BillingAddress) => void
+  onCancelCheckout?: () => void | Promise<void>
+  cancellingCheckout?: boolean
 }
 
 function DetailField({ label, value, mono = false }: { label: string; value: ReactNode; mono?: boolean }) {
@@ -67,6 +69,8 @@ export function CartPreviewPanel({
   purchaseResult = null,
   checkoutPopupBlocked = false,
   onConfirmPayment,
+  onCancelCheckout,
+  cancellingCheckout = false,
 }: CartPreviewPanelProps) {
   const { pricing, plan, planDetails } = cart
   const systemAddedCount = planDetails?.systemAddedEntities?.length ?? 0
@@ -277,6 +281,8 @@ export function CartPreviewPanel({
                   <CheckoutSessionActions
                     checkoutUrl={purchaseResult.checkoutUrl}
                     popupBlocked={checkoutPopupBlocked}
+                    onCancelCheckout={onCancelCheckout}
+                    cancellingCheckout={cancellingCheckout}
                   />
                 )}
               </Alert>

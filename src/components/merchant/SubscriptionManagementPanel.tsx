@@ -22,10 +22,11 @@ import PaymentIcon from '@mui/icons-material/Payment'
 import TrendingDownIcon from '@mui/icons-material/TrendingDown'
 import { Link as RouterLink } from 'react-router-dom'
 import {
+  cancelMerchantCheckout,
   cancelScheduledSubscriptionDowngrade,
   cancelSubscriptionAutoRenew,
+  fetchScheduledSubscriptionDowngrade,
   getManualSubscriptionRenewalPreview,
-  getScheduledSubscriptionDowngrade,
   initiateManualRenewal,
 } from '../../api/merchant'
 import { ApiRequestError } from '../../api/client'
@@ -47,6 +48,7 @@ import {
   resolveManualRenewalEligibleState,
 } from '../../utils/renewalEligibility'
 import { BillingAddressFields } from './BillingAddressFields'
+import { CheckoutSessionActions } from '../payment/CheckoutSessionActions'
 import { ApiTransactionInspector } from '../ApiTransactionInspector'
 import { useApiTransaction } from '../../hooks/useApiTransaction'
 
@@ -148,6 +150,7 @@ export function SubscriptionManagementPanel({
   const [initiatingRenewal, setInitiatingRenewal] = useState(false)
   const [renewalResult, setRenewalResult] = useState<ManualRenewalResponse | null>(null)
   const [renewalInitError, setRenewalInitError] = useState<string | null>(null)
+  const [cancellingCheckout, setCancellingCheckout] = useState(false)
 
   const { transaction, execute } = useApiTransaction()
 
@@ -167,9 +170,14 @@ export function SubscriptionManagementPanel({
     try {
       const result = await execute(
         {},
-        () => getScheduledSubscriptionDowngrade(),
+        () => fetchScheduledSubscriptionDowngrade(),
         'GET /api/v1/merchant/subscription/downgrade/schedule',
       )
+      if (!result) {
+        setDowngradeNotFound(true)
+        setDowngrade(null)
+        return
+      }
       setDowngrade(result)
     } catch (err) {
       if (err instanceof ApiRequestError && err.status === 404) {
@@ -302,6 +310,36 @@ export function SubscriptionManagementPanel({
       setInitiatingRenewal(false)
     }
   }
+
+  const handleCancelCheckout = async () => {
+    setCancellingCheckout(true)
+    setActionError(null)
+    setActionMessage(null)
+
+    try {
+      const result = await execute(
+        {},
+        () => cancelMerchantCheckout(),
+        'POST /api/v1/merchant/subscription/checkout/cancel',
+      )
+      setActionMessage(result.message)
+      setRenewalResult(null)
+      onChanged?.()
+    } catch (err) {
+      const message =
+        err instanceof ApiRequestError
+          ? err.body.message ?? err.message
+          : err instanceof Error
+            ? err.message
+            : 'Failed to cancel checkout'
+      setActionError(message)
+    } finally {
+      setCancellingCheckout(false)
+    }
+  }
+
+  const renewalCheckoutUrl =
+    renewalResult?.checkoutUrl ?? renewalResult?.stripeCheckoutUrl ?? null
 
   return (
     <Stack spacing={3}>
@@ -554,6 +592,13 @@ export function SubscriptionManagementPanel({
                       ·{' '}
                       <RouterLink to="/dev/payment-confirm">Confirm payment</RouterLink>
                     </>
+                  )}
+                  {renewalCheckoutUrl && (
+                    <CheckoutSessionActions
+                      checkoutUrl={renewalCheckoutUrl}
+                      onCancelCheckout={() => void handleCancelCheckout()}
+                      cancellingCheckout={cancellingCheckout}
+                    />
                   )}
                 </Alert>
               )}

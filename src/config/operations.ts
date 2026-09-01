@@ -60,7 +60,8 @@ export const operations: OperationLink[] = [
     description: 'Browse plans as a merchant, configure limits and volume tiers, and add the selection to the cart.',
     path: '/merchant/plans',
     icon: StorefrontIcon,
-    apiEndpoint: 'GET /api/v1/merchant/subscription/plans',
+    apiEndpoint:
+      'GET /api/v1/merchant/subscription/plans · POST /plan/purchase · POST /checkout/cancel',
     available: true,
   },
   {
@@ -150,11 +151,11 @@ export const operations: OperationLink[] = [
   {
     title: 'Renewal Testing',
     description:
-      'Test auto-renew scheduler flows, manual renewal preview, POST /renew recovery checkout, and all renewal scenarios.',
+      'Test auto-renew scheduler flows, manual renewal preview, POST /renew recovery checkout, update subscription dates, and cancel checkout.',
     path: '/merchant/renewal-testing',
     icon: AutorenewIcon,
     apiEndpoint:
-      'GET /renewal/preview · POST /renew · PUT /auto-renew/cancel · Scheduler',
+      'PATCH /test/subscription/update-dates · BullMQ subscription-cron-auto-renew · GET /renewal/preview · POST /renew',
     available: true,
   },
   {

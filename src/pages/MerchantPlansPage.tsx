@@ -16,11 +16,12 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart'
 import StorefrontIcon from '@mui/icons-material/Storefront'
-import { getMerchantCart, getActiveSubscription, listMerchantPlans, purchasePlanCart, upsertMerchantCart } from '../api/merchant'
+import { getMerchantCart, getActiveSubscription, listMerchantPlans, purchasePlanCart, upsertMerchantCart, cancelMerchantCheckout } from '../api/merchant'
 import { getPlanById, listPlans } from '../api/plans'
 import { ApiRequestError } from '../api/client'
 import { PageHeader } from '../components/layout/PageHeader'
 import { CartPreviewPanel } from '../components/merchant/CartPreviewPanel'
+import { CancelMerchantCheckoutButton } from '../components/payment/CancelMerchantCheckoutButton'
 import { PlanCartConfigurator } from '../components/merchant/PlanCartConfigurator'
 import { ApiErrorAlert } from '../components/ApiErrorAlert'
 import { ApiTransactionInspector } from '../components/ApiTransactionInspector'
@@ -77,6 +78,7 @@ export function MerchantPlansPage() {
   const [purchaseError, setPurchaseError] = useState<unknown>(null)
   const [purchaseResult, setPurchaseResult] = useState<MerchantPlanPurchaseResult | null>(null)
   const [checkoutPopupBlocked, setCheckoutPopupBlocked] = useState(false)
+  const [cancellingCheckout, setCancellingCheckout] = useState(false)
 
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
@@ -319,6 +321,40 @@ export function MerchantPlansPage() {
     }
   }
 
+  const handleCancelCheckout = async () => {
+    setCancellingCheckout(true)
+    setPurchaseError(null)
+
+    try {
+      const result = await execute(
+        {},
+        () => cancelMerchantCheckout(),
+        'POST /api/v1/merchant/subscription/checkout/cancel',
+      )
+      setPurchaseResult(null)
+      setCheckoutPopupBlocked(false)
+      const preview = await getMerchantCart().catch(() => null)
+      setCartPreview(preview)
+      setSnackbar({ open: true, message: result.message, severity: 'success' })
+    } catch (error) {
+      setPurchaseError(error)
+      setSnackbar({
+        open: true,
+        message: getApiErrorSummary(error),
+        severity: 'error',
+      })
+    } finally {
+      setCancellingCheckout(false)
+    }
+  }
+
+  const handleCheckoutCancelled = async () => {
+    setPurchaseResult(null)
+    setCheckoutPopupBlocked(false)
+    const preview = await getMerchantCart().catch(() => null)
+    setCartPreview(preview)
+  }
+
   return (
     <>
       <Stack spacing={3}>
@@ -326,7 +362,7 @@ export function MerchantPlansPage() {
           eyebrow="Merchant checkout"
           title="Browse plans & configure cart"
           description="List plans available to the merchant, configure attribute limits and volume tiers, then add the selection to the subscription cart."
-          apiEndpoint="GET /api/v1/merchant/cart/plan · GET /api/v1/merchant/subscription/plans · POST /api/v1/merchant/cart/plan · POST /api/v1/merchant/subscription/plan/purchase"
+          apiEndpoint="GET /api/v1/merchant/cart/plan · GET /api/v1/merchant/subscription/plans · POST /api/v1/merchant/cart/plan · POST /api/v1/merchant/subscription/plan/purchase · POST /api/v1/merchant/subscription/checkout/cancel"
           backTo="/"
           backLabel="Back to home"
           actions={
@@ -342,6 +378,17 @@ export function MerchantPlansPage() {
         />
 
         {loadError && <Alert severity="error">{loadError}</Alert>}
+
+        <Alert severity="info">
+          <Typography variant="subtitle2" gutterBottom>
+            Stuck checkout?
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            If a Stripe session was started but not completed, cancel checkout to expire the session,
+            delete the pending invoice, and unlock the cart (PROCESSING → ACTIVE).
+          </Typography>
+          <CancelMerchantCheckoutButton onCancelled={() => void handleCheckoutCancelled()} />
+        </Alert>
 
         <Grid container spacing={3}>
           <Grid size={{ xs: 12, lg: selectedPlan ? 5 : 12 }}>
@@ -512,6 +559,8 @@ export function MerchantPlansPage() {
                       purchaseResult={purchaseResult}
                       checkoutPopupBlocked={checkoutPopupBlocked}
                       onConfirmPayment={(billingAddress) => void handleConfirmPayment(billingAddress)}
+                      onCancelCheckout={() => void handleCancelCheckout()}
+                      cancellingCheckout={cancellingCheckout}
                     />
                   </>
                 )}

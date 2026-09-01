@@ -112,6 +112,24 @@ export function formatDateOnly(value: string | null | undefined): string {
   return date.toLocaleDateString()
 }
 
+/** Format an ISO timestamp for `<input type="datetime-local" />`. */
+export function toDatetimeLocalInputValue(value: string | null | undefined): string {
+  if (!value) {
+    return ''
+  }
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+  const pad = (part: number) => String(part).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+/** Parse a datetime-local input value to ISO 8601 for API payloads. */
+export function datetimeLocalInputToIso(value: string): string {
+  return new Date(value).toISOString()
+}
+
 export function invoiceStatusColor(
   status: string,
 ): 'default' | 'success' | 'warning' | 'error' | 'info' {

@@ -919,6 +919,11 @@ export interface CancelMessageResult {
   message: string
 }
 
+export interface UpdateSubscriptionDatesPayload {
+  startDate: string
+  endDate: string
+}
+
 export interface ExtendMerchantSubscriptionEndDatePayload {
   merchantId: string
   days: number

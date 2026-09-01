@@ -1,7 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import Accordion from '@mui/material/Accordion'
-import AccordionDetails from '@mui/material/AccordionDetails'
-import AccordionSummary from '@mui/material/AccordionSummary'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -24,21 +21,27 @@ import TableRow from '@mui/material/TableRow'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import AutorenewIcon from '@mui/icons-material/Autorenew'
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import TrendingDownIcon from '@mui/icons-material/TrendingDown'
 import PaymentIcon from '@mui/icons-material/Payment'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import RefreshIcon from '@mui/icons-material/Refresh'
+import ScheduleIcon from '@mui/icons-material/Schedule'
 import { Link as RouterLink } from 'react-router-dom'
 import { extendMerchantSubscriptionEndDate } from '../api/plans'
 import {
+  cancelMerchantCheckout,
   cancelSubscriptionAutoRenew,
+  fetchScheduledSubscriptionDowngrade,
   getActiveSubscription,
   getManualSubscriptionRenewalPreview,
-  getScheduledSubscriptionDowngrade,
   initiateManualRenewal,
   listInvoices,
 } from '../api/merchant'
+import { updateSubscriptionDates } from '../api/subscriptionTest'
+import {
+  enqueueSubscriptionAutoRenewCronJob,
+  SUBSCRIPTION_AUTO_RENEW_CRON_QUEUE,
+} from '../api/cronDevTools'
 import { ApiRequestError } from '../api/client'
 import { DEFAULT_REDIS_CONNECTION, publishToRedisStream } from '../api/redisDevTools'
 import { ApiErrorAlert } from '../components/ApiErrorAlert'
@@ -46,6 +49,7 @@ import { ApiTransactionInspector } from '../components/ApiTransactionInspector'
 import { PageHeader } from '../components/layout/PageHeader'
 import { BillingAddressFields } from '../components/merchant/BillingAddressFields'
 import { RenewalRedisEventsPanel } from '../components/merchant/RenewalRedisEventsPanel'
+import { CheckoutSessionActions } from '../components/payment/CheckoutSessionActions'
 import { useApiTransaction } from '../hooks/useApiTransaction'
 import type {
   ActiveSubscriptionResponse,
@@ -59,7 +63,7 @@ import {
   buildInitiateManualRenewalPayload,
   defaultBillingAddress,
 } from '../utils/billingAddress'
-import { formatDateOnly, formatDateTime, formatMoney } from '../utils/planDisplay'
+import { formatDateOnly, formatDateTime, formatMoney, toDatetimeLocalInputValue, datetimeLocalInputToIso } from '../utils/planDisplay'
 import {
   buildSucceededPaymentEventFromHandoff,
 } from '../utils/paymentEventBuilder'
@@ -70,14 +74,14 @@ import {
   describePreviewAvailability,
 } from '../utils/renewalEligibility'
 import {
-  renewalScenarioCategoryLabels,
-  renewalTestScenarios,
-  type RenewalScenarioCategory,
-} from '../utils/renewalScenarios'
+  buildExpirePresetDates,
+  expirePresetLabels,
+  type ExpirePresetKind,
+} from '../utils/renewalDatePresets'
 
 const DEFAULT_MOCK_MERCHANT_ID = '00000000-0000-4000-8000-000000000003'
 
-type RenewalPreviewKind = 'extend' | 'renew' | 'redis'
+type RenewalPreviewKind = 'extend' | 'updateDates' | 'cron' | 'renew' | 'redis'
 
 function EligibilityRow({ label, ok, detail }: { label: string; ok: boolean; detail?: string }) {
   return (
@@ -113,6 +117,16 @@ export function SubscriptionRenewalTestingPage() {
   const [extendMessage, setExtendMessage] = useState<string | null>(null)
   const [extendError, setExtendError] = useState<string | null>(null)
 
+  const [updateStartDate, setUpdateStartDate] = useState('')
+  const [updateEndDate, setUpdateEndDate] = useState('')
+  const [updatingDates, setUpdatingDates] = useState(false)
+  const [updateDatesMessage, setUpdateDatesMessage] = useState<string | null>(null)
+  const [updateDatesError, setUpdateDatesError] = useState<string | null>(null)
+
+  const [cancellingCheckout, setCancellingCheckout] = useState(false)
+  const [cancelCheckoutMessage, setCancelCheckoutMessage] = useState<string | null>(null)
+  const [cancelCheckoutError, setCancelCheckoutError] = useState<string | null>(null)
+
   const [autoPoll, setAutoPoll] = useState(false)
   const [cancellingAutoRenew, setCancellingAutoRenew] = useState(false)
 
@@ -125,7 +139,10 @@ export function SubscriptionRenewalTestingPage() {
   const [paymentMessage, setPaymentMessage] = useState<string | null>(null)
   const [paymentError, setPaymentError] = useState<string | null>(null)
 
-  const [scenarioFilter, setScenarioFilter] = useState<RenewalScenarioCategory | 'all'>('all')
+  const [runningAutoRenewCron, setRunningAutoRenewCron] = useState(false)
+  const [autoRenewCronMessage, setAutoRenewCronMessage] = useState<string | null>(null)
+  const [autoRenewCronError, setAutoRenewCronError] = useState<string | null>(null)
+
   const [previewKind, setPreviewKind] = useState<RenewalPreviewKind>('extend')
   const { transaction, execute } = useApiTransaction()
 
@@ -149,12 +166,7 @@ export function SubscriptionRenewalTestingPage() {
         getActiveSubscription(),
         getManualSubscriptionRenewalPreview().catch(() => null),
         listInvoices({ limit: 10, sortBy: 'createdAt', sortOrder: 'desc' }).catch(() => null),
-        getScheduledSubscriptionDowngrade().catch((err) => {
-          if (err instanceof ApiRequestError && err.status === 404) {
-            return null
-          }
-          throw err
-        }),
+        fetchScheduledSubscriptionDowngrade(),
       ])
       setSubscriptionData(activeSub)
       setScheduledChange(scheduledChangeResult)
@@ -194,6 +206,12 @@ export function SubscriptionRenewalTestingPage() {
     }, 5000)
     return () => window.clearInterval(interval)
   }, [autoPoll, loadAll])
+
+  useEffect(() => {
+    if (!subscription) return
+    setUpdateStartDate(toDatetimeLocalInputValue(subscription.startDate))
+    setUpdateEndDate(toDatetimeLocalInputValue(subscription.endDate))
+  }, [subscription?.startDate, subscription?.endDate])
 
   const handleExtendEndDate = async () => {
     const parsedDays = Number(extendDays)
@@ -235,6 +253,121 @@ export function SubscriptionRenewalTestingPage() {
       setExtendError(message)
     } finally {
       setExtending(false)
+    }
+  }
+
+  const handleUpdateSubscriptionDates = async () => {
+    if (!updateStartDate.trim() || !updateEndDate.trim()) {
+      setUpdateDatesError('Start date and end date are required.')
+      return
+    }
+
+    const start = new Date(updateStartDate)
+    const end = new Date(updateEndDate)
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      setUpdateDatesError('Enter valid start and end dates.')
+      return
+    }
+    if (end.getTime() <= start.getTime()) {
+      setUpdateDatesError('End date must be after start date.')
+      return
+    }
+
+    setUpdatingDates(true)
+    setUpdateDatesError(null)
+    setUpdateDatesMessage(null)
+    setPreviewKind('updateDates')
+
+    const payload = {
+      startDate: datetimeLocalInputToIso(updateStartDate),
+      endDate: datetimeLocalInputToIso(updateEndDate),
+    }
+
+    try {
+      const result = await execute(
+        payload,
+        () => updateSubscriptionDates(payload),
+        'PATCH /api/v1/test/subscription/update-dates',
+      )
+      setUpdateDatesMessage(result.message)
+      await loadAll()
+    } catch (err) {
+      const message =
+        err instanceof ApiRequestError
+          ? err.body.message ?? err.message
+          : err instanceof Error
+            ? err.message
+            : 'Failed to update subscription dates'
+      setUpdateDatesError(message)
+    } finally {
+      setUpdatingDates(false)
+    }
+  }
+
+  const handleExpirePreset = (kind: ExpirePresetKind) => {
+    setPreviewKind('updateDates')
+    const { start, end } = buildExpirePresetDates(kind, subscription?.startDate)
+    setUpdateStartDate(toDatetimeLocalInputValue(start.toISOString()))
+    setUpdateEndDate(toDatetimeLocalInputValue(end.toISOString()))
+  }
+
+  const handleRunAutoRenewCron = async () => {
+    setRunningAutoRenewCron(true)
+    setAutoRenewCronError(null)
+    setAutoRenewCronMessage(null)
+    setPreviewKind('cron')
+
+    const payload = {
+      queue: SUBSCRIPTION_AUTO_RENEW_CRON_QUEUE,
+      jobName: SUBSCRIPTION_AUTO_RENEW_CRON_QUEUE,
+      data: {},
+    }
+
+    try {
+      const result = await execute(
+        payload,
+        () => enqueueSubscriptionAutoRenewCronJob(),
+        `POST /dev-tools/cron/enqueue (${SUBSCRIPTION_AUTO_RENEW_CRON_QUEUE})`,
+      )
+      setAutoRenewCronMessage(result.message)
+      await loadAll()
+    } catch (err) {
+      const message =
+        err instanceof ApiRequestError
+          ? err.body.message ?? err.message
+          : err instanceof Error
+            ? err.message
+            : 'Failed to enqueue auto-renew cron job'
+      setAutoRenewCronError(message)
+    } finally {
+      setRunningAutoRenewCron(false)
+    }
+  }
+
+  const handleCancelCheckout = async () => {
+    setCancellingCheckout(true)
+    setCancelCheckoutError(null)
+    setCancelCheckoutMessage(null)
+
+    try {
+      const result = await execute(
+        {},
+        () => cancelMerchantCheckout(),
+        'POST /api/v1/merchant/subscription/checkout/cancel',
+      )
+      setCancelCheckoutMessage(result.message)
+      setRenewalResult(null)
+      await loadAll()
+    } catch (err) {
+      const message =
+        err instanceof ApiRequestError
+          ? err.body.message ?? err.message
+          : err instanceof Error
+            ? err.message
+            : 'Failed to cancel checkout'
+      setCancelCheckoutError(message)
+    } finally {
+      setCancellingCheckout(false)
     }
   }
 
@@ -301,11 +434,6 @@ export function SubscriptionRenewalTestingPage() {
     }
   }
 
-  const filteredScenarios =
-    scenarioFilter === 'all'
-      ? renewalTestScenarios
-      : renewalTestScenarios.filter((scenario) => scenario.category === scenarioFilter)
-
   const isEndDatePast = subscription
     ? new Date(subscription.endDate).getTime() <= Date.now()
     : false
@@ -323,6 +451,25 @@ export function SubscriptionRenewalTestingPage() {
     [billingAddress, includeBillingAddress],
   )
 
+  const updateDatesPreviewPayload = useMemo(() => {
+    if (!updateStartDate.trim() || !updateEndDate.trim()) {
+      return { startDate: '', endDate: '' }
+    }
+    return {
+      startDate: datetimeLocalInputToIso(updateStartDate),
+      endDate: datetimeLocalInputToIso(updateEndDate),
+    }
+  }, [updateStartDate, updateEndDate])
+
+  const cronPreviewPayload = useMemo(
+    () => ({
+      queue: SUBSCRIPTION_AUTO_RENEW_CRON_QUEUE,
+      jobName: SUBSCRIPTION_AUTO_RENEW_CRON_QUEUE,
+      data: {},
+    }),
+    [],
+  )
+
   const redisPreviewPayload = useMemo(() => {
     const handoff = renewalResult?.paymentHandoff
     if (!handoff) return null
@@ -336,16 +483,32 @@ export function SubscriptionRenewalTestingPage() {
     if (previewKind === 'renew') {
       return { title: 'Manual renewal payload preview', payload: renewPreviewPayload }
     }
+    if (previewKind === 'updateDates') {
+      return { title: 'Update subscription dates payload preview', payload: updateDatesPreviewPayload }
+    }
+    if (previewKind === 'cron') {
+      return { title: 'Auto-renew cron enqueue preview', payload: cronPreviewPayload }
+    }
     return { title: 'Extend end date payload preview', payload: extendPreviewPayload }
-  }, [previewKind, redisPreviewPayload, renewPreviewPayload, extendPreviewPayload])
+  }, [
+    previewKind,
+    redisPreviewPayload,
+    renewPreviewPayload,
+    updateDatesPreviewPayload,
+    cronPreviewPayload,
+    extendPreviewPayload,
+  ])
+
+  const renewalCheckoutUrl =
+    renewalResult?.checkoutUrl ?? renewalResult?.stripeCheckoutUrl ?? null
 
   return (
     <Stack spacing={3}>
       <PageHeader
         eyebrow="Merchant"
         title="Subscription renewal testing"
-        description="End-to-end workspace for auto-renew scheduler flows, manual renewal preview, and POST /renew recovery checkout."
-        apiEndpoint="GET /renewal/preview · POST /renew · Scheduler · PUT /auto-renew/cancel"
+        description="End-to-end workspace for auto-renew scheduler flows, manual renewal preview, POST /renew recovery checkout, and subscription date test utilities."
+        apiEndpoint="PATCH /test/subscription/update-dates · BullMQ subscription-cron-auto-renew · GET /renewal/preview · POST /renew · POST /checkout/cancel"
         backTo="/"
         backLabel="Back to home"
         actions={
@@ -558,12 +721,60 @@ export function SubscriptionRenewalTestingPage() {
 
           <Card>
             <CardContent>
+              <Stack direction="row" spacing={1} sx={{ mb: 2, alignItems: 'center' }}>
+                <ScheduleIcon color="primary" />
+                <Typography variant="h6">Run auto-renew cron job</Typography>
+              </Stack>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Enqueues a one-off BullMQ job on queue{' '}
+                <Box component="span" sx={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>
+                  {SUBSCRIPTION_AUTO_RENEW_CRON_QUEUE}
+                </Box>
+                . The subscription MS worker picks it up and processes eligible due subscriptions
+                (same handler as the scheduled cron). Requires the subscription service and Redis to
+                be running locally.
+              </Typography>
+              <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                <Button
+                  variant="contained"
+                  color="secondary"
+                  startIcon={
+                    runningAutoRenewCron ? (
+                      <CircularProgress size={18} color="inherit" />
+                    ) : (
+                      <PlayArrowIcon />
+                    )
+                  }
+                  disabled={runningAutoRenewCron}
+                  onClick={() => void handleRunAutoRenewCron()}
+                >
+                  {runningAutoRenewCron ? 'Enqueueing…' : 'Run auto-renew cron now'}
+                </Button>
+                <Typography variant="caption" color="text.secondary">
+                  Typical flow: expire subscription dates → run cron → confirm payment if needed.
+                </Typography>
+              </Stack>
+              {autoRenewCronMessage && (
+                <Alert severity="success" sx={{ mt: 2 }}>
+                  {autoRenewCronMessage}
+                </Alert>
+              )}
+              {autoRenewCronError && (
+                <Alert severity="error" sx={{ mt: 2 }}>
+                  {autoRenewCronError}
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent>
               <Typography variant="h6" gutterBottom>
                 Prepare subscription for renewal
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Auto-renew triggers when end_date ≤ now. The extend API only adds positive days — to
-                expire immediately, set end_date in the database or wait for natural expiry.
+                Auto-renew triggers when end_date ≤ now. Use admin extend to add days, or set absolute
+                dates below (PATCH /test/subscription/update-dates) to expire immediately.
               </Typography>
 
               <Grid container spacing={2}>
@@ -621,16 +832,93 @@ export function SubscriptionRenewalTestingPage() {
               {extendMessage && <Alert severity="success" sx={{ mt: 2 }}>{extendMessage}</Alert>}
               {extendError && <Alert severity="error" sx={{ mt: 2 }}>{extendError}</Alert>}
 
+              <Divider sx={{ my: 3 }} />
+
+              <Typography variant="subtitle1" gutterBottom>
+                Set absolute subscription dates (logged-in merchant)
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                PATCH /api/v1/test/subscription/update-dates — updates start and end dates on the
+                active subscription for the current merchant JWT. Use this to expire immediately for
+                auto-renew testing without admin extend-by-days.
+              </Typography>
+
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <TextField
+                    label="Start date"
+                    type="datetime-local"
+                    value={updateStartDate}
+                    onChange={(event) => {
+                      setPreviewKind('updateDates')
+                      setUpdateStartDate(event.target.value)
+                    }}
+                    fullWidth
+                    size="small"
+                    slotProps={{ inputLabel: { shrink: true } }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <TextField
+                    label="End date"
+                    type="datetime-local"
+                    value={updateEndDate}
+                    onChange={(event) => {
+                      setPreviewKind('updateDates')
+                      setUpdateEndDate(event.target.value)
+                    }}
+                    fullWidth
+                    size="small"
+                    slotProps={{ inputLabel: { shrink: true } }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <Stack spacing={1}>
+                    <Button
+                      variant="contained"
+                      onClick={() => void handleUpdateSubscriptionDates()}
+                      disabled={updatingDates || !subscription}
+                    >
+                      {updatingDates ? 'Updating…' : 'Update dates'}
+                    </Button>
+                    <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
+                      {(['immediate', 'monthly', 'yearly'] as ExpirePresetKind[]).map((kind) => (
+                        <Button
+                          key={kind}
+                          variant="outlined"
+                          color="warning"
+                          size="small"
+                          disabled={!subscription}
+                          onClick={() => handleExpirePreset(kind)}
+                        >
+                          {expirePresetLabels[kind]}
+                        </Button>
+                      ))}
+                    </Stack>
+                    {subscription && (
+                      <Typography variant="caption" color="text.secondary">
+                        Presets set end date to now. Monthly/yearly use a full billing period ending
+                        today (start = now − 1 month/year). Current billing cycle:{' '}
+                        {subscription.billingCycle}.
+                      </Typography>
+                    )}
+                  </Stack>
+                </Grid>
+              </Grid>
+
+              {subscription && (
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                  Current: {formatDateTime(subscription.startDate)} → {formatDateTime(subscription.endDate)}
+                </Typography>
+              )}
+
+              {updateDatesMessage && <Alert severity="success" sx={{ mt: 2 }}>{updateDatesMessage}</Alert>}
+              {updateDatesError && <Alert severity="error" sx={{ mt: 2 }}>{updateDatesError}</Alert>}
+
               {!isEndDatePast && (
-                <Alert severity="warning" sx={{ mt: 2 }}>
-                  End date is still in the future. To test auto-renew, expire the subscription in DB:
-                  <Box
-                    component="pre"
-                    sx={{ mt: 1, mb: 0, fontSize: '0.75rem', overflow: 'auto' }}
-                  >
-                    {`UPDATE merchant_subscriptions SET end_date = NOW() - INTERVAL '1 day'\nWHERE id = '${subscription.subscriptionId}';`}
-                  </Box>
-                  Then enable auto-refresh and watch for a renewal invoice within ~10 seconds.
+                <Alert severity="info" sx={{ mt: 2 }}>
+                  End date is still in the future. Pick an expire preset above, then click Update dates
+                  to trigger auto-renew testing without a DB update.
                 </Alert>
               )}
 
@@ -741,7 +1029,7 @@ export function SubscriptionRenewalTestingPage() {
                     {renewalResult.invoice.status}
                   </Typography>
                   {renewalResult.paymentHandoff && (
-                    <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                    <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap' }}>
                       <Button
                         size="small"
                         variant="contained"
@@ -768,8 +1056,18 @@ export function SubscriptionRenewalTestingPage() {
                       </Button>
                     </Stack>
                   )}
+                  {renewalCheckoutUrl && (
+                    <CheckoutSessionActions
+                      checkoutUrl={renewalCheckoutUrl}
+                      onCancelCheckout={() => void handleCancelCheckout()}
+                      cancellingCheckout={cancellingCheckout}
+                    />
+                  )}
                 </Alert>
               )}
+
+              {cancelCheckoutMessage && <Alert severity="success" sx={{ mt: 2 }}>{cancelCheckoutMessage}</Alert>}
+              {cancelCheckoutError && <Alert severity="error" sx={{ mt: 2 }}>{cancelCheckoutError}</Alert>}
 
               {paymentMessage && <Alert severity="success" sx={{ mt: 2 }}>{paymentMessage}</Alert>}
               {paymentError && <Alert severity="error" sx={{ mt: 2 }}>{paymentError}</Alert>}
@@ -827,77 +1125,6 @@ export function SubscriptionRenewalTestingPage() {
           </Card>
         </>
       )}
-
-      <Card>
-        <CardContent>
-          <Typography variant="h6" gutterBottom>
-            Scenario playbook
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            All testable auto-renew, preview, recovery, and validation scenarios with preparation
-            steps and expected outcomes.
-          </Typography>
-
-          <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap' }}>
-            <Chip
-              label="All"
-              clickable
-              color={scenarioFilter === 'all' ? 'primary' : 'default'}
-              onClick={() => setScenarioFilter('all')}
-            />
-            {(Object.keys(renewalScenarioCategoryLabels) as RenewalScenarioCategory[]).map((key) => (
-              <Chip
-                key={key}
-                label={renewalScenarioCategoryLabels[key]}
-                clickable
-                color={scenarioFilter === key ? 'primary' : 'default'}
-                onClick={() => setScenarioFilter(key)}
-              />
-            ))}
-          </Stack>
-
-          {filteredScenarios.map((scenario) => (
-            <Accordion key={scenario.id} disableGutters sx={{ mb: 1 }}>
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                  <Typography variant="subtitle2">{scenario.title}</Typography>
-                  <Chip
-                    label={renewalScenarioCategoryLabels[scenario.category]}
-                    size="small"
-                    variant="outlined"
-                  />
-                </Stack>
-              </AccordionSummary>
-              <AccordionDetails>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                  {scenario.description}
-                </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                  Preparation
-                </Typography>
-                <Box component="ul" sx={{ mt: 0.5, mb: 1, pl: 2 }}>
-                  {scenario.prepSteps.map((step) => (
-                    <Typography key={step} component="li" variant="body2">
-                      {step}
-                    </Typography>
-                  ))}
-                </Box>
-                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                  Expected outcome
-                </Typography>
-                <Typography variant="body2" sx={{ mb: 1 }}>
-                  {scenario.expectedOutcome}
-                </Typography>
-                <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap' }}>
-                  {scenario.apiEndpoints.map((endpoint) => (
-                    <Chip key={endpoint} label={endpoint} size="small" variant="outlined" />
-                  ))}
-                </Stack>
-              </AccordionDetails>
-            </Accordion>
-          ))}
-        </CardContent>
-      </Card>
 
       <ApiTransactionInspector
         livePayload={livePreview.payload}
