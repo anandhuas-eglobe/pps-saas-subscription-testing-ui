@@ -303,6 +303,13 @@ export function PlanDetailView({ plan }: PlanDetailViewProps) {
               <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: 'wrap' }}>
                 <Chip label={plan.planType} size="small" variant="outlined" />
                 <Chip label={plan.status} size="small" color={planStatusColor(plan.status)} />
+                {plan.activeSubscriptionCount != null && (
+                  <Chip
+                    label={`${plan.activeSubscriptionCount} active subscription${plan.activeSubscriptionCount === 1 ? '' : 's'}`}
+                    size="small"
+                    variant="outlined"
+                  />
+                )}
               </Stack>
               <Typography variant="body1" color="text.secondary">
                 {plan.planDescription || 'No description provided.'}

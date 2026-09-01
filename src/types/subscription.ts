@@ -277,6 +277,7 @@ export interface PlanDetail {
   planDescription: string
   planType: PlanTypeValue
   status: PlanStatusValue
+  activeSubscriptionCount?: number
   baseMonthlyPrice: number
   baseYearlyPrice: number
   baseCurrency: string
