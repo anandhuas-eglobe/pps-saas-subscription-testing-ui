@@ -283,6 +283,7 @@ function buildPaidAddonCartPayload(addon: AddonCatalogItem) {
   return {
     planFeatureId: addon.planFeatureId,
     isAddonTrial: false,
+    autoRenew: true,
     ...(addon.planFeatureAttributeId
       ? { planFeatureAttributeId: addon.planFeatureAttributeId }
       : {}),
@@ -609,6 +610,7 @@ async function runAddonTrialAllocatedEmailTestFlow(
   await upsertAddonCart({
     planFeatureId: addon.planFeatureId,
     isAddonTrial: true,
+    autoRenew: true,
     ...(addon.planFeatureAttributeId
       ? { planFeatureAttributeId: addon.planFeatureAttributeId }
       : {}),

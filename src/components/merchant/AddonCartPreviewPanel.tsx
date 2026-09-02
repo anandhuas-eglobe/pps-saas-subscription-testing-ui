@@ -79,6 +79,12 @@ export function AddonCartPreviewPanel({
 
           <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
             <Chip label={addonTitle} size="small" />
+            <Chip
+              label={cart.autoRenew ? 'Auto-renew on' : 'Auto-renew off'}
+              size="small"
+              color={cart.autoRenew ? 'success' : 'default'}
+              variant="outlined"
+            />
             {cart.isTrial ? (
               <Chip label="Add-on trial" size="small" color="warning" />
             ) : (

@@ -69,6 +69,7 @@ export function MerchantAddonsPage() {
 
   const [selectedAddonKey, setSelectedAddonKey] = useState<string | null>(null)
   const [isAddonTrial, setIsAddonTrial] = useState(false)
+  const [autoRenew, setAutoRenew] = useState(true)
   const [attributeValue, setAttributeValue] = useState(1)
 
   const [submitting, setSubmitting] = useState(false)
@@ -116,6 +117,7 @@ export function MerchantAddonsPage() {
     return {
       planFeatureId: selectedAddon.planFeatureId,
       isAddonTrial,
+      autoRenew,
       ...(selectedAddon.planFeatureAttributeId
         ? { planFeatureAttributeId: selectedAddon.planFeatureAttributeId }
         : {}),
@@ -125,7 +127,7 @@ export function MerchantAddonsPage() {
         ? { value: attributeValue }
         : {}),
     }
-  }, [selectedAddon, isAddonTrial, attributeValue])
+  }, [selectedAddon, isAddonTrial, autoRenew, attributeValue])
 
   const loadExistingAddonCart = useCallback(async (items: AddonCatalogItem[]) => {
     const existingCart = await fetchExistingAddonCart()
@@ -142,6 +144,7 @@ export function MerchantAddonsPage() {
 
     setSelectedAddonKey(matchingAddon.key)
     setIsAddonTrial(formState.isAddonTrial)
+    setAutoRenew(formState.autoRenew)
     setAttributeValue(
       matchingAddon.attribute ? formState.attributeValue : 1,
     )
@@ -207,6 +210,7 @@ export function MerchantAddonsPage() {
         const matchingAddon = findAddonCatalogItem(addonItems, formState.addonKey)
         if (matchingAddon?.key === addon.key) {
           setIsAddonTrial(formState.isAddonTrial)
+          setAutoRenew(formState.autoRenew)
           setAttributeValue(addon.attribute ? formState.attributeValue : 1)
           setCartPreview(existingCart)
           return
@@ -217,6 +221,7 @@ export function MerchantAddonsPage() {
     }
 
     setIsAddonTrial(defaultAddonTrialSelection(addon))
+    setAutoRenew(true)
     setAttributeValue(addon.attribute ? defaultAddonAttributeValue(addon.attribute) : 1)
     setCartPreview(null)
   }
@@ -265,6 +270,7 @@ export function MerchantAddonsPage() {
       const payload = {
         planFeatureId: selectedAddon.planFeatureId,
         isAddonTrial,
+        autoRenew,
         ...(selectedAddon.planFeatureAttributeId
           ? { planFeatureAttributeId: selectedAddon.planFeatureAttributeId }
           : {}),
@@ -496,9 +502,11 @@ export function MerchantAddonsPage() {
                           addon={selectedAddon}
                           currency={subscriptionData.plan.baseCurrency}
                           isAddonTrial={isAddonTrial}
+                          autoRenew={autoRenew}
                           attributeValue={attributeValue}
                           subscriptionIsTrial={subscriptionIsTrial}
                           onTrialChange={setIsAddonTrial}
+                          onAutoRenewChange={setAutoRenew}
                           onAttributeValueChange={setAttributeValue}
                         />
                       </CardContent>

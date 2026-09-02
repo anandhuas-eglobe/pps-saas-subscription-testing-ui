@@ -19,9 +19,11 @@ interface AddonCartConfiguratorProps {
   addon: AddonCatalogItem
   currency: string
   isAddonTrial: boolean
+  autoRenew: boolean
   attributeValue: number
   subscriptionIsTrial: boolean
   onTrialChange: (value: boolean) => void
+  onAutoRenewChange: (value: boolean) => void
   onAttributeValueChange: (value: number) => void
 }
 
@@ -82,9 +84,11 @@ export function AddonCartConfigurator({
   addon,
   currency,
   isAddonTrial,
+  autoRenew,
   attributeValue,
   subscriptionIsTrial,
   onTrialChange,
+  onAutoRenewChange,
   onAttributeValueChange,
 }: AddonCartConfiguratorProps) {
   const isSimple = addon.featureType === FeatureType.SIMPLE
@@ -133,6 +137,22 @@ export function AddonCartConfigurator({
               add-on does not offer a trial.
             </Typography>
           )}
+        </Grid>
+
+        <Grid size={{ xs: 12 }}>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={autoRenew}
+                onChange={(event) => onAutoRenewChange(event.target.checked)}
+              />
+            }
+            label="Auto-renew add-on at end of billing cycle"
+          />
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+            When disabled, the add-on will not renew automatically and can be cancelled before the
+            next billing cycle.
+          </Typography>
         </Grid>
 
         {isSimple && config && 'planFeaturePriceMonthly' in config && (

@@ -530,6 +530,7 @@ export interface UpsertAddonCartPayload {
   planFeatureId: string
   planFeatureAttributeId?: string
   isAddonTrial: boolean
+  autoRenew?: boolean
   value?: number
 }
 
