@@ -1,6 +1,8 @@
 import { DEFAULT_REDIS_CONNECTION, type RedisConnectionSettings } from './redisDevTools'
 
 export const SUBSCRIPTION_AUTO_RENEW_CRON_QUEUE = 'subscription-cron-auto-renew'
+export const SUBSCRIPTION_MERCHANT_USAGE_RESET_CRON_QUEUE =
+  'subscription-cron-merchant-usage-reset'
 export const PAYMENT_STRIPE_WEBHOOK_PROCESS_CRON_QUEUE = 'payment-cron-stripe-webhook-process'
 
 export interface DevCronJobDefinition {
@@ -17,6 +19,13 @@ export const DEV_CRON_JOBS: DevCronJobDefinition[] = [
     queue: SUBSCRIPTION_AUTO_RENEW_CRON_QUEUE,
     label: 'Subscription auto-renew',
     description: 'Process eligible subscription auto-renewals in batches',
+    service: 'subscription',
+  },
+  {
+    id: 'subscription-merchant-usage-reset',
+    queue: SUBSCRIPTION_MERCHANT_USAGE_RESET_CRON_QUEUE,
+    label: 'Merchant usage reset',
+    description: 'Reset monthly usage limits for eligible yearly subscriptions',
     service: 'subscription',
   },
   {
@@ -111,4 +120,20 @@ export async function enqueueSubscriptionAutoRenewCronJob(
   } = {},
 ): Promise<EnqueueCronJobResult> {
   return enqueueCronJob(SUBSCRIPTION_AUTO_RENEW_CRON_QUEUE, options)
+}
+
+export async function enqueueStripeWebhookProcessCronJob(
+  options: {
+    redis?: RedisConnectionSettings
+  } = {},
+): Promise<EnqueueCronJobResult> {
+  return enqueueCronJob(PAYMENT_STRIPE_WEBHOOK_PROCESS_CRON_QUEUE, options)
+}
+
+export async function enqueueMerchantUsageResetCronJob(
+  options: {
+    redis?: RedisConnectionSettings
+  } = {},
+): Promise<EnqueueCronJobResult> {
+  return enqueueCronJob(SUBSCRIPTION_MERCHANT_USAGE_RESET_CRON_QUEUE, options)
 }

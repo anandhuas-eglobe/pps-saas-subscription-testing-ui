@@ -43,12 +43,14 @@ import {
   buildAttributeCartPayload,
   createDefaultAttributeDrafts,
   extractSubscribedPlanAttributes,
+  isShortTermPurchaseEligible,
   validateAttributeCartDrafts,
   type AttributeChangeDraft,
 } from '../utils/attributeChangeBuilder'
 import {
   applyAttributeCartPreviewToDrafts,
   fetchExistingAttributeCart,
+  readShortTermPurchaseFromCart,
 } from '../utils/cartHydration'
 import { buildAttributePurchasePayload } from '../utils/billingAddress'
 import { handlePurchaseCheckoutResult } from '../utils/checkoutSession'
@@ -61,6 +63,7 @@ export function MerchantAttributeChangesPage() {
 
   const [drafts, setDrafts] = useState<Record<string, AttributeChangeDraft>>({})
   const [cartPreview, setCartPreview] = useState<MerchantAttributeCartPreview | null>(null)
+  const [isShortTermPurchase, setIsShortTermPurchase] = useState(false)
 
   const [submitting, setSubmitting] = useState(false)
   const [fetchingCart, setFetchingCart] = useState(false)
@@ -96,17 +99,35 @@ export function MerchantAttributeChangesPage() {
     [subscriptionData],
   )
 
+  const limitsAndUsages = subscriptionData?.subscription.limitsAndUsages ?? []
+
+  const shortTermPurchaseEligible = useMemo(
+    () => isShortTermPurchaseEligible(attributeItems, drafts, limitsAndUsages),
+    [attributeItems, drafts, limitsAndUsages],
+  )
+
   const [cancellingAttributeId, setCancellingAttributeId] = useState<string | null>(null)
 
   const livePayload = useMemo(
     () => ({
       features: buildAttributeCartPayload(attributeItems, drafts),
+      ...(isShortTermPurchase ? { isShortTermPurchase: true } : {}),
     }),
-    [attributeItems, drafts],
+    [attributeItems, drafts, isShortTermPurchase],
   )
 
+  useEffect(() => {
+    if (!shortTermPurchaseEligible && isShortTermPurchase) {
+      setIsShortTermPurchase(false)
+    }
+  }, [shortTermPurchaseEligible, isShortTermPurchase])
+
   const applyExistingAttributeCart = useCallback(
-    async (items: ReturnType<typeof extractSubscribedPlanAttributes>, trackTransaction: boolean) => {
+    async (
+      items: ReturnType<typeof extractSubscribedPlanAttributes>,
+      usageLimits: typeof limitsAndUsages,
+      trackTransaction: boolean,
+    ) => {
       try {
         const preview = trackTransaction
           ? await execute({}, () => getMerchantAttributeCart(), 'GET /api/v1/merchant/cart/attribute')
@@ -117,9 +138,10 @@ export function MerchantAttributeChangesPage() {
         }
 
         setCartPreview(preview)
+        setIsShortTermPurchase(readShortTermPurchaseFromCart(preview))
         setDrafts((current) =>
           applyAttributeCartPreviewToDrafts(
-            Object.keys(current).length > 0 ? current : createDefaultAttributeDrafts(items),
+            Object.keys(current).length > 0 ? current : createDefaultAttributeDrafts(items, usageLimits),
             preview,
           ),
         )
@@ -148,9 +170,10 @@ export function MerchantAttributeChangesPage() {
       )
       setSubscriptionData(result)
       const items = extractSubscribedPlanAttributes(result.plan)
-      const defaultDrafts = createDefaultAttributeDrafts(items)
+      const defaultDrafts = createDefaultAttributeDrafts(items, result.subscription.limitsAndUsages)
       setDrafts(defaultDrafts)
       setCartPreview(null)
+      setIsShortTermPurchase(false)
       setSubmitError(null)
       setFetchError(null)
       setPurchaseError(null)
@@ -158,7 +181,7 @@ export function MerchantAttributeChangesPage() {
       setClientValidationErrors([])
 
       if (!result.subscription.isTrial) {
-        await applyExistingAttributeCart(items, false)
+        await applyExistingAttributeCart(items, result.subscription.limitsAndUsages, false)
       }
     } catch (err) {
       if (err instanceof ApiRequestError && err.status === 404) {
@@ -203,6 +226,7 @@ export function MerchantAttributeChangesPage() {
     try {
       const preview = await applyExistingAttributeCart(
         extractSubscribedPlanAttributes(subscriptionData.plan),
+        limitsAndUsages,
         true,
       )
       if (!preview) {
@@ -253,6 +277,7 @@ export function MerchantAttributeChangesPage() {
     try {
       const payload = {
         features: buildAttributeCartPayload(attributeItems, drafts),
+        ...(isShortTermPurchase ? { isShortTermPurchase: true } : {}),
       }
 
       const result = await execute(
@@ -262,6 +287,7 @@ export function MerchantAttributeChangesPage() {
       )
       const preview = await getMerchantAttributeCart()
       setCartPreview(preview)
+      setIsShortTermPurchase(readShortTermPurchaseFromCart(preview))
       setDrafts((current) => applyAttributeCartPreviewToDrafts(current, preview))
       setSnackbar({ open: true, message: result.message, severity: 'success' })
     } catch (error) {
@@ -325,7 +351,9 @@ export function MerchantAttributeChangesPage() {
       })
       const preview = await getMerchantAttributeCart()
       setCartPreview(preview)
+      setIsShortTermPurchase(readShortTermPurchaseFromCart(preview))
       setDrafts((current) => applyAttributeCartPreviewToDrafts(current, preview))
+      await loadSubscription()
     } catch (error) {
       setPurchaseError(error)
       setSnackbar({
@@ -344,7 +372,7 @@ export function MerchantAttributeChangesPage() {
         <PageHeader
           eyebrow="Attribute changes"
           title="Upgrade or downgrade limits"
-          description="View all included and add-on attributes on your subscribed plan, change limits, upsert the attribute cart, and fetch pricing preview."
+          description="View all included and add-on attributes on your subscribed plan, change limits, optionally mark upgrades as short-term purchases, upsert the attribute cart, and fetch pricing preview."
           apiEndpoint="GET /api/v1/merchant/cart/attribute · POST /api/v1/merchant/cart/attribute · POST /api/v1/merchant/subscription/attribute/purchase · POST /api/v1/merchant/subscription/attribute/downgrade/schedule/cancel"
           backTo="/"
           backLabel="Back to home"
@@ -461,7 +489,11 @@ export function MerchantAttributeChangesPage() {
                   <AttributeChangeEditor
                     items={attributeItems}
                     drafts={drafts}
+                    limitsAndUsages={limitsAndUsages}
                     currency={subscriptionData.plan.baseCurrency}
+                    isShortTermPurchase={isShortTermPurchase}
+                    shortTermPurchaseEligible={shortTermPurchaseEligible}
+                    onShortTermPurchaseChange={setIsShortTermPurchase}
                     onDraftChange={handleDraftChange}
                   />
                 </CardContent>

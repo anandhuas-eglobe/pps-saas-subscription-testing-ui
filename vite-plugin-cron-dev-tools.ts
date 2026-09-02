@@ -7,6 +7,10 @@ import Redis from 'ioredis'
 const ENQUEUE_PATH = '/dev-tools/cron/enqueue'
 const HEALTH_PATH = '/dev-tools/cron/health'
 export const SUBSCRIPTION_AUTO_RENEW_CRON_QUEUE = 'subscription-cron-auto-renew'
+export const SUBSCRIPTION_MERCHANT_USAGE_RESET_CRON_QUEUE =
+  'subscription-cron-merchant-usage-reset'
+export const PAYMENT_STRIPE_WEBHOOK_PROCESS_CRON_QUEUE =
+  'payment-cron-stripe-webhook-process'
 
 interface RedisConnectionOptions {
   host?: string
@@ -117,7 +121,8 @@ export function cronDevToolsPlugin(): Plugin {
             endpoints: [ENQUEUE_PATH],
             queues: [
               SUBSCRIPTION_AUTO_RENEW_CRON_QUEUE,
-              'payment-cron-stripe-webhook-process',
+              SUBSCRIPTION_MERCHANT_USAGE_RESET_CRON_QUEUE,
+              PAYMENT_STRIPE_WEBHOOK_PROCESS_CRON_QUEUE,
             ],
           })
           return

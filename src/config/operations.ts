@@ -116,7 +116,7 @@ export const operations: OperationLink[] = [
   },
   {
     title: 'Attribute Changes',
-    description: 'View included and add-on attributes on your plan, change limits, upsert the attribute cart, preview pricing, and complete checkout.',
+    description: 'View included and add-on attributes on your plan, change limits, upsert short-term attribute upgrades, preview pricing, and complete checkout.',
     path: '/merchant/attributes',
     icon: TuneIcon,
     apiEndpoint: 'POST /api/v1/merchant/subscription/attribute/purchase',

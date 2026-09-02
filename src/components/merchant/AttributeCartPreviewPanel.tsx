@@ -63,6 +63,9 @@ export function AttributeCartPreviewPanel({
 
           <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
             <SubscriptionActionChip action={cart.subscriptionAction} />
+            {cart.isShortTermPurchase && (
+              <Chip label="Short-term purchase" size="small" color="secondary" />
+            )}
             <Chip label={cart.billingCycle ?? '—'} size="small" variant="outlined" />
             <Chip
               label={
@@ -74,6 +77,15 @@ export function AttributeCartPreviewPanel({
               variant="outlined"
             />
           </Stack>
+
+          {cart.isShortTermPurchase && (
+            <Alert severity="info">
+              Invoice line items will use the name{' '}
+              <strong>Short Term Attribute Upgrade: {'{attribute}'}</strong>. After payment,
+              the upgrade quantity is accumulated in{' '}
+              <strong>short_term_purchase_quantity</strong> on the usage row.
+            </Alert>
+          )}
 
           <TableContainer>
             <Table size="small">
@@ -90,7 +102,11 @@ export function AttributeCartPreviewPanel({
                   <TableRow key={change.planFeatureAttributeId}>
                     <TableCell>
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {change.attributeName ?? change.attributeCode ?? 'Attribute'}
+                        {cart.isShortTermPurchase
+                          ? `Short Term Attribute Upgrade: ${
+                              change.attributeName ?? change.attributeCode ?? 'Attribute'
+                            }`
+                          : change.attributeName ?? change.attributeCode ?? 'Attribute'}
                       </Typography>
                       {!change.isPriceApplicable && change.ineligibilityMessage && (
                         <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>

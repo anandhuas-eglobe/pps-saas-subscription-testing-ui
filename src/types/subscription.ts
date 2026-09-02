@@ -438,6 +438,7 @@ export interface SubscriptionLimitAndUsage {
   usedCount: number
   usageLimit: number | null
   scheduledUsageLimit: number | null
+  shortTermPurchaseQuantity?: number
   overageEnabled: boolean
   createdAt: string
   updatedAt: string
@@ -574,6 +575,7 @@ export interface MerchantAddonPurchaseResult {
 
 export interface UpsertAttributeCartPayload {
   features: CartFeatureSelection[]
+  isShortTermPurchase?: boolean
 }
 
 export interface AttributeCartChangeLine {
@@ -608,6 +610,7 @@ export interface MerchantAttributeCartPreview {
   autoRenew: boolean
   subscriptionAction: SubscriptionActionValue
   subscriptionId: string
+  isShortTermPurchase?: boolean
   attributeChanges: AttributeCartChangeLine[]
   pricing: AttributeCartPricing
 }

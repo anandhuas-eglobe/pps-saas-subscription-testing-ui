@@ -65,6 +65,7 @@ export function SubscriptionLimitsAndUsagesPanel({
                   <TableCell>Attribute</TableCell>
                   <TableCell>Usage type</TableCell>
                   <TableCell>Consumption</TableCell>
+                  <TableCell align="right">Short-term qty</TableCell>
                   <TableCell>Overage</TableCell>
                   <TableCell>Last updated</TableCell>
                 </TableRow>
@@ -109,6 +110,9 @@ export function SubscriptionLimitsAndUsagesPanel({
                             />
                           </Box>
                         )}
+                      </TableCell>
+                      <TableCell align="right">
+                        {(row.shortTermPurchaseQuantity ?? 0).toLocaleString()}
                       </TableCell>
                       <TableCell>
                         <Chip

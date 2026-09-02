@@ -102,6 +102,12 @@ export function applyAttributeCartPreviewToDrafts(
   return next
 }
 
+export function readShortTermPurchaseFromCart(
+  cart: MerchantAttributeCartPreview | null | undefined,
+): boolean {
+  return cart?.isShortTermPurchase === true
+}
+
 export function findAddonCatalogItem(
   addonItems: AddonCatalogItem[],
   addonKey: string,

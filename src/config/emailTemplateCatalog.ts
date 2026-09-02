@@ -70,7 +70,7 @@ export const EMAIL_TEMPLATE_CATEGORIES: EmailTemplateCategoryMeta[] = [
   },
 ]
 
-/** All 26 subscription email templates (mirrors notifications SUBSCRIPTION_EMAIL_EVENT_MAPPERS). */
+/** All 28 subscription email templates (mirrors notifications SUBSCRIPTION_EMAIL_EVENT_MAPPERS). */
 export const SUBSCRIPTION_EMAIL_TEMPLATES: EmailTemplateDefinition[] = [
   {
     id: 'trial-allocated',
@@ -245,6 +245,24 @@ export const SUBSCRIPTION_EMAIL_TEMPLATES: EmailTemplateDefinition[] = [
     category: 'payment-success',
     eventType: 'subscription.payment.success.attribute.upgrade.email',
     templateId: 'subscription/payment-success-attribute-upgrade',
+    automated: false,
+  },
+  {
+    id: 'payment-success-short-term-attribute-upgrade',
+    title: 'Payment success — short-term attribute upgrade',
+    description: 'Receipt after a short-term monthly attribute limit upgrade is purchased.',
+    category: 'payment-success',
+    eventType: 'subscription.payment.success.short.term.attribute.upgrade.email',
+    templateId: 'subscription/payment-success-short-term-attribute-upgrade',
+    automated: false,
+  },
+  {
+    id: 'short-term-attribute-purchase-reverted',
+    title: 'Short-term attribute purchase reverted',
+    description: 'Sent when a short-term attribute upgrade ends at renewal or monthly usage reset.',
+    category: 'operations',
+    eventType: 'subscription.short.term.attribute.purchase.reverted.email',
+    templateId: 'subscription/short-term-attribute-purchase-reverted',
     automated: false,
   },
   {

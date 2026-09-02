@@ -2,6 +2,7 @@ import Box from '@mui/material/Box'
 import Checkbox from '@mui/material/Checkbox'
 import Chip from '@mui/material/Chip'
 import FormControl from '@mui/material/FormControl'
+import FormControlLabel from '@mui/material/FormControlLabel'
 import InputLabel from '@mui/material/InputLabel'
 import MenuItem from '@mui/material/MenuItem'
 import Select from '@mui/material/Select'
@@ -15,20 +16,25 @@ import TableRow from '@mui/material/TableRow'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import TuneIcon from '@mui/icons-material/Tune'
-import type { PlanDetailFeatureAttribute } from '../../types/subscription'
+import type { PlanDetailFeatureAttribute, SubscriptionLimitAndUsage } from '../../types/subscription'
 import { PriceType } from '../../types/subscription'
 import type { AttributeChangeDraft, SubscribedPlanAttributeItem } from '../../utils/attributeChangeBuilder'
 import {
   inclusionColor,
   inclusionLabel,
   priceTypeLabel,
+  resolveAttributeUsageType,
 } from '../../utils/attributeChangeBuilder'
 import { formatMoney } from '../../utils/planDisplay'
 
 interface AttributeChangeEditorProps {
   items: SubscribedPlanAttributeItem[]
   drafts: Record<string, AttributeChangeDraft>
+  limitsAndUsages: SubscriptionLimitAndUsage[]
   currency: string
+  isShortTermPurchase: boolean
+  shortTermPurchaseEligible: boolean
+  onShortTermPurchaseChange: (value: boolean) => void
   onDraftChange: (planFeatureAttributeId: string, patch: Partial<AttributeChangeDraft>) => void
 }
 
@@ -82,7 +88,11 @@ function ValueField({
 export function AttributeChangeEditor({
   items,
   drafts,
+  limitsAndUsages,
   currency,
+  isShortTermPurchase,
+  shortTermPurchaseEligible,
+  onShortTermPurchaseChange,
   onDraftChange,
 }: AttributeChangeEditorProps) {
   const includedCount = items.filter(
@@ -102,6 +112,22 @@ export function AttributeChangeEditor({
         </Box>
       </Stack>
 
+      <FormControlLabel
+        control={
+          <Checkbox
+            checked={isShortTermPurchase}
+            disabled={!shortTermPurchaseEligible}
+            onChange={(event) => onShortTermPurchaseChange(event.target.checked)}
+          />
+        }
+        label="Short-term purchase (monthly limited attribute upgrade only)"
+      />
+      {!shortTermPurchaseEligible && (
+        <Typography variant="caption" color="text.secondary">
+          Select one or more LIMITED_MONTHLY attribute upgrades to enable short-term purchase.
+        </Typography>
+      )}
+
       <TableContainer>
         <Table size="small">
           <TableHead>
@@ -109,6 +135,7 @@ export function AttributeChangeEditor({
               <TableCell padding="checkbox" />
               <TableCell>Attribute</TableCell>
               <TableCell>Type</TableCell>
+              <TableCell>Usage</TableCell>
               <TableCell>Pricing</TableCell>
               <TableCell align="right">Current</TableCell>
               <TableCell>New limit</TableCell>
@@ -122,6 +149,14 @@ export function AttributeChangeEditor({
               }
 
               const config = item.attribute.attributeConfig
+              const usageType = resolveAttributeUsageType(
+                item.planFeatureAttributeId,
+                item.attribute,
+                limitsAndUsages,
+              )
+              const usageRow = limitsAndUsages.find(
+                (row) => row.planFeatureAttributeId === item.planFeatureAttributeId,
+              )
 
               return (
                 <TableRow key={item.key} hover selected={draft.selected}>
@@ -149,6 +184,20 @@ export function AttributeChangeEditor({
                       color={inclusionColor(item.inclusionType)}
                       variant="outlined"
                     />
+                  </TableCell>
+                  <TableCell>
+                    {usageType ? (
+                      <Chip label={usageType} size="small" variant="outlined" />
+                    ) : (
+                      <Typography variant="caption" color="text.secondary">
+                        —
+                      </Typography>
+                    )}
+                    {(usageRow?.shortTermPurchaseQuantity ?? 0) > 0 && (
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                        Short-term qty: {usageRow?.shortTermPurchaseQuantity}
+                      </Typography>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2">{priceTypeLabel(item.attribute)}</Typography>
