@@ -30,7 +30,9 @@ import { SubscriptionRenewalTestingPage } from './pages/SubscriptionRenewalTesti
 import { EmailTemplatesTestingPage } from './pages/EmailTemplatesTestingPage'
 import { NotificationsPage } from './pages/NotificationsPage'
 import { SavedCardsPage } from './pages/SavedCardsPage'
+import { ZendeskChatTestingPage } from './pages/ZendeskChatTestingPage'
 import { NotificationProvider } from './notifications/NotificationContext'
+import { ZendeskMessengerAuthBridge } from './components/zendesk/ZendeskMessengerAuthBridge'
 
 const router = createBrowserRouter([
   {
@@ -60,6 +62,7 @@ const router = createBrowserRouter([
         path: '/',
         element: (
           <NotificationProvider>
+            <ZendeskMessengerAuthBridge />
             <AppLayout />
           </NotificationProvider>
         ),
@@ -80,6 +83,7 @@ const router = createBrowserRouter([
           { path: 'merchant/overage-testing', element: <OverageTestingPage /> },
           { path: 'merchant/guest-plans', element: <MerchantGuestPlansPage /> },
           { path: 'merchant/usage-simulation', element: <UsageSimulationPage /> },
+          { path: 'merchant/zendesk-chat', element: <ZendeskChatTestingPage /> },
           { path: 'admin/extend-subscription', element: <ExtendSubscriptionEndDatePage /> },
           { path: 'merchant/invoices/:invoiceId', element: <InvoiceDetailPage /> },
           { path: 'merchant/invoices', element: <InvoiceListPage /> },

@@ -31,6 +31,7 @@ const navItems = [
   { label: 'Attribute Changes', path: '/merchant/attributes' },
   { label: 'Active Subscription', path: '/merchant/subscription' },
   { label: 'Renewal Testing', path: '/merchant/renewal-testing' },
+  { label: 'Zendesk Chat', path: '/merchant/zendesk-chat' },
   { label: 'Overage Testing', path: '/merchant/overage-testing' },
   { label: 'Overage', path: '/merchant/overage' },
   { label: 'Usage Simulation', path: '/merchant/usage-simulation' },

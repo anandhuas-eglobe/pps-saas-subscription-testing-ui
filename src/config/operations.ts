@@ -19,6 +19,7 @@ import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined'
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive'
 import CreditCardIcon from '@mui/icons-material/CreditCard'
 import PersonAddOutlinedIcon from '@mui/icons-material/PersonAddOutlined'
+import SupportAgentIcon from '@mui/icons-material/SupportAgent'
 import type { SvgIconComponent } from '@mui/icons-material'
 
 export interface OperationLink {
@@ -156,6 +157,15 @@ export const operations: OperationLink[] = [
     icon: AutorenewIcon,
     apiEndpoint:
       'PATCH /test/subscription/update-dates · BullMQ subscription-cron-auto-renew · GET /renewal/preview · POST /renew',
+    available: true,
+  },
+  {
+    title: 'Zendesk Chat Auth',
+    description:
+      'Fetch a Zendesk Messaging JWT from merchant-support and authenticate the Web Widget with zE loginUser.',
+    path: '/merchant/zendesk-chat',
+    icon: SupportAgentIcon,
+    apiEndpoint: 'GET /api/v1/support/zendesk/messaging-jwt · zE messenger loginUser',
     available: true,
   },
   {

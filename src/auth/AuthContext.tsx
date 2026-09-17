@@ -18,6 +18,7 @@ import {
   setSession,
   type AuthUser,
 } from './tokenStorage'
+import { logoutZendeskMessenger } from '../utils/zendeskMessenger'
 
 interface AuthContextValue {
   user: AuthUser | null
@@ -63,6 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void hydrate()
 
     const onCleared = () => {
+      logoutZendeskMessenger()
       setUser(null)
       setIsAuthenticated(false)
     }
@@ -109,6 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logout = useCallback(async () => {
+    logoutZendeskMessenger()
     await logoutSession()
     setUser(null)
     setIsAuthenticated(false)
