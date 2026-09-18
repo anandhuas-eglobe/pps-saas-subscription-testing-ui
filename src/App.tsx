@@ -33,11 +33,16 @@ import { SavedCardsPage } from './pages/SavedCardsPage'
 import { ZendeskChatTestingPage } from './pages/ZendeskChatTestingPage'
 import { NotificationProvider } from './notifications/NotificationContext'
 import { ZendeskMessengerAuthBridge } from './components/zendesk/ZendeskMessengerAuthBridge'
+import { SettingsPage } from './pages/SettingsPage'
 
 const router = createBrowserRouter([
   {
     path: '/login',
     element: <LoginPage />,
+  },
+  {
+    path: '/settings',
+    element: <SettingsPage />,
   },
   {
     path: '/merchant/signup',

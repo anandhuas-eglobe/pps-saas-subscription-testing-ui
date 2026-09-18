@@ -21,6 +21,7 @@ import BookmarkAddOutlinedIcon from '@mui/icons-material/BookmarkAddOutlined'
 import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined'
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined'
 import SubscriptionsIcon from '@mui/icons-material/Subscriptions'
+import { useTheme } from '@mui/material/styles'
 import { Link as RouterLink, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { formatAuthError, useAuth } from '../auth/AuthContext'
 import {
@@ -34,10 +35,12 @@ import {
   upsertSavedCredential,
   type SavedCredential,
 } from '../auth/savedCredentialsStorage'
+import { SettingsIconButton } from '../components/layout/SettingsIconButton'
 
 const EMPTY_CREDENTIAL_SELECTION = ''
 
 export function LoginPage() {
+  const theme = useTheme()
   const { login, isAuthenticated, isReady } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
@@ -180,10 +183,20 @@ export function LoginPage() {
         alignItems: 'center',
         justifyContent: 'center',
         px: 2,
-        background:
-          'radial-gradient(circle at top left, rgba(79, 70, 229, 0.16), transparent 32%), radial-gradient(circle at bottom right, rgba(37, 99, 235, 0.14), transparent 28%), #f3f4f8',
+        position: 'relative',
+        background: theme.custom.loginBackground,
       }}
     >
+      <Box
+        sx={{
+          position: 'fixed',
+          top: 16,
+          right: 16,
+          zIndex: (muiTheme) => muiTheme.zIndex.appBar,
+        }}
+      >
+        <SettingsIconButton tone="dark" />
+      </Box>
       <Paper
         sx={{
           width: '100%',
@@ -201,7 +214,7 @@ export function LoginPage() {
                 borderRadius: 2,
                 display: 'grid',
                 placeItems: 'center',
-                background: 'linear-gradient(135deg, #312e81 0%, #4338ca 55%, #2563eb 100%)',
+                background: theme.custom.brandMarkGradient,
                 color: 'white',
               }}
             >

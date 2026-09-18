@@ -17,6 +17,7 @@ import { AUTH_SESSION_CLEARED_EVENT, AUTH_SESSION_UPDATED_EVENT } from '../auth/
 import { getMerchantIdFromAccessToken } from '../auth/jwtClaims'
 import { useAuth } from '../auth/AuthContext'
 import { getNotificationsWsUrl } from '../config/api'
+import { useSelectedApiServer } from '../hooks/useSelectedApiServer'
 import type { InAppNotification } from '../types/notifications'
 import { isNotificationUnread, normalizeNotification } from '../utils/notifications'
 import {
@@ -51,12 +52,12 @@ interface NotificationContextValue {
 
 const NotificationContext = createContext<NotificationContextValue | null>(null)
 
-function getSocketUrl(): string {
-  return getNotificationsWsUrl()
-}
-
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth()
+  const selectedServer = useSelectedApiServer()
+  const socketUrl = selectedServer
+    ? `${selectedServer.notificationsWsUrl.replace(/\/$/, '')}/notifications`
+    : getNotificationsWsUrl()
   const [merchantId, setMerchantId] = useState<string | null>(() => getMerchantIdFromAccessToken())
 
   const [previewItems, setPreviewItems] = useState<InAppNotification[]>([])
@@ -202,7 +203,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    const socket = io(getSocketUrl(), {
+    const socket = io(socketUrl, {
       path: '/socket.io',
       query: { userId: merchantId },
       auth: { userId: merchantId },
@@ -222,7 +223,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       setSocketConnected(false)
       setSocketError(
         error.message ||
-          'Live socket failed — check VITE_NOTIFICATIONS_WS_URL and that the notifications service is running.',
+          'Live socket failed — check the notifications WS URL in Settings and that the notifications service is running.',
       )
     }
 
@@ -239,7 +240,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       socket.disconnect()
       setSocketConnected(false)
     }
-  }, [applyIncoming, merchantId, refreshPreview])
+  }, [applyIncoming, merchantId, refreshPreview, socketUrl])
 
   useEffect(() => {
     if (!merchantId) {

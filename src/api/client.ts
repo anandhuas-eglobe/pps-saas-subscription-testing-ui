@@ -7,8 +7,6 @@ import { fetchWithRateLimitRetry } from './rateLimitRetry'
 
 export { ApiRequestError } from './errors'
 
-const API_BASE = getApiBaseUrl()
-
 async function parseJson<T>(response: Response): Promise<ApiResponse<T>> {
   const text = await response.text()
   if (!text) {
@@ -37,7 +35,7 @@ async function executeRequest(
   path: string,
   init: RequestInit | undefined,
   headers: HeadersInit,
-  baseUrl = API_BASE,
+  baseUrl = getApiBaseUrl(),
 ): Promise<Response> {
   const url = `${baseUrl}${path}`
   return fetchWithRateLimitRetry(() =>
@@ -53,7 +51,7 @@ export async function apiRequest<T>(
   init?: RequestInit,
   options?: { baseUrl?: string },
 ): Promise<{ response: Response; body: ApiResponse<T> }> {
-  const baseUrl = options?.baseUrl ?? API_BASE
+  const baseUrl = options?.baseUrl ?? getApiBaseUrl()
   const headers = await buildAuthHeaders(init)
   let response = await executeRequest(path, init, headers, baseUrl)
   let body = await parseJson<T>(response)
@@ -77,9 +75,10 @@ export async function apiRequest<T>(
 }
 
 export async function apiDownloadBlob(path: string, fallbackFilename = 'download.pdf'): Promise<void> {
+  const baseUrl = getApiBaseUrl()
   const headers = await buildAuthHeaders()
   let response = await fetchWithRateLimitRetry(() =>
-    fetch(`${API_BASE}${path}`, { headers }),
+    fetch(`${baseUrl}${path}`, { headers }),
   )
 
   if (response.status === 401 && getAccessToken()) {
@@ -87,7 +86,7 @@ export async function apiDownloadBlob(path: string, fallbackFilename = 'download
     if (refreshed) {
       const retryHeaders = await buildAuthHeaders()
       response = await fetchWithRateLimitRetry(() =>
-        fetch(`${API_BASE}${path}`, { headers: retryHeaders }),
+        fetch(`${baseUrl}${path}`, { headers: retryHeaders }),
       )
     } else {
       clearSession()

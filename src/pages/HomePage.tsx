@@ -8,19 +8,28 @@ import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch'
+import { useTheme } from '@mui/material/styles'
 import { Link as RouterLink } from 'react-router-dom'
 import { operations } from '../config/operations'
 
 export function HomePage() {
+  const theme = useTheme()
+
   return (
     <Stack spacing={4}>
       <Box
         sx={{
           p: { xs: 3, md: 5 },
           borderRadius: 4,
-          background: 'linear-gradient(135deg, #312e81 0%, #4338ca 45%, #2563eb 100%)',
+          background: theme.custom.heroGradient,
           color: 'white',
-          boxShadow: '0 24px 60px rgba(49, 46, 129, 0.25)',
+          boxShadow: '0 24px 60px rgba(15, 23, 42, 0.28)',
+          ...(theme.custom.paperGlass
+            ? {
+                backdropFilter: 'blur(16px)',
+                border: '1px solid rgba(255,255,255,0.35)',
+              }
+            : {}),
         }}
       >
         <Stack direction="row" spacing={1.5} sx={{ mb: 2, alignItems: 'center' }}>

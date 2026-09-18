@@ -3,8 +3,6 @@ import { getApiBaseUrl } from '../config/api'
 import { ApiRequestError } from './errors'
 import { fetchWithRateLimitRetry } from './rateLimitRetry'
 
-const API_BASE = getApiBaseUrl()
-
 export interface LoginRequest {
   email: string
   password: string
@@ -56,7 +54,7 @@ async function iamRequest<T>(
   init?: RequestInit,
 ): Promise<{ response: Response; body: IamEnvelope<T> }> {
   const response = await fetchWithRateLimitRetry(() =>
-    fetch(`${API_BASE}${path}`, {
+    fetch(`${getApiBaseUrl()}${path}`, {
       ...init,
       headers: {
         'Content-Type': 'application/json',

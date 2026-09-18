@@ -11,8 +11,11 @@ import SubscriptionsIcon from '@mui/icons-material/Subscriptions'
 import ScienceIcon from '@mui/icons-material/Science'
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
 import LogoutIcon from '@mui/icons-material/Logout'
+import { useTheme } from '@mui/material/styles'
 import { Link as RouterLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
+import { useSelectedApiServer } from '../../hooks/useSelectedApiServer'
+import { getAppVisualThemeMeta } from '../../theme/visualThemes'
 import { NotificationBell } from '../notifications/NotificationBell'
 import { NotificationDrawer } from '../notifications/NotificationDrawer'
 import { CopyAccessTokenButton } from './CopyAccessTokenButton'
@@ -20,6 +23,7 @@ import { CopyMerchantIdButton } from './CopyMerchantIdButton'
 import { CronJobsMenu } from './CronJobsMenu'
 import { DatabaseResetButton } from './DatabaseResetButton'
 import { RedisCacheFlushButton } from './RedisCacheFlushButton'
+import { SettingsIconButton } from './SettingsIconButton'
 
 const navItems = [
   { label: 'Home', path: '/' },
@@ -68,10 +72,13 @@ function isNavItemActive(pathname: string, itemPath: string): boolean {
 }
 
 export function AppLayout() {
+  const theme = useTheme()
   const location = useLocation()
   const navigate = useNavigate()
   const { user, logout } = useAuth()
   const [loggingOut, setLoggingOut] = useState(false)
+  const selectedServer = useSelectedApiServer()
+  const themeMeta = getAppVisualThemeMeta(theme.custom.id)
 
   async function handleLogout() {
     setLoggingOut(true)
@@ -104,7 +111,7 @@ export function AppLayout() {
         elevation={0}
         sx={{
           borderBottom: '1px solid rgba(255,255,255,0.08)',
-          background: 'linear-gradient(135deg, #312e81 0%, #4338ca 55%, #2563eb 100%)',
+          background: theme.custom.appBarGradient,
         }}
       >
         <Toolbar sx={{ gap: 2, minHeight: { xs: 56, sm: 64 } }}>
@@ -139,12 +146,25 @@ export function AppLayout() {
             spacing={1}
             sx={{ flexShrink: 0, alignItems: 'center' }}
           >
+            <SettingsIconButton tone="light" size="small" />
             <NotificationBell />
             <CopyAccessTokenButton />
             <CopyMerchantIdButton />
             <CronJobsMenu />
             <DatabaseResetButton />
             <RedisCacheFlushButton />
+            {selectedServer ? (
+              <Chip
+                label={`${selectedServer.name} · ${themeMeta.label}`}
+                size="small"
+                sx={{
+                  bgcolor: 'rgba(255,255,255,0.14)',
+                  color: 'white',
+                  maxWidth: 220,
+                  display: { xs: 'none', md: 'flex' },
+                }}
+              />
+            ) : null}
             <Chip
               icon={<ScienceIcon sx={{ fontSize: '16px !important' }} />}
               label="Testing UI"

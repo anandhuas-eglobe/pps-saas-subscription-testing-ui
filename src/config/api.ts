@@ -1,32 +1,26 @@
-/** Upstream API gateway URL (used for production builds; dev traffic is proxied via Vite). */
-export function getApiGatewayUrl(): string {
-  return (import.meta.env.VITE_API_GATEWAY_URL ?? '').replace(/\/$/, '')
-}
-
-/** Direct notifications service URL for Socket.io (gateway does not proxy WebSockets). */
-export function getNotificationsServiceUrl(): string {
-  return (import.meta.env.VITE_NOTIFICATIONS_WS_URL ?? 'http://localhost:3108').replace(/\/$/, '')
-}
+import { getSelectedApiBaseUrl, getSelectedNotificationsWsUrl } from './apiServersStorage'
 
 /**
  * Base URL prepended to API paths.
- * In dev, returns empty string so requests stay same-origin and Vite proxies to the gateway.
+ * Resolved from the API server selected in Settings (localStorage).
  */
 export function getApiBaseUrl(): string {
-  if (import.meta.env.DEV) {
-    return ''
-  }
-  return getApiGatewayUrl()
+  return getSelectedApiBaseUrl()
 }
 
 /**
  * Socket.IO namespace URL for live notifications.
- * In dev, uses same-origin `/notifications`; Vite proxies `/socket.io` to the notifications service.
+ * Uses the notifications WS URL configured on the selected API server.
  */
 export function getNotificationsWsUrl(): string {
-  if (import.meta.env.DEV) {
+  const notificationsBase = getSelectedNotificationsWsUrl().replace(/\/$/, '')
+  if (!notificationsBase) {
     return '/notifications'
   }
-  const notificationsBase = getNotificationsServiceUrl()
   return `${notificationsBase}/notifications`
+}
+
+/** Host-only notifications service URL (without /notifications namespace). */
+export function getNotificationsServiceUrl(): string {
+  return getSelectedNotificationsWsUrl().replace(/\/$/, '')
 }
