@@ -182,6 +182,10 @@ export interface PlanListItem {
   status: PlanStatusValue
   baseMonthlyPrice: number
   baseYearlyPrice: number
+  /** Catalog starting monthly price: base + INCLUDED features/attributes. */
+  planMonthlyPrice: number
+  /** Catalog starting yearly price: base + INCLUDED features/attributes. */
+  planYearlyPrice: number
   baseCurrency: string
   trial: { enabled: boolean; days: number | null }
   grace: { enabled: boolean; days: number | null }
@@ -280,6 +284,10 @@ export interface PlanDetail {
   activeSubscriptionCount?: number
   baseMonthlyPrice: number
   baseYearlyPrice: number
+  /** Catalog starting monthly price: base + INCLUDED features/attributes. */
+  planMonthlyPrice: number
+  /** Catalog starting yearly price: base + INCLUDED features/attributes. */
+  planYearlyPrice: number
   baseCurrency: string
   migrationPlanId: string | null
   trial: TrialGraceDetail

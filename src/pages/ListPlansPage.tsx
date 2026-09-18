@@ -303,8 +303,8 @@ export function ListPlansPage() {
                         <TableCell>Plan name</TableCell>
                         <TableCell>Type</TableCell>
                         <TableCell>Status</TableCell>
-                        <TableCell>Monthly</TableCell>
-                        <TableCell>Yearly</TableCell>
+                        <TableCell>Plan monthly</TableCell>
+                        <TableCell>Plan yearly</TableCell>
                         <TableCell>Trial</TableCell>
                         <TableCell align="right">Actions</TableCell>
                       </TableRow>
@@ -342,10 +342,20 @@ export function ListPlansPage() {
                             <Chip label={plan.status} size="small" color={planStatusColor(plan.status)} />
                           </TableCell>
                           <TableCell>
-                            {plan.baseCurrency} {plan.baseMonthlyPrice}
+                            <Typography variant="body2">
+                              {plan.baseCurrency} {plan.planMonthlyPrice}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              base {plan.baseMonthlyPrice}
+                            </Typography>
                           </TableCell>
                           <TableCell>
-                            {plan.baseCurrency} {plan.baseYearlyPrice}
+                            <Typography variant="body2">
+                              {plan.baseCurrency} {plan.planYearlyPrice}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              base {plan.baseYearlyPrice}
+                            </Typography>
                           </TableCell>
                           <TableCell>
                             {plan.trial.enabled

@@ -325,15 +325,23 @@ export function PlanDetailView({ plan }: PlanDetailViewProps) {
           <Grid container spacing={3}>
             <Grid size={{ xs: 12, md: 4 }}>
               <Typography variant="overline" color="text.secondary">
-                Base pricing
+                Plan price
               </Typography>
               <Stack spacing={1.5} sx={{ mt: 1 }}>
                 <DetailField
                   label="Monthly"
-                  value={formatMoney(plan.baseCurrency, plan.baseMonthlyPrice)}
+                  value={formatMoney(plan.baseCurrency, plan.planMonthlyPrice)}
                 />
                 <DetailField
                   label="Yearly"
+                  value={formatMoney(plan.baseCurrency, plan.planYearlyPrice)}
+                />
+                <DetailField
+                  label="Base monthly"
+                  value={formatMoney(plan.baseCurrency, plan.baseMonthlyPrice)}
+                />
+                <DetailField
+                  label="Base yearly"
                   value={formatMoney(plan.baseCurrency, plan.baseYearlyPrice)}
                 />
               </Stack>

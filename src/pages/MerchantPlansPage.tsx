@@ -454,11 +454,17 @@ export function MerchantPlansPage() {
                                   </Typography>
                                 </Box>
 
-                                <Stack direction="row" spacing={2}>
-                                  <Typography variant="body2">
-                                    {formatMoney(plan.baseCurrency, plan.baseMonthlyPrice)} / mo
-                                  </Typography>
-                                  <Typography variant="body2" color="text.secondary">
+                                <Stack spacing={0.5}>
+                                  <Stack direction="row" spacing={2}>
+                                    <Typography variant="body2" fontWeight={600}>
+                                      {formatMoney(plan.baseCurrency, plan.planMonthlyPrice)} / mo
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                      {formatMoney(plan.baseCurrency, plan.planYearlyPrice)} / yr
+                                    </Typography>
+                                  </Stack>
+                                  <Typography variant="caption" color="text.secondary">
+                                    Base {formatMoney(plan.baseCurrency, plan.baseMonthlyPrice)} / mo ·{' '}
                                     {formatMoney(plan.baseCurrency, plan.baseYearlyPrice)} / yr
                                   </Typography>
                                 </Stack>
