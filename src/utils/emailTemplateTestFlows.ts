@@ -16,6 +16,7 @@ import { BillingCycle, FeatureType, PlanStatus, SubscriptionAction } from '../ty
 import {
   defaultAddonAttributeValue,
   extractAddonCatalogItems,
+  isAddonShortTermPurchaseEligible,
   type AddonCatalogItem,
 } from './addonBuilder'
 import {
@@ -270,20 +271,36 @@ function pickTrialEnabledAddon(plan: Parameters<typeof extractAddonCatalogItems>
   return trialAddons[0]
 }
 
-function pickPurchasableAddon(plan: Parameters<typeof extractAddonCatalogItems>[0]): AddonCatalogItem {
+function pickPurchasableAddon(
+  plan: Parameters<typeof extractAddonCatalogItems>[0],
+  options?: { shortTermEligibleOnly?: boolean },
+): AddonCatalogItem {
   const addons = extractAddonCatalogItems(plan)
   if (addons.length === 0) {
     throw new Error('Active plan has no purchasable add-ons.')
   }
 
+  if (options?.shortTermEligibleOnly) {
+    const eligible = addons.filter((addon) => isAddonShortTermPurchaseEligible(addon))
+    if (eligible.length === 0) {
+      throw new Error(
+        'Active plan has no short-term-eligible add-ons (SIMPLE or LIMITED_MONTHLY).',
+      )
+    }
+    return eligible.find((addon) => addon.featureType === FeatureType.SIMPLE) ?? eligible[0]
+  }
+
   return addons.find((addon) => addon.featureType === FeatureType.SIMPLE) ?? addons[0]
 }
 
-function buildPaidAddonCartPayload(addon: AddonCatalogItem) {
+function buildPaidAddonCartPayload(
+  addon: AddonCatalogItem,
+  options?: { isShortTermPurchase?: boolean },
+) {
   return {
     planFeatureId: addon.planFeatureId,
     isAddonTrial: false,
-    autoRenew: true,
+    ...(options?.isShortTermPurchase ? { isShortTermPurchase: true } : {}),
     ...(addon.planFeatureAttributeId
       ? { planFeatureAttributeId: addon.planFeatureAttributeId }
       : {}),
@@ -550,6 +567,7 @@ async function runAddonPurchaseEmailTestFlowPhase1(
 
 async function runAddonPurchaseEmailTestFlowPhase2(
   onStepUpdate: EmailTemplateTestStepUpdater,
+  options?: { isShortTermPurchase?: boolean },
 ): Promise<EmailTemplateTestFlowResult> {
   const activeSubscription = await getActiveSubscription()
   if (activeSubscription.subscription.isTrial) {
@@ -558,14 +576,17 @@ async function runAddonPurchaseEmailTestFlowPhase2(
     )
   }
 
-  const addon = pickPurchasableAddon(activeSubscription.plan)
+  const isShortTermPurchase = options?.isShortTermPurchase === true
+  const addon = pickPurchasableAddon(activeSubscription.plan, {
+    shortTermEligibleOnly: isShortTermPurchase,
+  })
 
   onStepUpdate('add-addon-cart', { status: 'running' })
-  await upsertAddonCart(buildPaidAddonCartPayload(addon))
+  await upsertAddonCart(buildPaidAddonCartPayload(addon, { isShortTermPurchase }))
   const addonCartPreview = await getMerchantAddonCart()
   onStepUpdate('add-addon-cart', {
     status: 'done',
-    detail: `${addon.title} · ${formatAddonCartSummary(addonCartPreview)}`,
+    detail: `${addon.title}${isShortTermPurchase ? ' · short-term' : ''} · ${formatAddonCartSummary(addonCartPreview)}`,
   })
 
   const { purchaseResult: addonPurchase, checkoutOpened } = await openAddonCheckout(
@@ -574,13 +595,16 @@ async function runAddonPurchaseEmailTestFlowPhase2(
   )
 
   return {
-    summary: `Complete add-on payment in checkout to trigger the add-on purchase email for ${addon.title}.`,
+    summary: isShortTermPurchase
+      ? `Complete add-on payment in checkout to trigger the short-term add-on purchase email for ${addon.title}.`
+      : `Complete add-on payment in checkout to trigger the add-on purchase email for ${addon.title}.`,
     checkoutUrl: addonPurchase.checkoutUrl,
     checkoutPopupBlocked: !checkoutOpened,
     details: {
       planId: activeSubscription.plan.id,
       planName: activeSubscription.plan.planName,
       addonTitle: addon.title,
+      isShortTermPurchase,
       addonPurchaseMessage: addonPurchase.message,
       addonInvoiceNumber: addonPurchase.paymentHandoff?.invoiceNumber ?? '',
     },
@@ -610,7 +634,6 @@ async function runAddonTrialAllocatedEmailTestFlow(
   await upsertAddonCart({
     planFeatureId: addon.planFeatureId,
     isAddonTrial: true,
-    autoRenew: true,
     ...(addon.planFeatureAttributeId
       ? { planFeatureAttributeId: addon.planFeatureAttributeId }
       : {}),
@@ -671,5 +694,11 @@ export const EMAIL_TEMPLATE_TEST_FLOWS: Record<string, EmailTemplateTestFlowDefi
     steps: ADDON_PURCHASE_EMAIL_TEST_STEPS,
     run: runAddonPurchaseEmailTestFlowPhase1,
     continueRun: runAddonPurchaseEmailTestFlowPhase2,
+  },
+  'payment-success-short-term-addon-purchase': {
+    steps: ADDON_PURCHASE_EMAIL_TEST_STEPS,
+    run: runAddonPurchaseEmailTestFlowPhase1,
+    continueRun: (onStepUpdate) =>
+      runAddonPurchaseEmailTestFlowPhase2(onStepUpdate, { isShortTermPurchase: true }),
   },
 }

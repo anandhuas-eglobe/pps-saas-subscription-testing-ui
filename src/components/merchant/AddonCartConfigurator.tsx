@@ -13,17 +13,18 @@ import ExtensionIcon from '@mui/icons-material/Extension'
 import type { PlanDetailFeatureAttribute } from '../../types/subscription'
 import { FeatureType, PriceType } from '../../types/subscription'
 import type { AddonCatalogItem } from '../../utils/addonBuilder'
+import { isAddonShortTermPurchaseEligible } from '../../utils/addonBuilder'
 import { formatMoney } from '../../utils/planDisplay'
 
 interface AddonCartConfiguratorProps {
   addon: AddonCatalogItem
   currency: string
   isAddonTrial: boolean
-  autoRenew: boolean
+  isShortTermPurchase: boolean
   attributeValue: number
   subscriptionIsTrial: boolean
   onTrialChange: (value: boolean) => void
-  onAutoRenewChange: (value: boolean) => void
+  onShortTermPurchaseChange: (value: boolean) => void
   onAttributeValueChange: (value: number) => void
 }
 
@@ -84,15 +85,16 @@ export function AddonCartConfigurator({
   addon,
   currency,
   isAddonTrial,
-  autoRenew,
+  isShortTermPurchase,
   attributeValue,
   subscriptionIsTrial,
   onTrialChange,
-  onAutoRenewChange,
+  onShortTermPurchaseChange,
   onAttributeValueChange,
 }: AddonCartConfiguratorProps) {
   const isSimple = addon.featureType === FeatureType.SIMPLE
   const config = isSimple ? addon.feature.featureConfig : addon.attribute?.attributeConfig
+  const shortTermEligible = isAddonShortTermPurchaseEligible(addon)
 
   return (
     <Stack spacing={2}>
@@ -139,21 +141,31 @@ export function AddonCartConfigurator({
           )}
         </Grid>
 
-        <Grid size={{ xs: 12 }}>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={autoRenew}
-                onChange={(event) => onAutoRenewChange(event.target.checked)}
-              />
-            }
-            label="Auto-renew add-on at end of billing cycle"
-          />
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-            When disabled, the add-on will not renew automatically and can be cancelled before the
-            next billing cycle.
-          </Typography>
-        </Grid>
+        {isAddonTrial ? (
+          <Grid size={{ xs: 12 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+              Trial add-ons do not auto-renew (server sets autoRenew=false).
+            </Typography>
+          </Grid>
+        ) : (
+          <Grid size={{ xs: 12 }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={isShortTermPurchase && shortTermEligible}
+                  disabled={!shortTermEligible}
+                  onChange={(event) => onShortTermPurchaseChange(event.target.checked)}
+                />
+              }
+              label="Short-term purchase (until usage reset)"
+            />
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+              {shortTermEligible
+                ? 'Uses monthly pricing. Torn down by the usage-reset job (yearly) or at renewal (monthly), consistent with attribute short-term purchase. Leave off for recurring (autoRenew=true).'
+                : 'Short-term purchase is not available for LIMITED (lifetime) add-on attributes. Choose a SIMPLE feature or LIMITED_MONTHLY attribute.'}
+            </Typography>
+          </Grid>
+        )}
 
         {isSimple && config && 'planFeaturePriceMonthly' in config && (
           <>
@@ -191,7 +203,8 @@ export function AddonCartConfigurator({
         {addon.isProrated && !isAddonTrial && (
           <Grid size={{ xs: 12 }}>
             <Typography variant="caption" color="text.secondary">
-              This add-on is prorated for the remaining subscription billing period.
+              This add-on is prorated for the remaining{' '}
+              {isShortTermPurchase ? 'usage-reset window' : 'subscription billing period'}.
             </Typography>
           </Grid>
         )}

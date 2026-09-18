@@ -239,6 +239,16 @@ export const SUBSCRIPTION_EMAIL_TEMPLATES: EmailTemplateDefinition[] = [
     automated: true,
   },
   {
+    id: 'payment-success-short-term-addon-purchase',
+    title: 'Payment success — short-term add-on purchase',
+    description:
+      'Receipt after purchasing a short-term add-on. Same plan+addon flow as add-on purchase, with isShortTermPurchase enabled (SIMPLE or LIMITED_MONTHLY add-ons).',
+    category: 'payment-success',
+    eventType: 'subscription.payment.success.short.term.addon.purchase.email',
+    templateId: 'subscription/payment-success-short-term-addon-purchase',
+    automated: true,
+  },
+  {
     id: 'payment-success-attribute-upgrade',
     title: 'Payment success — attribute upgrade',
     description: 'Receipt after upgrading attribute limits.',

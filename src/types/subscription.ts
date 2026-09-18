@@ -508,6 +508,7 @@ export interface ActivePlanAddonItem {
   planFeatureAttributeId: string | null
   status: string
   autoRenew: boolean
+  isShortTermPurchase?: boolean
   isTrial: boolean
   trialStartDate: string | null
   trialEndDate: string | null
@@ -530,7 +531,7 @@ export interface UpsertAddonCartPayload {
   planFeatureId: string
   planFeatureAttributeId?: string
   isAddonTrial: boolean
-  autoRenew?: boolean
+  isShortTermPurchase?: boolean
   value?: number
 }
 
@@ -557,6 +558,7 @@ export interface MerchantAddonCartPreview {
   billingCycle: BillingCycleValue | null
   autoRenew: boolean
   isTrial: boolean
+  isShortTermPurchase?: boolean
   addon: AddonCartItemPreview
   pricing: CartPricingPreview
 }

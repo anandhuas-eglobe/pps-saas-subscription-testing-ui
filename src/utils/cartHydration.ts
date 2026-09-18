@@ -75,13 +75,13 @@ export function hydratePlanCartFormState(
 export function hydrateAddonCartFormState(cart: MerchantAddonCartPreview): {
   addonKey: string
   isAddonTrial: boolean
-  autoRenew: boolean
+  isShortTermPurchase: boolean
   attributeValue: number
 } {
   return {
     addonKey: addonKeyFromCartPreview(cart),
     isAddonTrial: cart.isTrial,
-    autoRenew: cart.autoRenew,
+    isShortTermPurchase: cart.isShortTermPurchase === true,
     attributeValue: cart.addon.attribute?.value ?? 1,
   }
 }

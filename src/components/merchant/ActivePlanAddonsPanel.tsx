@@ -128,12 +128,23 @@ function AddonCard({
               color={addonSubscriptionStatusColor(addon.status)}
             />
             {addon.isTrial && <Chip label="Trial" size="small" color="warning" variant="outlined" />}
-            <Chip
-              label={addon.autoRenew ? 'Auto-renew on' : 'Auto-renew off'}
-              size="small"
-              variant="outlined"
-            />
+            {addon.isShortTermPurchase ? (
+              <Chip label="Short-term" size="small" color="info" variant="outlined" />
+            ) : (
+              <Chip
+                label={addon.autoRenew ? 'Auto-renew on' : 'Auto-renew off'}
+                size="small"
+                variant="outlined"
+              />
+            )}
           </Stack>
+
+          {addon.isShortTermPurchase ? (
+            <Alert severity="info">
+              Short-term add-on: removed at the next monthly usage reset (yearly plans) or at plan
+              renewal (monthly plans).
+            </Alert>
+          ) : null}
 
           <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
             {addon.addonSubscriptionId}

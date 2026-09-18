@@ -113,3 +113,14 @@ export function validateAddonAttributeValue(
 
   return errors
 }
+
+/**
+ * Short-term addon purchase is allowed for SIMPLE features and LIMITED_MONTHLY attributes only.
+ */
+export function isAddonShortTermPurchaseEligible(addon: AddonCatalogItem): boolean {
+  if (addon.featureType === FeatureType.SIMPLE) {
+    return true
+  }
+  return addon.attribute?.isMonthlyLimit === true
+}
+

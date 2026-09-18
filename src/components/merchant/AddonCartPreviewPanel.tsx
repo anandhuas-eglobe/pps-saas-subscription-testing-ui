@@ -85,12 +85,23 @@ export function AddonCartPreviewPanel({
               color={cart.autoRenew ? 'success' : 'default'}
               variant="outlined"
             />
+            {cart.isShortTermPurchase ? (
+              <Chip label="Short-term purchase" size="small" color="info" />
+            ) : null}
             {cart.isTrial ? (
               <Chip label="Add-on trial" size="small" color="warning" />
             ) : (
               <Chip label={cart.billingCycle ?? '—'} size="small" variant="outlined" />
             )}
           </Stack>
+
+          {cart.isShortTermPurchase ? (
+            <Alert severity="info">
+              Short-term add-on uses monthly pricing and is removed at the next usage reset (yearly
+              plans) or at plan renewal (monthly plans)—same clock as attribute short-term
+              purchase.
+            </Alert>
+          ) : null}
 
           {addon.attribute && (
             <Typography variant="body2" color="text.secondary">

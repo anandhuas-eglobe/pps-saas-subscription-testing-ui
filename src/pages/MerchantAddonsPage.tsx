@@ -45,6 +45,7 @@ import {
 import {
   defaultAddonAttributeValue,
   extractAddonCatalogItems,
+  isAddonShortTermPurchaseEligible,
   validateAddonAttributeValue,
   type AddonCatalogItem,
 } from '../utils/addonBuilder'
@@ -69,7 +70,7 @@ export function MerchantAddonsPage() {
 
   const [selectedAddonKey, setSelectedAddonKey] = useState<string | null>(null)
   const [isAddonTrial, setIsAddonTrial] = useState(false)
-  const [autoRenew, setAutoRenew] = useState(true)
+  const [isShortTermPurchase, setIsShortTermPurchase] = useState(false)
   const [attributeValue, setAttributeValue] = useState(1)
 
   const [submitting, setSubmitting] = useState(false)
@@ -110,6 +111,17 @@ export function MerchantAddonsPage() {
   const addonCartBlockedOnPlanTrial =
     Boolean(selectedAddon) && subscriptionIsTrial && !selectedAddon!.addonTrialEnabled
 
+  const shortTermPurchaseEligible = useMemo(
+    () => (selectedAddon ? isAddonShortTermPurchaseEligible(selectedAddon) : false),
+    [selectedAddon],
+  )
+
+  useEffect(() => {
+    if (!shortTermPurchaseEligible && isShortTermPurchase) {
+      setIsShortTermPurchase(false)
+    }
+  }, [shortTermPurchaseEligible, isShortTermPurchase])
+
   const livePayload = useMemo(() => {
     if (!selectedAddon) {
       return undefined
@@ -117,7 +129,7 @@ export function MerchantAddonsPage() {
     return {
       planFeatureId: selectedAddon.planFeatureId,
       isAddonTrial,
-      autoRenew,
+      ...(!isAddonTrial && isShortTermPurchase ? { isShortTermPurchase: true } : {}),
       ...(selectedAddon.planFeatureAttributeId
         ? { planFeatureAttributeId: selectedAddon.planFeatureAttributeId }
         : {}),
@@ -127,7 +139,7 @@ export function MerchantAddonsPage() {
         ? { value: attributeValue }
         : {}),
     }
-  }, [selectedAddon, isAddonTrial, autoRenew, attributeValue])
+  }, [selectedAddon, isAddonTrial, isShortTermPurchase, attributeValue])
 
   const loadExistingAddonCart = useCallback(async (items: AddonCatalogItem[]) => {
     const existingCart = await fetchExistingAddonCart()
@@ -144,7 +156,7 @@ export function MerchantAddonsPage() {
 
     setSelectedAddonKey(matchingAddon.key)
     setIsAddonTrial(formState.isAddonTrial)
-    setAutoRenew(formState.autoRenew)
+    setIsShortTermPurchase(formState.isShortTermPurchase)
     setAttributeValue(
       matchingAddon.attribute ? formState.attributeValue : 1,
     )
@@ -210,7 +222,7 @@ export function MerchantAddonsPage() {
         const matchingAddon = findAddonCatalogItem(addonItems, formState.addonKey)
         if (matchingAddon?.key === addon.key) {
           setIsAddonTrial(formState.isAddonTrial)
-          setAutoRenew(formState.autoRenew)
+          setIsShortTermPurchase(formState.isShortTermPurchase)
           setAttributeValue(addon.attribute ? formState.attributeValue : 1)
           setCartPreview(existingCart)
           return
@@ -221,7 +233,7 @@ export function MerchantAddonsPage() {
     }
 
     setIsAddonTrial(defaultAddonTrialSelection(addon))
-    setAutoRenew(true)
+    setIsShortTermPurchase(false)
     setAttributeValue(addon.attribute ? defaultAddonAttributeValue(addon.attribute) : 1)
     setCartPreview(null)
   }
@@ -270,7 +282,7 @@ export function MerchantAddonsPage() {
       const payload = {
         planFeatureId: selectedAddon.planFeatureId,
         isAddonTrial,
-        autoRenew,
+        ...(!isAddonTrial && isShortTermPurchase ? { isShortTermPurchase: true } : {}),
         ...(selectedAddon.planFeatureAttributeId
           ? { planFeatureAttributeId: selectedAddon.planFeatureAttributeId }
           : {}),
@@ -502,11 +514,16 @@ export function MerchantAddonsPage() {
                           addon={selectedAddon}
                           currency={subscriptionData.plan.baseCurrency}
                           isAddonTrial={isAddonTrial}
-                          autoRenew={autoRenew}
+                          isShortTermPurchase={isShortTermPurchase}
                           attributeValue={attributeValue}
                           subscriptionIsTrial={subscriptionIsTrial}
-                          onTrialChange={setIsAddonTrial}
-                          onAutoRenewChange={setAutoRenew}
+                          onTrialChange={(value) => {
+                            setIsAddonTrial(value)
+                            if (value) {
+                              setIsShortTermPurchase(false)
+                            }
+                          }}
+                          onShortTermPurchaseChange={setIsShortTermPurchase}
                           onAttributeValueChange={setAttributeValue}
                         />
                       </CardContent>
