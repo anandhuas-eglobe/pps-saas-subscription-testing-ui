@@ -34,6 +34,9 @@ import { ZendeskChatTestingPage } from './pages/ZendeskChatTestingPage'
 import { NotificationProvider } from './notifications/NotificationContext'
 import { ZendeskMessengerAuthBridge } from './components/zendesk/ZendeskMessengerAuthBridge'
 import { SettingsPage } from './pages/SettingsPage'
+import { AdminCatalogFeatureListPage } from './pages/admin-catalog/AdminCatalogFeatureListPage'
+import { AdminCatalogFeatureDetailPage } from './pages/admin-catalog/AdminCatalogFeatureDetailPage'
+import { AdminCatalogAttributeDetailPage } from './pages/admin-catalog/AdminCatalogAttributeDetailPage'
 
 const router = createBrowserRouter([
   {
@@ -90,6 +93,12 @@ const router = createBrowserRouter([
           { path: 'merchant/usage-simulation', element: <UsageSimulationPage /> },
           { path: 'merchant/zendesk-chat', element: <ZendeskChatTestingPage /> },
           { path: 'admin/extend-subscription', element: <ExtendSubscriptionEndDatePage /> },
+          { path: 'admin/catalog-features', element: <AdminCatalogFeatureListPage /> },
+          { path: 'admin/catalog-features/:featureId', element: <AdminCatalogFeatureDetailPage /> },
+          {
+            path: 'admin/catalog-features/:featureId/attributes/:attributeId',
+            element: <AdminCatalogAttributeDetailPage />,
+          },
           { path: 'merchant/invoices/:invoiceId', element: <InvoiceDetailPage /> },
           { path: 'merchant/invoices', element: <InvoiceListPage /> },
           { path: 'merchant/cards', element: <SavedCardsPage /> },

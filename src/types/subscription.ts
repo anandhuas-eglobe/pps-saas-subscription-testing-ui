@@ -73,8 +73,50 @@ export interface FeatureAttributeRow {
   featureId: string
   attributeName: string
   attributeCode: string
+  description?: string
+  iconUrl?: string | null
   isLinkable: boolean
   isMonthlyLimit: boolean
+}
+
+/** Admin catalog feature (`GET/PATCH /api/v1/admin/features`). */
+export interface AdminCatalogFeature {
+  id: string
+  code: string
+  name: string
+  description: string
+  iconUrl: string | null
+  status: boolean
+  parentFeatureId: string | null
+  attributeCount?: number
+  createdAt: string
+  updatedAt: string
+}
+
+/** Admin catalog feature attribute. */
+export interface AdminCatalogFeatureAttribute {
+  id: string
+  featureId: string
+  name: string
+  attributeCode: string
+  description: string
+  iconUrl: string | null
+  isLinkable: boolean
+  isMonthlyLimit: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AdminCatalogFeatureListResult {
+  features: AdminCatalogFeature[]
+  pagination: {
+    total: number
+    page: number
+    limit: number
+    totalPages: number
+    hasNext: boolean
+    hasPrev: boolean
+  }
 }
 
 export interface CatalogFeature {
@@ -186,6 +228,10 @@ export interface PlanListItem {
   planMonthlyPrice: number
   /** Catalog starting yearly price: base + INCLUDED features/attributes. */
   planYearlyPrice: number
+  /** Amount saved on yearly vs 12 × monthly catalog price. Omitted when percent &lt; 1. */
+  yearlySavingsAmount?: number
+  /** Whole-number percent saved on yearly vs 12 × monthly catalog price. Omitted when &lt; 1. */
+  yearlySavingsPercent?: number
   baseCurrency: string
   trial: { enabled: boolean; days: number | null }
   grace: { enabled: boolean; days: number | null }
@@ -227,6 +273,12 @@ export interface UpdatePlanStatusPayload {
 export interface TrialGraceDetail {
   enabled: boolean
   days: number | null
+}
+
+/** Merchant plan list trial block (eligibility + active trial on this plan). */
+export interface MerchantTrialDetail extends TrialGraceDetail {
+  inTrial: boolean
+  remainingTrialDays: number | null
 }
 
 export interface PlanDetailAttributeConfig {
@@ -288,6 +340,10 @@ export interface PlanDetail {
   planMonthlyPrice: number
   /** Catalog starting yearly price: base + INCLUDED features/attributes. */
   planYearlyPrice: number
+  /** Amount saved on yearly vs 12 × monthly catalog price. Omitted when percent &lt; 1. */
+  yearlySavingsAmount?: number
+  /** Whole-number percent saved on yearly vs 12 × monthly catalog price. Omitted when &lt; 1. */
+  yearlySavingsPercent?: number
   baseCurrency: string
   migrationPlanId: string | null
   trial: TrialGraceDetail
@@ -317,9 +373,13 @@ export const SubscriptionAction = {
 export type SubscriptionActionValue =
   (typeof SubscriptionAction)[keyof typeof SubscriptionAction]
 
+export interface MerchantPlanListItem extends Omit<PlanDetail, 'trial'> {
+  trial: MerchantTrialDetail
+}
+
 export interface MerchantPlanListResponse {
-  plans: PlanDetail[]
   activePlanId: string | null
+  plans: MerchantPlanListItem[]
 }
 
 export interface CartAttributeValue {
@@ -423,10 +483,14 @@ export interface BillingAddress {
 
 export interface InitiatePlanPurchasePayload {
   billingAddress?: BillingAddress
+  /** Required when checkout total is $0 and the merchant must save a card first. */
+  agreedToTerms?: boolean
 }
 
 export interface MerchantPlanPurchaseResult {
   checkoutUrl?: string
+  /** Save-card setup URL from Payment MS when $0 checkout has no active saved card. */
+  setupUrl?: string
   subscriptionId?: string
   message: string
   paymentHandoff?: {
@@ -695,9 +759,40 @@ export interface InvoiceReceipt {
   createdAt: string
 }
 
+/** Seller address on invoice detail (from subscription service config). */
+export interface BillingFromAddress {
+  name: string
+  addressLine: string
+  city: string
+  stateProvince: string
+  postalZipCode: string
+  country: string
+  businessEmail: string
+}
+
+export const InvoiceBillingPeriodType = {
+  SUBSCRIPTION: 'SUBSCRIPTION',
+  ATTRIBUTE: 'ATTRIBUTE',
+  ADDON: 'ADDON',
+  OVERAGE: 'OVERAGE',
+  RESELLER_OVERAGE: 'RESELLER_OVERAGE',
+} as const
+
+export type InvoiceBillingPeriodTypeValue =
+  (typeof InvoiceBillingPeriodType)[keyof typeof InvoiceBillingPeriodType]
+
+export interface InvoiceBillingPeriodEntry {
+  type: InvoiceBillingPeriodTypeValue | string
+  from: string
+  to: string
+}
+
 export interface InvoiceDetail extends Omit<InvoiceListItem, 'lineItems'> {
   taxData: unknown | null
   metaData: unknown | null
+  merchantName?: string
+  billingFromAddress?: BillingFromAddress | null
+  billingPeriod?: InvoiceBillingPeriodEntry[] | null
   lineItems: InvoiceLineItem[]
   receipt: InvoiceReceipt | null
 }
@@ -886,6 +981,8 @@ export interface OverageHistoryListItem {
   status: MerchantSubscriptionOverageStatusValue | string
   attributeCode: string | null
   attributeName: string | null
+  billingPeriodFrom: string | null
+  billingPeriodTo: string | null
   createdAt: string
   updatedAt: string
 }
@@ -971,6 +1068,10 @@ export interface ManualRenewalResponse {
   invoice: ManualRenewalInvoice
   checkoutUrl?: string
   stripeCheckoutUrl?: string
+  /** Save-card setup when $0 renewal has no payment method on file. */
+  setupUrl?: string
+  /** Set when $0 renewal fulfilled immediately (saved card on file). */
+  subscriptionId?: string
   paymentHandoff?: {
     invoiceId: string
     invoiceNumber: string
@@ -983,6 +1084,8 @@ export interface ManualRenewalResponse {
 
 export interface InitiateManualRenewalPayload {
   billingAddress?: BillingAddress
+  /** Required for $0 manual renewal (same as zero plan checkout). */
+  agreedToTerms?: boolean
 }
 
 export interface ManualRenewalFailureResponse {
