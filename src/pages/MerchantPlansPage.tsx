@@ -16,7 +16,15 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart'
 import StorefrontIcon from '@mui/icons-material/Storefront'
-import { getMerchantCart, getActiveSubscription, listMerchantPlans, purchasePlanCart, upsertMerchantCart, cancelMerchantCheckout } from '../api/merchant'
+import {
+  getMerchantCart,
+  getActiveSubscription,
+  listMerchantPlans,
+  purchasePlanCart,
+  upsertMerchantCart,
+  cancelMerchantCheckout,
+  MERCHANT_CART_GET_PATH,
+} from '../api/merchant'
 import { getPlanById, listPlans } from '../api/plans'
 import { ApiRequestError } from '../api/client'
 import { PageHeader } from '../components/layout/PageHeader'
@@ -49,6 +57,7 @@ import {
 import { formatMoney, formatTrialGrace, planStatusColor } from '../utils/planDisplay'
 import {
   buildInitiatePurchasePayload,
+  isZeroAmountPlanCheckout,
   requiresBillingAddressForCheckout,
 } from '../utils/billingAddress'
 import { handlePurchaseCheckoutResult } from '../utils/checkoutSession'
@@ -262,7 +271,7 @@ export function MerchantPlansPage() {
         () => upsertMerchantCart(payload),
         'POST /api/v1/merchant/cart/plan',
       )
-      const preview = await getMerchantCart()
+      const preview = await execute({}, () => getMerchantCart(), `GET ${MERCHANT_CART_GET_PATH}`)
       setCartPreview(preview)
       setSnackbar({ open: true, message: result.message, severity: 'success' })
     } catch (error) {
@@ -277,7 +286,10 @@ export function MerchantPlansPage() {
     }
   }
 
-  const handleConfirmPayment = async (billingAddress?: BillingAddress) => {
+  const handleConfirmPayment = async (options?: {
+    billingAddress?: BillingAddress
+    agreedToTerms?: boolean
+  }) => {
     setPurchasing(true)
     setPurchaseError(null)
     setPurchaseResult(null)
@@ -290,7 +302,13 @@ export function MerchantPlansPage() {
             subscriptionAction: cartPreview.subscriptionAction,
           })
         : false
-      const purchasePayload = buildInitiatePurchasePayload(billingAddress, requiresBilling)
+      const purchasePayload = buildInitiatePurchasePayload(
+        options?.billingAddress,
+        requiresBilling,
+        cartPreview && isZeroAmountPlanCheckout(cartPreview)
+          ? { agreedToTerms: options?.agreedToTerms }
+          : undefined,
+      )
       const result = await execute(
         purchasePayload,
         () => purchasePlanCart(purchasePayload),
@@ -298,14 +316,19 @@ export function MerchantPlansPage() {
       )
       setPurchaseResult(result)
       const opened = handlePurchaseCheckoutResult(result)
-      setCheckoutPopupBlocked(Boolean(result.checkoutUrl) && !opened)
+      const redirectUrl = result.checkoutUrl ?? result.setupUrl
+      setCheckoutPopupBlocked(Boolean(redirectUrl) && !opened)
       setSnackbar({
         open: true,
-        message: result.checkoutUrl
+        message: result.setupUrl
           ? opened
-            ? 'Checkout session opened in a new tab.'
-            : 'Purchase started. Open the checkout session below if the popup was blocked.'
-          : result.message,
+            ? 'Save-card setup opened in a new tab.'
+            : 'Save-card setup started. Open the session below if the popup was blocked.'
+          : result.checkoutUrl
+            ? opened
+              ? 'Checkout session opened in a new tab.'
+              : 'Purchase started. Open the checkout session below if the popup was blocked.'
+            : result.message,
         severity: 'success',
       })
       await loadPlans()
@@ -362,7 +385,7 @@ export function MerchantPlansPage() {
           eyebrow="Merchant checkout"
           title="Browse plans & configure cart"
           description="List plans available to the merchant, configure attribute limits and volume tiers, then add the selection to the subscription cart."
-          apiEndpoint="GET /api/v1/merchant/cart/plan · GET /api/v1/merchant/subscription/plans · POST /api/v1/merchant/cart/plan · POST /api/v1/merchant/subscription/plan/purchase · POST /api/v1/merchant/subscription/checkout/cancel"
+          apiEndpoint="GET /api/v1/merchant/cart · GET /api/v1/merchant/subscription/plans · POST /api/v1/merchant/cart/plan · POST /api/v1/merchant/subscription/plan/purchase · POST /api/v1/merchant/subscription/checkout/cancel"
           backTo="/"
           backLabel="Back to home"
           actions={
@@ -456,13 +479,20 @@ export function MerchantPlansPage() {
 
                                 <Stack spacing={0.5}>
                                   <Stack direction="row" spacing={2}>
-                                    <Typography variant="body2" fontWeight={600}>
+                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
                                       {formatMoney(plan.baseCurrency, plan.planMonthlyPrice)} / mo
                                     </Typography>
                                     <Typography variant="body2" color="text.secondary">
                                       {formatMoney(plan.baseCurrency, plan.planYearlyPrice)} / yr
                                     </Typography>
                                   </Stack>
+                                  {plan.yearlySavingsPercent != null &&
+                                    plan.yearlySavingsAmount != null && (
+                                      <Typography variant="caption" color="success.main">
+                                        Save {formatMoney(plan.baseCurrency, plan.yearlySavingsAmount)}{' '}
+                                        / yr ({plan.yearlySavingsPercent}%)
+                                      </Typography>
+                                    )}
                                   <Typography variant="caption" color="text.secondary">
                                     Base {formatMoney(plan.baseCurrency, plan.baseMonthlyPrice)} / mo ·{' '}
                                     {formatMoney(plan.baseCurrency, plan.baseYearlyPrice)} / yr
@@ -564,7 +594,7 @@ export function MerchantPlansPage() {
                       purchasing={purchasing}
                       purchaseResult={purchaseResult}
                       checkoutPopupBlocked={checkoutPopupBlocked}
-                      onConfirmPayment={(billingAddress) => void handleConfirmPayment(billingAddress)}
+                      onConfirmPayment={(options) => void handleConfirmPayment(options)}
                       onCancelCheckout={() => void handleCancelCheckout()}
                       cancellingCheckout={cancellingCheckout}
                     />

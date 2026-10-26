@@ -2,6 +2,7 @@ import type {
   BillingAddress,
   InitiateManualRenewalPayload,
   InitiatePlanPurchasePayload,
+  ManualRenewalResponse,
 } from '../types/subscription'
 import { SubscriptionAction, type SubscriptionActionValue } from '../types/subscription'
 
@@ -99,19 +100,37 @@ export function toBillingAddressPayload(address: BillingAddress): BillingAddress
   }
 }
 
+/** Paid plan cart with $0 base total (matches subscription MS `baseGrandTotal` zero checkout). */
+export function isZeroAmountPlanCheckout(cart: {
+  isTrial: boolean
+  pricing: { grandTotal: number; baseGrandTotal?: number }
+}): boolean {
+  if (cart.isTrial) {
+    return false
+  }
+  const baseTotal = cart.pricing.baseGrandTotal ?? cart.pricing.grandTotal
+  return baseTotal === 0
+}
+
 export function buildInitiatePurchasePayload(
   billingAddress: BillingAddress | undefined,
   requiresBilling: boolean,
+  options?: { agreedToTerms?: boolean },
 ): InitiatePlanPurchasePayload {
-  if (!requiresBilling) {
-    return {}
+  const payload: InitiatePlanPurchasePayload = {}
+
+  if (requiresBilling) {
+    if (!billingAddress || !isBillingAddressComplete(billingAddress)) {
+      throw new Error('Billing address is required for paid checkout')
+    }
+    payload.billingAddress = toBillingAddressPayload(billingAddress)
   }
 
-  if (!billingAddress || !isBillingAddressComplete(billingAddress)) {
-    throw new Error('Billing address is required for paid checkout')
+  if (options?.agreedToTerms) {
+    payload.agreedToTerms = true
   }
 
-  return { billingAddress: toBillingAddressPayload(billingAddress) }
+  return payload
 }
 
 export function buildAttributePurchasePayload(
@@ -124,17 +143,52 @@ export function buildAttributePurchasePayload(
   return { billingAddress: toBillingAddressPayload(billingAddress) }
 }
 
+export function isZeroAmountRenewalPricing(pricing: {
+  grandTotal: number
+  baseGrandTotal?: number
+}): boolean {
+  return isZeroAmountPlanCheckout({
+    isTrial: false,
+    pricing: {
+      grandTotal: pricing.grandTotal,
+      baseGrandTotal: pricing.baseGrandTotal,
+    },
+  })
+}
+
 export function buildInitiateManualRenewalPayload(
   billingAddress: BillingAddress | undefined,
   includeBillingAddress: boolean,
+  options?: { agreedToTerms?: boolean },
 ): InitiateManualRenewalPayload {
-  if (!includeBillingAddress) {
-    return {}
+  const payload: InitiateManualRenewalPayload = {}
+
+  if (includeBillingAddress) {
+    if (!billingAddress || !isBillingAddressComplete(billingAddress)) {
+      throw new Error('Billing address is required when no prior completed invoice address exists')
+    }
+    payload.billingAddress = toBillingAddressPayload(billingAddress)
   }
 
-  if (!billingAddress || !isBillingAddressComplete(billingAddress)) {
-    throw new Error('Billing address is required when no prior completed invoice address exists')
+  if (options?.agreedToTerms) {
+    payload.agreedToTerms = true
   }
 
-  return { billingAddress: toBillingAddressPayload(billingAddress) }
+  return payload
+}
+
+/** True when manual renewal still needs a paid checkout or Redis payment simulation. */
+export function manualRenewalNeedsPaidPaymentConfirmation(
+  result: ManualRenewalResponse,
+): boolean {
+  if (result.subscriptionId) {
+    return false
+  }
+  if (result.invoice.status === 'COMPLETED') {
+    return false
+  }
+  if (result.setupUrl) {
+    return false
+  }
+  return result.invoice.grandTotal > 0 && result.invoice.status === 'PENDING'
 }

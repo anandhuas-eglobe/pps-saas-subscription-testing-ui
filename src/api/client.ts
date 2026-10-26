@@ -2,22 +2,32 @@ import type { ApiResponse } from '../types/subscription'
 import { getAuthorizationHeader, getValidAccessToken, refreshSession } from '../auth/sessionManager'
 import { clearSession, getAccessToken } from '../auth/tokenStorage'
 import { getApiBaseUrl } from '../config/api'
-import { ApiRequestError } from './errors'
+import { ApiNetworkError, ApiRequestError } from './errors'
+import type { GatewayResponseSnapshot } from './gatewaySnapshot'
+import { snapshotFromResponse } from './gatewaySnapshot'
 import { fetchWithRateLimitRetry } from './rateLimitRetry'
 
-export { ApiRequestError } from './errors'
+export { ApiRequestError, ApiNetworkError } from './errors'
+export { GatewayCallResult, type GatewayResponseSnapshot } from './gatewaySnapshot'
 
-async function parseJson<T>(response: Response): Promise<ApiResponse<T>> {
-  const text = await response.text()
-  if (!text) {
-    return {
-      success: response.ok,
-      timestamp: new Date().toISOString(),
-      message: response.statusText,
-    }
+async function executeRequest(
+  path: string,
+  init: RequestInit | undefined,
+  headers: HeadersInit,
+  baseUrl = getApiBaseUrl(),
+): Promise<Response> {
+  const url = `${baseUrl}${path}`
+  const method = (init?.method ?? 'GET').toUpperCase()
+  try {
+    return await fetchWithRateLimitRetry(() =>
+      fetch(url, {
+        ...init,
+        headers,
+      }),
+    )
+  } catch (error) {
+    throw new ApiNetworkError(url, method, error)
   }
-
-  return JSON.parse(text) as ApiResponse<T>
 }
 
 async function buildAuthHeaders(init?: RequestInit): Promise<HeadersInit> {
@@ -31,81 +41,70 @@ async function buildAuthHeaders(init?: RequestInit): Promise<HeadersInit> {
   }
 }
 
-async function executeRequest(
-  path: string,
-  init: RequestInit | undefined,
-  headers: HeadersInit,
-  baseUrl = getApiBaseUrl(),
-): Promise<Response> {
-  const url = `${baseUrl}${path}`
-  return fetchWithRateLimitRetry(() =>
-    fetch(url, {
-      ...init,
-      headers,
-    }),
-  )
-}
-
 export async function apiRequest<T>(
   path: string,
   init?: RequestInit,
   options?: { baseUrl?: string },
-): Promise<{ response: Response; body: ApiResponse<T> }> {
+): Promise<{ response: Response; body: ApiResponse<T>; snapshot: GatewayResponseSnapshot }> {
   const baseUrl = options?.baseUrl ?? getApiBaseUrl()
+  const method = (init?.method ?? 'GET').toUpperCase()
+  const url = `${baseUrl}${path}`
   const headers = await buildAuthHeaders(init)
   let response = await executeRequest(path, init, headers, baseUrl)
-  let body = await parseJson<T>(response)
+  let snapshot = await snapshotFromResponse(response, url, method)
+  let body = snapshot.body as ApiResponse<T>
 
   if (response.status === 401 && getAccessToken()) {
     const refreshed = await refreshSession()
     if (refreshed) {
       const retryHeaders = await buildAuthHeaders(init)
       response = await executeRequest(path, init, retryHeaders, baseUrl)
-      body = await parseJson<T>(response)
+      snapshot = await snapshotFromResponse(response, url, method)
+      body = snapshot.body as ApiResponse<T>
     } else {
       clearSession()
     }
   }
 
   if (!response.ok || body.success === false) {
-    throw new ApiRequestError(response.status, body)
+    throw new ApiRequestError(snapshot)
   }
 
-  return { response, body }
+  return { response, body, snapshot }
 }
 
 export async function apiDownloadBlob(path: string, fallbackFilename = 'download.pdf'): Promise<void> {
   const baseUrl = getApiBaseUrl()
   const headers = await buildAuthHeaders()
-  let response = await fetchWithRateLimitRetry(() =>
-    fetch(`${baseUrl}${path}`, { headers }),
-  )
+  const url = `${baseUrl}${path}`
+  let response: Response
+  try {
+    response = await fetchWithRateLimitRetry(() =>
+      fetch(url, { headers }),
+    )
+  } catch (error) {
+    throw new ApiNetworkError(url, 'GET', error)
+  }
 
   if (response.status === 401 && getAccessToken()) {
     const refreshed = await refreshSession()
     if (refreshed) {
       const retryHeaders = await buildAuthHeaders()
-      response = await fetchWithRateLimitRetry(() =>
-        fetch(`${baseUrl}${path}`, { headers: retryHeaders }),
-      )
+      try {
+        response = await fetchWithRateLimitRetry(() =>
+          fetch(url, { headers: retryHeaders }),
+        )
+      } catch (error) {
+        throw new ApiNetworkError(url, 'GET', error)
+      }
     } else {
       clearSession()
     }
   }
 
   if (!response.ok) {
-    const text = await response.text()
-    if (text) {
-      try {
-        const body = JSON.parse(text) as ApiResponse<unknown>
-        throw new ApiRequestError(response.status, body)
-      } catch (error) {
-        if (error instanceof ApiRequestError) {
-          throw error
-        }
-      }
-    }
-    throw new Error(`Download failed with status ${response.status}`)
+    const snapshot = await snapshotFromResponse(response, url, 'GET')
+    throw new ApiRequestError(snapshot)
   }
 
   const blob = await response.blob()

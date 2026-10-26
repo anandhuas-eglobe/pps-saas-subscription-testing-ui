@@ -336,6 +336,12 @@ export function PlanDetailView({ plan }: PlanDetailViewProps) {
                   label="Yearly"
                   value={formatMoney(plan.baseCurrency, plan.planYearlyPrice)}
                 />
+                {plan.yearlySavingsPercent != null && plan.yearlySavingsAmount != null && (
+                  <DetailField
+                    label="Yearly savings"
+                    value={`${formatMoney(plan.baseCurrency, plan.yearlySavingsAmount)} (${plan.yearlySavingsPercent}%)`}
+                  />
+                )}
                 <DetailField
                   label="Base monthly"
                   value={formatMoney(plan.baseCurrency, plan.baseMonthlyPrice)}

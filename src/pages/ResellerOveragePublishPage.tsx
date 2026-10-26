@@ -32,6 +32,8 @@ import {
   buildResellerOverageRedisStreamPayloadJson,
   buildResellerOverageRequestedEvent,
   createDefaultResellerOveragePublishForm,
+  datetimeLocalInputToIso,
+  isoToDatetimeLocalInput,
   type ResellerOveragePublishFormValues,
   type ResellerOverageRequestedEvent,
 } from '../utils/resellerOverageEventBuilder'
@@ -247,10 +249,11 @@ export function ResellerOveragePublishPage() {
       />
 
       <Alert severity="info" icon={<LocalMallIcon />}>
-        The consumer expects <code>metadata.context.source = order-service</code> and{' '}
-        <code>metadata.context.entityType = order</code>. Use <strong>Publish to Redis</strong> while
-        running <code>npm run dev</code>. The subscription service must use{' '}
-        <code>MESSAGING_PROVIDER=redis</code>.
+        The consumer expects <code>metadata.context.source = order-service</code>,{' '}
+        <code>metadata.context.entityType = order</code>, and payload{' '}
+        <code>billingPeriodFrom</code> / <code>billingPeriodTo</code> (ISO-8601). Use{' '}
+        <strong>Publish to Redis</strong> while running <code>npm run dev</code>. The subscription
+        service must use <code>MESSAGING_PROVIDER=redis</code>.
       </Alert>
 
       {devToolsAvailable === false && (
@@ -409,6 +412,37 @@ export function ResellerOveragePublishPage() {
                           updateFormField(current, 'overageAmount', Number(event.target.value)),
                         )
                       }
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 12, md: 6 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Billing period from"
+                      type="datetime-local"
+                      value={isoToDatetimeLocalInput(form.billingPeriodFrom)}
+                      onChange={(event) => {
+                        const iso = datetimeLocalInputToIso(event.target.value)
+                        if (!iso) return
+                        setForm((current) => updateFormField(current, 'billingPeriodFrom', iso))
+                      }}
+                      slotProps={{ inputLabel: { shrink: true } }}
+                      helperText="Usage window start stored on overage history and invoice OVERAGE period"
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 12, md: 6 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Billing period to"
+                      type="datetime-local"
+                      value={isoToDatetimeLocalInput(form.billingPeriodTo)}
+                      onChange={(event) => {
+                        const iso = datetimeLocalInputToIso(event.target.value)
+                        if (!iso) return
+                        setForm((current) => updateFormField(current, 'billingPeriodTo', iso))
+                      }}
+                      slotProps={{ inputLabel: { shrink: true } }}
                     />
                   </Grid>
                   <Grid size={{ xs: 12, md: 6 }}>

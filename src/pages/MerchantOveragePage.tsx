@@ -36,6 +36,7 @@ import {
   type OverageHistoryListItem,
 } from '../types/subscription'
 import { formatDateTime, formatMoney } from '../utils/planDisplay'
+import { formatOverageHistoryBillingPeriod } from '../utils/invoiceBillingDisplay'
 import { handlePurchaseCheckoutResult } from '../utils/checkoutSession'
 import { CheckoutSessionActions } from '../components/payment/CheckoutSessionActions'
 
@@ -292,6 +293,7 @@ export function MerchantOveragePage() {
                     <TableCell>Attribute</TableCell>
                     <TableCell align="right">Qty</TableCell>
                     <TableCell align="right">Amount</TableCell>
+                    <TableCell>Billing period</TableCell>
                     <TableCell>Status</TableCell>
                     <TableCell>Created</TableCell>
                     <TableCell align="right">Invoice</TableCell>
@@ -306,6 +308,9 @@ export function MerchantOveragePage() {
                       </TableCell>
                       <TableCell align="right">{row.quantity ?? '—'}</TableCell>
                       <TableCell align="right">{formatMoney('USD', row.overageAmount)}</TableCell>
+                      <TableCell sx={{ fontSize: '0.8rem' }}>
+                        {formatOverageHistoryBillingPeriod(row.billingPeriodFrom, row.billingPeriodTo)}
+                      </TableCell>
                       <TableCell>
                         <Chip label={row.status} size="small" color={overageStatusColor(row.status)} />
                       </TableCell>

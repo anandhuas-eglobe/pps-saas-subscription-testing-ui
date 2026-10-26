@@ -1,6 +1,6 @@
 import AddCircleOutlineOutlinedIcon from '@mui/icons-material/AddCircleOutlineOutlined'
-import ListAltIcon from '@mui/icons-material/ListAlt'
 import CategoryIcon from '@mui/icons-material/Category'
+import ListAltIcon from '@mui/icons-material/ListAlt'
 import StorefrontIcon from '@mui/icons-material/Storefront'
 import ExtensionIcon from '@mui/icons-material/Extension'
 import TuneIcon from '@mui/icons-material/Tune'
@@ -57,12 +57,21 @@ export const operations: OperationLink[] = [
     available: true,
   },
   {
+    title: 'Admin Catalog Features',
+    description:
+      'List catalog features and attributes, patch names/descriptions, and upload icons via the admin features API.',
+    path: '/admin/catalog-features',
+    icon: CategoryIcon,
+    apiEndpoint: 'GET/PATCH /api/v1/admin/features · POST/DELETE …/icon',
+    available: true,
+  },
+  {
     title: 'Merchant Plans',
     description: 'Browse plans as a merchant, configure limits and volume tiers, and add the selection to the cart.',
     path: '/merchant/plans',
     icon: StorefrontIcon,
     apiEndpoint:
-      'GET /api/v1/merchant/subscription/plans · POST /plan/purchase · POST /checkout/cancel',
+      'GET /plans · POST /plan/purchase ($0 → setupUrl or immediate fulfill) · POST /checkout/cancel',
     available: true,
   },
   {
@@ -71,7 +80,7 @@ export const operations: OperationLink[] = [
     path: '/merchant/subscription',
     icon: VerifiedIcon,
     apiEndpoint:
-      'GET /active · GET /renewal/preview · POST /renew · PUT /auto-renew/cancel',
+      'GET /active · GET /renewal/preview · POST /renew ($0 → setupUrl or immediate) · PUT /auto-renew/cancel',
     available: true,
   },
   {
@@ -112,7 +121,8 @@ export const operations: OperationLink[] = [
     description: 'Browse add-ons on your active plan, configure limits or trials, add to cart, and complete payment. Purchased add-ons appear on the active subscription page.',
     path: '/merchant/addons',
     icon: ExtensionIcon,
-    apiEndpoint: 'GET /api/v1/merchant/subscription/active-plan/addons · POST /api/v1/merchant/cart/addon',
+    apiEndpoint:
+      'GET /api/v1/merchant/cart · GET /api/v1/merchant/subscription/active-plan/addons · POST /api/v1/merchant/cart/addon',
     available: true,
   },
   {
@@ -194,7 +204,8 @@ export const operations: OperationLink[] = [
   },
   {
     title: 'Reseller Overage',
-    description: 'Publish a ResellerOverageRequested event to order.reseller.overage.requested for the subscription reseller overage consumer.',
+    description:
+      'Publish ResellerOverageRequested (merchantId, overageAmount, billingPeriodFrom/To) to order.reseller.overage.requested.',
     path: '/dev/reseller-overage',
     icon: LocalMallIcon,
     apiEndpoint: 'Redis stream order.reseller.overage.requested',
@@ -217,13 +228,5 @@ export const operations: OperationLink[] = [
     icon: NotificationsActiveIcon,
     apiEndpoint: 'GET /api/v1/notifications · WS notification:new',
     available: true,
-  },
-  {
-    title: 'Feature Catalog',
-    description: 'View all available features and attributes used when configuring subscription plans.',
-    path: '/features',
-    icon: CategoryIcon,
-    apiEndpoint: 'GET /api/v1/features',
-    available: false,
   },
 ]

@@ -153,6 +153,7 @@ export function NitroPlansListPanel({ refreshKey = 0 }: NitroPlansListPanelProps
                       <TableCell>Status</TableCell>
                       <TableCell>Plan monthly</TableCell>
                       <TableCell>Plan yearly</TableCell>
+                      <TableCell>Yearly savings</TableCell>
                       <TableCell align="right">Actions</TableCell>
                     </TableRow>
                   </TableHead>
@@ -198,6 +199,24 @@ export function NitroPlansListPanel({ refreshKey = 0 }: NitroPlansListPanelProps
                           <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                             base {plan.baseYearlyPrice}
                           </Typography>
+                        </TableCell>
+                        <TableCell>
+                          {plan.yearlySavingsPercent != null && plan.yearlySavingsAmount != null ? (
+                            <>
+                              <Typography variant="body2">
+                                {plan.baseCurrency} {plan.yearlySavingsAmount}
+                              </Typography>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                sx={{ display: 'block' }}
+                              >
+                                {plan.yearlySavingsPercent}%
+                              </Typography>
+                            </>
+                          ) : (
+                            '—'
+                          )}
                         </TableCell>
                         <TableCell align="right">
                           <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>

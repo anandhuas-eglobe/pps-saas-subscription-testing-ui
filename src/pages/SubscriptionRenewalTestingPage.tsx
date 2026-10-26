@@ -62,6 +62,8 @@ import type {
 import {
   buildInitiateManualRenewalPayload,
   defaultBillingAddress,
+  isZeroAmountRenewalPricing,
+  manualRenewalNeedsPaidPaymentConfirmation,
 } from '../utils/billingAddress'
 import { formatDateOnly, formatDateTime, formatMoney, toDatetimeLocalInputValue, datetimeLocalInputToIso } from '../utils/planDisplay'
 import {
@@ -131,7 +133,8 @@ export function SubscriptionRenewalTestingPage() {
   const [cancellingAutoRenew, setCancellingAutoRenew] = useState(false)
 
   const [billingAddress, setBillingAddress] = useState<BillingAddress>(defaultBillingAddress)
-  const [includeBillingAddress, setIncludeBillingAddress] = useState(false)
+  const [includeBillingAddress, setIncludeBillingAddress] = useState(true)
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [initiatingRenewal, setInitiatingRenewal] = useState(false)
   const [renewalResult, setRenewalResult] = useState<ManualRenewalResponse | null>(null)
   const [renewalError, setRenewalError] = useState<unknown>(null)
@@ -390,7 +393,9 @@ export function SubscriptionRenewalTestingPage() {
     setPaymentMessage(null)
     setPaymentError(null)
     setPreviewKind('renew')
-    const payload = buildInitiateManualRenewalPayload(billingAddress, includeBillingAddress)
+    const payload = buildInitiateManualRenewalPayload(billingAddress, includeBillingAddress, {
+      agreedToTerms: agreedToTerms || undefined,
+    })
 
     try {
       const result = await execute(
@@ -446,9 +451,18 @@ export function SubscriptionRenewalTestingPage() {
     [extendMerchantId, extendDays],
   )
 
+  const zeroAmountRenewalExpected = useMemo(
+    () =>
+      preview?.available === true && isZeroAmountRenewalPricing(preview.pricing),
+    [preview],
+  )
+
   const renewPreviewPayload = useMemo(
-    () => buildInitiateManualRenewalPayload(billingAddress, includeBillingAddress),
-    [billingAddress, includeBillingAddress],
+    () =>
+      buildInitiateManualRenewalPayload(billingAddress, includeBillingAddress, {
+        agreedToTerms: agreedToTerms || undefined,
+      }),
+    [billingAddress, includeBillingAddress, agreedToTerms],
   )
 
   const updateDatesPreviewPayload = useMemo(() => {
@@ -499,8 +513,11 @@ export function SubscriptionRenewalTestingPage() {
     extendPreviewPayload,
   ])
 
+  const renewalSetupUrl = renewalResult?.setupUrl ?? null
   const renewalCheckoutUrl =
     renewalResult?.checkoutUrl ?? renewalResult?.stripeCheckoutUrl ?? null
+  const showPaidPaymentConfirm =
+    renewalResult != null && manualRenewalNeedsPaidPaymentConfirmation(renewalResult)
 
   return (
     <Stack spacing={3}>
@@ -508,7 +525,7 @@ export function SubscriptionRenewalTestingPage() {
         eyebrow="Merchant"
         title="Subscription renewal testing"
         description="End-to-end workspace for auto-renew scheduler flows, manual renewal preview, POST /renew recovery checkout, and subscription date test utilities."
-        apiEndpoint="PATCH /test/subscription/update-dates · BullMQ subscription-cron-auto-renew · GET /renewal/preview · POST /renew · POST /checkout/cancel"
+        apiEndpoint="PATCH /test/subscription/update-dates · BullMQ subscription-cron-auto-renew · GET /renewal/preview · POST /renew ($0 + terms) · POST /checkout/cancel"
         backTo="/"
         backLabel="Back to home"
         actions={
@@ -973,8 +990,17 @@ export function SubscriptionRenewalTestingPage() {
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                 POST /api/v1/merchant/subscription/renew — for RENEWAL_FAILED, grace period, or
-                MERCHANT_CANCELLED subscriptions.
+                MERCHANT_CANCELLED subscriptions. $0 renewals require billing address,{' '}
+                <code>agreedToTerms</code>, and a saved card (or save-card <code>setupUrl</code>).
               </Typography>
+
+              {zeroAmountRenewalExpected && (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  Preview total is $0 — check terms below. With a saved card, renewal completes
+                  immediately; without one you get a save-card setup URL (not Stripe payment
+                  checkout).
+                </Alert>
+              )}
 
               <FormControlLabel
                 control={
@@ -986,7 +1012,20 @@ export function SubscriptionRenewalTestingPage() {
                     }}
                   />
                 }
-                label="Include billing address (required when no prior completed invoice address exists)"
+                label="Include billing address (required for $0 renewal and when no prior invoice address exists)"
+              />
+
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={agreedToTerms}
+                    onChange={(event) => {
+                      setPreviewKind('renew')
+                      setAgreedToTerms(event.target.checked)
+                    }}
+                  />
+                }
+                label="I agree to the terms and conditions (required for $0 renewal)"
               />
 
               {includeBillingAddress && (
@@ -1028,7 +1067,12 @@ export function SubscriptionRenewalTestingPage() {
                     {formatMoney(renewalResult.invoice.currency, renewalResult.invoice.grandTotal)} ·{' '}
                     {renewalResult.invoice.status}
                   </Typography>
-                  {renewalResult.paymentHandoff && (
+                  {renewalResult.subscriptionId && (
+                    <Typography variant="body2" sx={{ mt: 0.5 }}>
+                      Subscription restored: {renewalResult.subscriptionId}
+                    </Typography>
+                  )}
+                  {showPaidPaymentConfirm && renewalResult.paymentHandoff && (
                     <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap' }}>
                       <Button
                         size="small"
@@ -1055,6 +1099,14 @@ export function SubscriptionRenewalTestingPage() {
                         Open payment confirm page
                       </Button>
                     </Stack>
+                  )}
+                  {renewalSetupUrl && (
+                    <CheckoutSessionActions
+                      checkoutUrl={renewalSetupUrl}
+                      openButtonLabel="Open save-card setup"
+                      onCancelCheckout={() => void handleCancelCheckout()}
+                      cancellingCheckout={cancellingCheckout}
+                    />
                   )}
                   {renewalCheckoutUrl && (
                     <CheckoutSessionActions

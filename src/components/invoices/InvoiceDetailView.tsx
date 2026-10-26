@@ -20,6 +20,11 @@ import {
   formatMoney,
   invoiceStatusColor,
 } from '../../utils/planDisplay'
+import {
+  billingPeriodTypeLabel,
+  formatBillingFromAddress,
+  formatInvoiceBillingPeriodRange,
+} from '../../utils/invoiceBillingDisplay'
 
 interface DetailFieldProps {
   label: string
@@ -60,6 +65,9 @@ export function InvoiceDetailView({ invoice }: InvoiceDetailViewProps) {
               <DetailField label="Invoice ID" value={invoice.id} />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <DetailField label="Merchant name" value={invoice.merchantName ?? '—'} />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <DetailField label="Subscription ID" value={invoice.subscriptionId ?? '—'} />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -86,15 +94,69 @@ export function InvoiceDetailView({ invoice }: InvoiceDetailViewProps) {
                 value={formatMoney(invoice.currency, invoice.proratedDifference)}
               />
             </Grid>
-            <Grid size={{ xs: 12 }}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <DetailField
-                label="Billing address"
+                label="Bill to (merchant)"
                 value={formatBillingAddress(invoice.billingAddress)}
               />
             </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <DetailField
+                label="Bill from (seller)"
+                value={formatBillingFromAddress(invoice.billingFromAddress)}
+              />
+            </Grid>
+            {invoice.billingFromAddress?.businessEmail && (
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <DetailField
+                  label="PPS business email"
+                  value={invoice.billingFromAddress.businessEmail}
+                />
+              </Grid>
+            )}
           </Grid>
         </CardContent>
       </Card>
+
+      {invoice.billingPeriod != null && invoice.billingPeriod.length > 0 && (
+        <Card>
+          <CardContent>
+            <Typography variant="h6" sx={{ mb: 2 }}>
+              Billing periods
+            </Typography>
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Type</TableCell>
+                    <TableCell>From</TableCell>
+                    <TableCell>To</TableCell>
+                    <TableCell>Range</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {invoice.billingPeriod.map((period) => (
+                    <TableRow key={`${period.type}-${period.from}-${period.to}`}>
+                      <TableCell>
+                        <Chip
+                          label={billingPeriodTypeLabel(period.type)}
+                          size="small"
+                          variant="outlined"
+                        />
+                      </TableCell>
+                      <TableCell>{formatDateTime(period.from)}</TableCell>
+                      <TableCell>{formatDateTime(period.to)}</TableCell>
+                      <TableCell>
+                        {formatInvoiceBillingPeriodRange(period.from, period.to)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardContent>

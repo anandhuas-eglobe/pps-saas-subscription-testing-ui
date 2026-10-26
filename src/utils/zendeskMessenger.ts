@@ -1,7 +1,6 @@
 import { fetchZendeskMessagingJwt } from '../api/zendeskMessaging'
 
 type ZeJwtCallback = (jwt: string) => void
-type ZeLoginCallback = (error: unknown | null) => void
 
 type ZeMessengerApi = (
   channel: 'messenger',

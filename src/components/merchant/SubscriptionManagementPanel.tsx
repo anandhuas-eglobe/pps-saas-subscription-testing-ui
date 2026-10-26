@@ -6,7 +6,9 @@ import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
 import Chip from '@mui/material/Chip'
 import CircularProgress from '@mui/material/CircularProgress'
+import Checkbox from '@mui/material/Checkbox'
 import Divider from '@mui/material/Divider'
+import FormControlLabel from '@mui/material/FormControlLabel'
 import Grid from '@mui/material/Grid'
 import Stack from '@mui/material/Stack'
 import Table from '@mui/material/Table'
@@ -40,6 +42,8 @@ import type {
 import {
   buildInitiateManualRenewalPayload,
   defaultBillingAddress,
+  isZeroAmountRenewalPricing,
+  manualRenewalNeedsPaidPaymentConfirmation,
 } from '../../utils/billingAddress'
 import { formatDateOnly, formatMoney } from '../../utils/planDisplay'
 import { handlePurchaseCheckoutResult } from '../../utils/checkoutSession'
@@ -146,7 +150,8 @@ export function SubscriptionManagementPanel({
   const [cancellingAutoRenew, setCancellingAutoRenew] = useState(false)
 
   const [billingAddress, setBillingAddress] = useState<BillingAddress>(defaultBillingAddress)
-  const [includeBillingAddress, setIncludeBillingAddress] = useState(false)
+  const [includeBillingAddress, setIncludeBillingAddress] = useState(true)
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [initiatingRenewal, setInitiatingRenewal] = useState(false)
   const [renewalResult, setRenewalResult] = useState<ManualRenewalResponse | null>(null)
   const [renewalInitError, setRenewalInitError] = useState<string | null>(null)
@@ -158,9 +163,18 @@ export function SubscriptionManagementPanel({
   const manualRecoveryCheck = checkManualRenewalEligibility(subscription)
   const isRecoveryPreview = manualRecoveryCheck.eligible
 
+  const zeroAmountRenewalExpected = useMemo(
+    () =>
+      renewalPreview?.available === true && isZeroAmountRenewalPricing(renewalPreview.pricing),
+    [renewalPreview],
+  )
+
   const livePayload = useMemo(
-    () => buildInitiateManualRenewalPayload(billingAddress, includeBillingAddress),
-    [billingAddress, includeBillingAddress],
+    () =>
+      buildInitiateManualRenewalPayload(billingAddress, includeBillingAddress, {
+        agreedToTerms: agreedToTerms || undefined,
+      }),
+    [billingAddress, includeBillingAddress, agreedToTerms],
   )
 
   const loadDowngrade = useCallback(async () => {
@@ -288,7 +302,9 @@ export function SubscriptionManagementPanel({
     setActionError(null)
     setActionMessage(null)
     try {
-      const payload = buildInitiateManualRenewalPayload(billingAddress, includeBillingAddress)
+      const payload = buildInitiateManualRenewalPayload(billingAddress, includeBillingAddress, {
+        agreedToTerms: agreedToTerms || undefined,
+      })
       const result = await execute(
         payload,
         () => initiateManualRenewal(payload),
@@ -338,8 +354,11 @@ export function SubscriptionManagementPanel({
     }
   }
 
+  const renewalSetupUrl = renewalResult?.setupUrl ?? null
   const renewalCheckoutUrl =
     renewalResult?.checkoutUrl ?? renewalResult?.stripeCheckoutUrl ?? null
+  const showPaidPaymentConfirm =
+    renewalResult != null && manualRenewalNeedsPaidPaymentConfirmation(renewalResult)
 
   return (
     <Stack spacing={3}>
@@ -554,7 +573,8 @@ export function SubscriptionManagementPanel({
           </Stack>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             POST /api/v1/merchant/subscription/renew — recovery checkout for RENEWAL_FAILED, grace
-            period, or MERCHANT_CANCELLED subscriptions. For full scenario testing see{' '}
+            period, or MERCHANT_CANCELLED subscriptions. $0 renewals need billing address, terms, and
+            a saved card (or save-card setup). For full scenario testing see{' '}
             <RouterLink to="/merchant/renewal-testing">Renewal Testing</RouterLink>.
           </Typography>
 
@@ -563,7 +583,22 @@ export function SubscriptionManagementPanel({
               <Alert severity="warning">
                 Subscription is eligible for manual recovery ({manualRecoveryState}).
               </Alert>
+              {zeroAmountRenewalExpected && (
+                <Alert severity="info">
+                  Estimated recovery total is $0 — accept terms before renewing. With a saved card the
+                  subscription restores immediately; otherwise use the save-card setup link.
+                </Alert>
+              )}
               <BillingAddressFields value={billingAddress} onChange={setBillingAddress} disabled={!includeBillingAddress} />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={agreedToTerms}
+                    onChange={(event) => setAgreedToTerms(event.target.checked)}
+                  />
+                }
+                label="I agree to the terms and conditions (required for $0 renewal)"
+              />
               <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                 <Button
                   variant="contained"
@@ -586,12 +621,23 @@ export function SubscriptionManagementPanel({
                   {renewalResult.message} — Invoice {renewalResult.invoice.invoiceNumber} (
                   {formatMoney(renewalResult.invoice.currency, renewalResult.invoice.grandTotal)}) ·{' '}
                   {renewalResult.invoice.status}
-                  {renewalResult.paymentHandoff && (
+                  {renewalResult.subscriptionId && (
+                    <> · Subscription {renewalResult.subscriptionId}</>
+                  )}
+                  {showPaidPaymentConfirm && renewalResult.paymentHandoff && (
                     <>
                       {' '}
                       ·{' '}
                       <RouterLink to="/dev/payment-confirm">Confirm payment</RouterLink>
                     </>
+                  )}
+                  {renewalSetupUrl && (
+                    <CheckoutSessionActions
+                      checkoutUrl={renewalSetupUrl}
+                      openButtonLabel="Open save-card setup"
+                      onCancelCheckout={() => void handleCancelCheckout()}
+                      cancellingCheckout={cancellingCheckout}
+                    />
                   )}
                   {renewalCheckoutUrl && (
                     <CheckoutSessionActions

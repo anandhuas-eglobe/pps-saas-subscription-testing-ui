@@ -1,6 +1,7 @@
 import type { AuthUser } from '../auth/tokenStorage'
 import { getApiBaseUrl } from '../config/api'
-import { ApiRequestError } from './errors'
+import { apiRequestErrorFromBody, ApiNetworkError, ApiRequestError } from './errors'
+import { snapshotFromResponse } from './gatewaySnapshot'
 import { fetchWithRateLimitRetry } from './rateLimitRetry'
 
 export interface LoginRequest {
@@ -38,43 +39,33 @@ interface IamEnvelope<T> {
   errors?: Array<{ message: string; field?: string }>
 }
 
-async function parseIamJson<T>(response: Response): Promise<IamEnvelope<T>> {
-  const text = await response.text()
-  if (!text) {
-    return {
-      message: response.statusText,
-      success: response.ok,
-    }
-  }
-  return JSON.parse(text) as IamEnvelope<T>
-}
-
 async function iamRequest<T>(
   path: string,
   init?: RequestInit,
 ): Promise<{ response: Response; body: IamEnvelope<T> }> {
-  const response = await fetchWithRateLimitRetry(() =>
-    fetch(`${getApiBaseUrl()}${path}`, {
-      ...init,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(init?.headers ?? {}),
-      },
-    }),
-  )
+  const baseUrl = getApiBaseUrl()
+  const url = `${baseUrl}${path}`
+  const method = (init?.method ?? 'GET').toUpperCase()
+  let response: Response
+  try {
+    response = await fetchWithRateLimitRetry(() =>
+      fetch(url, {
+        ...init,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(init?.headers ?? {}),
+        },
+      }),
+    )
+  } catch (error) {
+    throw new ApiNetworkError(url, method, error)
+  }
 
-  const body = await parseIamJson<T>(response)
+  const snapshot = await snapshotFromResponse(response, url, method)
+  const body = snapshot.body as IamEnvelope<T>
 
   if (!response.ok || body.success === false) {
-    throw new ApiRequestError(response.status, {
-      success: false,
-      timestamp: new Date().toISOString(),
-      message: body.message ?? `Request failed with status ${response.status}`,
-      statusCode: body.statusCode ?? response.status,
-      errorCode: body.errorCode,
-      errors: body.errors,
-      data: body.data as unknown,
-    })
+    throw new ApiRequestError(snapshot)
   }
 
   return { response, body }
@@ -91,12 +82,17 @@ export async function loginWithIam(payload: LoginRequest): Promise<LoginSuccessD
   })
 
   if (!body.data?.accessToken) {
-    throw new ApiRequestError(200, {
-      success: false,
-      timestamp: new Date().toISOString(),
-      message: body.message ?? 'Login response did not include an access token',
-      data: body.data,
-    })
+    throw apiRequestErrorFromBody(
+      200,
+      {
+        success: false,
+        timestamp: new Date().toISOString(),
+        message: body.message ?? 'Login response did not include an access token',
+        data: body.data,
+      },
+      `${getApiBaseUrl()}/api/v1/auth/login`,
+      'POST',
+    )
   }
 
   return body.data
@@ -109,12 +105,17 @@ export async function refreshTokenWithIam(refreshToken: string): Promise<Refresh
   })
 
   if (!body.data?.accessToken || !body.data.refreshToken) {
-    throw new ApiRequestError(200, {
-      success: false,
-      timestamp: new Date().toISOString(),
-      message: body.message ?? 'Refresh response did not include tokens',
-      data: body.data,
-    })
+    throw apiRequestErrorFromBody(
+      200,
+      {
+        success: false,
+        timestamp: new Date().toISOString(),
+        message: body.message ?? 'Refresh response did not include tokens',
+        data: body.data,
+      },
+      `${getApiBaseUrl()}/api/v1/auth/refresh-token`,
+      'POST',
+    )
   }
 
   return body.data

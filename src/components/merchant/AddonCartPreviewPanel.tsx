@@ -25,6 +25,8 @@ import {
 import { formatMoney } from '../../utils/planDisplay'
 import { BillingAddressFields } from './BillingAddressFields'
 import { CheckoutSessionActions } from '../payment/CheckoutSessionActions'
+import { NextRenewalDateField } from './NextRenewalDateField'
+import { MERCHANT_CART_GET_PATH } from '../../api/merchantCart'
 
 interface AddonCartPreviewPanelProps {
   cart: MerchantAddonCartPreview
@@ -72,12 +74,13 @@ export function AddonCartPreviewPanel({
             <Box>
               <Typography variant="h6">Add-on cart preview</Typography>
               <Typography variant="body2" color="text.secondary">
-                GET /api/v1/merchant/cart/addon
+                GET {MERCHANT_CART_GET_PATH} (add-on cart)
               </Typography>
             </Box>
           </Stack>
 
           <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
+            <Chip label={`Cart: ${cart.cartType}`} size="small" variant="outlined" />
             <Chip label={addonTitle} size="small" />
             <Chip
               label={cart.autoRenew ? 'Auto-renew on' : 'Auto-renew off'}
@@ -108,6 +111,8 @@ export function AddonCartPreviewPanel({
               Selected quantity: {addon.attribute.value}
             </Typography>
           )}
+
+          <NextRenewalDateField nextRenewalDate={cart.nextRenewalDate} />
 
           <Divider />
 

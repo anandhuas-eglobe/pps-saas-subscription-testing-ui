@@ -25,6 +25,7 @@ import {
   requiresBillingAddressForCheckout,
 } from './billingAddress'
 import { buildDefaultCartSelections } from './cartBuilder'
+import { formatDateTime } from './planDisplay'
 import { handlePurchaseCheckoutResult } from './checkoutSession'
 import {
   buildNitroTestPlanPayload,
@@ -517,19 +518,21 @@ async function runPlanUpgradeEmailTestFlow(
 function formatAddonCartSummary(cart: Awaited<ReturnType<typeof getMerchantAddonCart>>): string {
   const total = cart.pricing?.grandTotal
   const currency = cart.pricing?.currency ?? cart.baseCurrency
+  const renewal = cart.nextRenewalDate ? ` · renews ${formatDateTime(cart.nextRenewalDate)}` : ''
   if (total == null) {
-    return 'Add-on cart ready'
+    return `Add-on cart ready${renewal}`
   }
-  return `${currency} ${total}`
+  return `${currency} ${total}${renewal}`
 }
 
 function formatCartSummary(cart: Awaited<ReturnType<typeof getMerchantCart>>): string {
   const total = cart.pricing?.grandTotal
   const currency = cart.pricing?.currency ?? cart.plan.baseCurrency
+  const renewal = cart.nextRenewalDate ? ` · renews ${formatDateTime(cart.nextRenewalDate)}` : ''
   if (total == null) {
-    return 'Cart ready'
+    return `Cart ready${renewal}`
   }
-  return `${currency} ${total}`
+  return `${currency} ${total}${renewal}`
 }
 
 async function runAddonPurchaseEmailTestFlowPhase1(
