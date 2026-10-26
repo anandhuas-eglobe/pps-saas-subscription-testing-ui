@@ -35,6 +35,19 @@ export const PriceType = {
 
 export type PriceTypeValue = (typeof PriceType)[keyof typeof PriceType]
 
+export const CartType = {
+  PLAN: 'PLAN',
+  ADDON: 'ADDON',
+  ATTRIBUTE: 'ATTRIBUTE',
+} as const
+
+export type CartTypeValue = (typeof CartType)[keyof typeof CartType]
+
+export interface MerchantCartPreviewBase {
+  cartType: CartTypeValue
+  nextRenewalDate: string | null
+}
+
 export interface ApiResponse<T> {
   success: boolean
   data?: T
@@ -458,7 +471,8 @@ export interface CartPricingPreview {
   lines: CartPricingLine[]
 }
 
-export interface MerchantCartPreview {
+export interface MerchantCartPreview extends MerchantCartPreviewBase {
+  cartType: typeof CartType.PLAN
   planId: string
   billingCycle: BillingCycleValue | null
   autoRenew: boolean
@@ -624,7 +638,8 @@ export interface AddonCartItemPreview {
   } | null
 }
 
-export interface MerchantAddonCartPreview {
+export interface MerchantAddonCartPreview extends MerchantCartPreviewBase {
+  cartType: typeof CartType.ADDON
   planId: string
   baseCurrency: string
   billingCycle: BillingCycleValue | null
@@ -678,7 +693,8 @@ export interface AttributeCartPricing {
   message: string
 }
 
-export interface MerchantAttributeCartPreview {
+export interface MerchantAttributeCartPreview extends MerchantCartPreviewBase {
+  cartType: typeof CartType.ATTRIBUTE
   planId: string
   baseCurrency: string
   billingCycle: BillingCycleValue | null
@@ -689,6 +705,11 @@ export interface MerchantAttributeCartPreview {
   attributeChanges: AttributeCartChangeLine[]
   pricing: AttributeCartPricing
 }
+
+export type MerchantUnifiedCartPreview =
+  | MerchantCartPreview
+  | MerchantAddonCartPreview
+  | MerchantAttributeCartPreview
 
 export interface InitiateAttributePurchasePayload {
   billingAddress: BillingAddress

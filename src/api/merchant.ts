@@ -29,7 +29,11 @@ import type {
   UpsertMerchantCartPayload,
 } from '../types/subscription'
 import type { PlanDetail } from '../types/subscription'
+import { CartType } from '../types/subscription'
 import { apiDownloadBlob, apiRequest, ApiRequestError, GatewayCallResult } from './client'
+import { getMerchantCartByType } from './merchantCart'
+
+export { getMerchantUnifiedCart, MERCHANT_CART_GET_PATH } from './merchantCart'
 
 export async function listMerchantPlans(): Promise<MerchantPlanListResponse> {
   const { body } = await apiRequest<MerchantPlanListResponse>(
@@ -50,8 +54,7 @@ export async function upsertMerchantCart(
 }
 
 export async function getMerchantCart(): Promise<MerchantCartPreview> {
-  const { body } = await apiRequest<MerchantCartPreview>('/api/v1/merchant/cart/plan')
-  return body.data!
+  return getMerchantCartByType(CartType.PLAN)
 }
 
 export async function purchasePlanCart(
@@ -98,8 +101,7 @@ export async function upsertAddonCart(payload: UpsertAddonCartPayload): Promise<
 }
 
 export async function getMerchantAddonCart(): Promise<MerchantAddonCartPreview> {
-  const { body } = await apiRequest<MerchantAddonCartPreview>('/api/v1/merchant/cart/addon')
-  return body.data!
+  return getMerchantCartByType(CartType.ADDON)
 }
 
 export async function purchaseAddonCart(
@@ -126,10 +128,7 @@ export async function upsertAttributeCart(
 }
 
 export async function getMerchantAttributeCart(): Promise<MerchantAttributeCartPreview> {
-  const { body } = await apiRequest<MerchantAttributeCartPreview>(
-    '/api/v1/merchant/cart/attribute',
-  )
-  return body.data!
+  return getMerchantCartByType(CartType.ATTRIBUTE)
 }
 
 export async function purchaseAttributeCart(

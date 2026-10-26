@@ -1,24 +1,21 @@
 import { ApiRequestError } from '../api/errors'
-import {
-  getMerchantAddonCart,
-  getMerchantAttributeCart,
-  getMerchantCart,
-} from '../api/merchant'
+import { getMerchantUnifiedCart } from '../api/merchant'
 import type {
   CartFeatureSelection,
   MerchantAddonCartPreview,
   MerchantAttributeCartPreview,
   MerchantCartPreview,
+  MerchantUnifiedCartPreview,
   PlanDetail,
 } from '../types/subscription'
-import { BillingCycle } from '../types/subscription'
+import { BillingCycle, CartType } from '../types/subscription'
 import type { AddonCatalogItem } from './addonBuilder'
 import type { AttributeChangeDraft } from './attributeChangeBuilder'
 import { buildDefaultCartSelections } from './cartBuilder'
 
-async function fetchCartOrNull<T>(fetcher: () => Promise<T>): Promise<T | null> {
+async function fetchUnifiedCartOrNull(): Promise<MerchantUnifiedCartPreview | null> {
   try {
-    return await fetcher()
+    return await getMerchantUnifiedCart()
   } catch (error) {
     if (error instanceof ApiRequestError && error.status === 404) {
       return null
@@ -27,16 +24,29 @@ async function fetchCartOrNull<T>(fetcher: () => Promise<T>): Promise<T | null> 
   }
 }
 
+async function fetchExistingCartByType(
+  expectedType: typeof CartType.PLAN | typeof CartType.ADDON | typeof CartType.ATTRIBUTE,
+): Promise<MerchantUnifiedCartPreview | null> {
+  const cart = await fetchUnifiedCartOrNull()
+  if (!cart || cart.cartType !== expectedType) {
+    return null
+  }
+  return cart
+}
+
 export async function fetchExistingPlanCart(): Promise<MerchantCartPreview | null> {
-  return fetchCartOrNull(() => getMerchantCart())
+  const cart = await fetchExistingCartByType(CartType.PLAN)
+  return cart && cart.cartType === CartType.PLAN ? cart : null
 }
 
 export async function fetchExistingAddonCart(): Promise<MerchantAddonCartPreview | null> {
-  return fetchCartOrNull(() => getMerchantAddonCart())
+  const cart = await fetchExistingCartByType(CartType.ADDON)
+  return cart && cart.cartType === CartType.ADDON ? cart : null
 }
 
 export async function fetchExistingAttributeCart(): Promise<MerchantAttributeCartPreview | null> {
-  return fetchCartOrNull(() => getMerchantAttributeCart())
+  const cart = await fetchExistingCartByType(CartType.ATTRIBUTE)
+  return cart && cart.cartType === CartType.ATTRIBUTE ? cart : null
 }
 
 export function selectionsFromPlanCartPreview(cart: MerchantCartPreview): CartFeatureSelection[] {
