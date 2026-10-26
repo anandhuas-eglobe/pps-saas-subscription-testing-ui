@@ -2,6 +2,7 @@ import { saveLastPaymentHandoff } from './paymentEventBuilder'
 
 export interface PurchaseCheckoutResult {
   checkoutUrl?: string
+  setupUrl?: string
   stripeCheckoutUrl?: string
   paymentHandoff?: {
     invoiceId: string
@@ -28,7 +29,7 @@ export function handlePurchaseCheckoutResult(result: PurchaseCheckoutResult): bo
     saveLastPaymentHandoff(result.paymentHandoff)
   }
 
-  const checkoutUrl = result.checkoutUrl ?? result.stripeCheckoutUrl
+  const checkoutUrl = result.checkoutUrl ?? result.stripeCheckoutUrl ?? result.setupUrl
   if (checkoutUrl) {
     return openCheckoutSession(checkoutUrl)
   }

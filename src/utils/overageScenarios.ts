@@ -89,7 +89,7 @@ export const overageTestScenarios: OverageTestScenario[] = [
     description: 'External order service publishes reseller overage to Redis stream.',
     prepSteps: [
       'MESSAGING_PROVIDER=redis on subscription service',
-      'Publish ResellerOverageRequested with merchantId and overageAmount',
+      'Publish ResellerOverageRequested with merchantId, overageAmount, billingPeriodFrom, billingPeriodTo',
     ],
     expectedOutcome: 'RESELLER overage history row and invoice created',
     apiEndpoints: ['Redis order.reseller.overage.requested'],

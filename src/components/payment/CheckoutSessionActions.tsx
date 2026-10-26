@@ -8,6 +8,8 @@ import { openCheckoutSession } from '../../utils/checkoutSession'
 
 interface CheckoutSessionActionsProps {
   checkoutUrl: string
+  /** Button label when opening a save-card setup session instead of paid checkout. */
+  openButtonLabel?: string
   popupBlocked?: boolean
   onCancelCheckout?: () => void | Promise<void>
   cancellingCheckout?: boolean
@@ -15,6 +17,7 @@ interface CheckoutSessionActionsProps {
 
 export function CheckoutSessionActions({
   checkoutUrl,
+  openButtonLabel = 'Open checkout session',
   popupBlocked = false,
   onCancelCheckout,
   cancellingCheckout = false,
@@ -23,7 +26,7 @@ export function CheckoutSessionActions({
     <Stack spacing={1} sx={{ mt: 1 }}>
       {popupBlocked && (
         <Typography variant="body2" color="warning.main">
-          Your browser blocked the checkout popup. Open the session manually below.
+          Your browser blocked the popup. Open the session manually below.
         </Typography>
       )}
       <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
@@ -33,7 +36,7 @@ export function CheckoutSessionActions({
           startIcon={<OpenInNewIcon />}
           onClick={() => openCheckoutSession(checkoutUrl)}
         >
-          Open checkout session
+          {openButtonLabel}
         </Button>
         {onCancelCheckout && (
           <Button

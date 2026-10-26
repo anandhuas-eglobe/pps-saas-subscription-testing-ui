@@ -66,8 +66,12 @@ import { handlePurchaseCheckoutResult } from '../utils/checkoutSession'
 import { CheckoutSessionActions } from '../components/payment/CheckoutSessionActions'
 import {
   buildResellerOverageRequestedEvent,
+  createDefaultResellerOverageBillingPeriod,
+  datetimeLocalInputToIso,
+  isoToDatetimeLocalInput,
   RESELLER_OVERAGE_REQUESTED_STREAM,
 } from '../utils/resellerOverageEventBuilder'
+import { formatOverageHistoryBillingPeriod } from '../utils/invoiceBillingDisplay'
 
 const DEFAULT_MOCK_MERCHANT_ID = '00000000-0000-4000-8000-000000000003'
 
@@ -99,6 +103,9 @@ export function OverageTestingPage() {
 
   const [resellerMerchantId, setResellerMerchantId] = useState(DEFAULT_MOCK_MERCHANT_ID)
   const [resellerAmount, setResellerAmount] = useState('25')
+  const defaultResellerBillingPeriod = useMemo(() => createDefaultResellerOverageBillingPeriod(), [])
+  const [resellerBillingFrom, setResellerBillingFrom] = useState(defaultResellerBillingPeriod.from)
+  const [resellerBillingTo, setResellerBillingTo] = useState(defaultResellerBillingPeriod.to)
   const [resellerPublishing, setResellerPublishing] = useState(false)
   const [resellerMessage, setResellerMessage] = useState<string | null>(null)
   const [resellerError, setResellerError] = useState<string | null>(null)
@@ -268,6 +275,14 @@ export function OverageTestingPage() {
       setResellerError('Overage amount must be positive.')
       return
     }
+    if (!resellerBillingFrom || !resellerBillingTo) {
+      setResellerError('Billing period from and to are required.')
+      return
+    }
+    if (new Date(resellerBillingFrom).getTime() > new Date(resellerBillingTo).getTime()) {
+      setResellerError('Billing period from must not be after to.')
+      return
+    }
 
     setResellerPublishing(true)
     setResellerError(null)
@@ -277,6 +292,8 @@ export function OverageTestingPage() {
       eventId: crypto.randomUUID(),
       merchantId: resellerMerchantId.trim(),
       overageAmount: parsedAmount,
+      billingPeriodFrom: resellerBillingFrom,
+      billingPeriodTo: resellerBillingTo,
       correlationId: `reseller-overage-ui-${Date.now()}`,
       entityId: crypto.randomUUID(),
       entityName: 'TEST-ORDER-OVERAGE',
@@ -373,6 +390,8 @@ export function OverageTestingPage() {
         eventId: 'preview-event-id',
         merchantId: resellerMerchantId.trim(),
         overageAmount: Number(resellerAmount) || 0,
+        billingPeriodFrom: resellerBillingFrom,
+        billingPeriodTo: resellerBillingTo,
         correlationId: 'reseller-overage-ui-preview',
         entityId: 'preview-order-id',
         entityName: 'TEST-ORDER-OVERAGE',
@@ -381,7 +400,7 @@ export function OverageTestingPage() {
         redisHost: 'localhost',
         redisPort: 6790,
       }),
-    [resellerMerchantId, resellerAmount],
+    [resellerMerchantId, resellerAmount, resellerBillingFrom, resellerBillingTo],
   )
 
   const redisPreviewPayload = useMemo(() => {
@@ -663,6 +682,36 @@ export function OverageTestingPage() {
                   />
                 </Grid>
                 <Grid size={{ xs: 12, md: 4 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Billing period from"
+                    type="datetime-local"
+                    value={isoToDatetimeLocalInput(resellerBillingFrom)}
+                    onChange={(event) => {
+                      setPreviewKind('reseller')
+                      const iso = datetimeLocalInputToIso(event.target.value)
+                      if (iso) setResellerBillingFrom(iso)
+                    }}
+                    slotProps={{ inputLabel: { shrink: true } }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Billing period to"
+                    type="datetime-local"
+                    value={isoToDatetimeLocalInput(resellerBillingTo)}
+                    onChange={(event) => {
+                      setPreviewKind('reseller')
+                      const iso = datetimeLocalInputToIso(event.target.value)
+                      if (iso) setResellerBillingTo(iso)
+                    }}
+                    slotProps={{ inputLabel: { shrink: true } }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, md: 4 }}>
                   <Button
                     variant="outlined"
                     disabled={resellerPublishing}
@@ -768,6 +817,7 @@ export function OverageTestingPage() {
                         <TableCell>Type</TableCell>
                         <TableCell>Attribute</TableCell>
                         <TableCell align="right">Amount</TableCell>
+                        <TableCell>Billing period</TableCell>
                         <TableCell>Status</TableCell>
                         <TableCell>Created</TableCell>
                         <TableCell />
@@ -779,6 +829,12 @@ export function OverageTestingPage() {
                           <TableCell>{row.overageType}</TableCell>
                           <TableCell>{row.attributeName ?? row.attributeCode ?? '—'}</TableCell>
                           <TableCell align="right">{formatMoney('USD', row.overageAmount)}</TableCell>
+                          <TableCell sx={{ fontSize: '0.8rem' }}>
+                            {formatOverageHistoryBillingPeriod(
+                              row.billingPeriodFrom,
+                              row.billingPeriodTo,
+                            )}
+                          </TableCell>
                           <TableCell>
                             <Chip
                               label={row.status}

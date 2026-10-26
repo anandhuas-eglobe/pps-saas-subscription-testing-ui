@@ -11,7 +11,6 @@ export default defineConfig(({ mode }) => {
     'https://saasppsgateway.eglobeitsolutions.org'
   const notificationsWsUrl =
     env.VITE_NOTIFICATIONS_WS_URL?.replace(/\/$/, '') || 'http://localhost:3108'
-
   return {
     plugins: [react(), redisDevToolsPlugin(), cronDevToolsPlugin(), databaseDevToolsPlugin()],
     server: {

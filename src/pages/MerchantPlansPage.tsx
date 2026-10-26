@@ -49,6 +49,7 @@ import {
 import { formatMoney, formatTrialGrace, planStatusColor } from '../utils/planDisplay'
 import {
   buildInitiatePurchasePayload,
+  isZeroAmountPlanCheckout,
   requiresBillingAddressForCheckout,
 } from '../utils/billingAddress'
 import { handlePurchaseCheckoutResult } from '../utils/checkoutSession'
@@ -277,7 +278,10 @@ export function MerchantPlansPage() {
     }
   }
 
-  const handleConfirmPayment = async (billingAddress?: BillingAddress) => {
+  const handleConfirmPayment = async (options?: {
+    billingAddress?: BillingAddress
+    agreedToTerms?: boolean
+  }) => {
     setPurchasing(true)
     setPurchaseError(null)
     setPurchaseResult(null)
@@ -290,7 +294,13 @@ export function MerchantPlansPage() {
             subscriptionAction: cartPreview.subscriptionAction,
           })
         : false
-      const purchasePayload = buildInitiatePurchasePayload(billingAddress, requiresBilling)
+      const purchasePayload = buildInitiatePurchasePayload(
+        options?.billingAddress,
+        requiresBilling,
+        cartPreview && isZeroAmountPlanCheckout(cartPreview)
+          ? { agreedToTerms: options?.agreedToTerms }
+          : undefined,
+      )
       const result = await execute(
         purchasePayload,
         () => purchasePlanCart(purchasePayload),
@@ -298,14 +308,19 @@ export function MerchantPlansPage() {
       )
       setPurchaseResult(result)
       const opened = handlePurchaseCheckoutResult(result)
-      setCheckoutPopupBlocked(Boolean(result.checkoutUrl) && !opened)
+      const redirectUrl = result.checkoutUrl ?? result.setupUrl
+      setCheckoutPopupBlocked(Boolean(redirectUrl) && !opened)
       setSnackbar({
         open: true,
-        message: result.checkoutUrl
+        message: result.setupUrl
           ? opened
-            ? 'Checkout session opened in a new tab.'
-            : 'Purchase started. Open the checkout session below if the popup was blocked.'
-          : result.message,
+            ? 'Save-card setup opened in a new tab.'
+            : 'Save-card setup started. Open the session below if the popup was blocked.'
+          : result.checkoutUrl
+            ? opened
+              ? 'Checkout session opened in a new tab.'
+              : 'Purchase started. Open the checkout session below if the popup was blocked.'
+            : result.message,
         severity: 'success',
       })
       await loadPlans()
@@ -456,13 +471,20 @@ export function MerchantPlansPage() {
 
                                 <Stack spacing={0.5}>
                                   <Stack direction="row" spacing={2}>
-                                    <Typography variant="body2" fontWeight={600}>
+                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
                                       {formatMoney(plan.baseCurrency, plan.planMonthlyPrice)} / mo
                                     </Typography>
                                     <Typography variant="body2" color="text.secondary">
                                       {formatMoney(plan.baseCurrency, plan.planYearlyPrice)} / yr
                                     </Typography>
                                   </Stack>
+                                  {plan.yearlySavingsPercent != null &&
+                                    plan.yearlySavingsAmount != null && (
+                                      <Typography variant="caption" color="success.main">
+                                        Save {formatMoney(plan.baseCurrency, plan.yearlySavingsAmount)}{' '}
+                                        / yr ({plan.yearlySavingsPercent}%)
+                                      </Typography>
+                                    )}
                                   <Typography variant="caption" color="text.secondary">
                                     Base {formatMoney(plan.baseCurrency, plan.baseMonthlyPrice)} / mo ·{' '}
                                     {formatMoney(plan.baseCurrency, plan.baseYearlyPrice)} / yr
@@ -564,7 +586,7 @@ export function MerchantPlansPage() {
                       purchasing={purchasing}
                       purchaseResult={purchaseResult}
                       checkoutPopupBlocked={checkoutPopupBlocked}
-                      onConfirmPayment={(billingAddress) => void handleConfirmPayment(billingAddress)}
+                      onConfirmPayment={(options) => void handleConfirmPayment(options)}
                       onCancelCheckout={() => void handleCancelCheckout()}
                       cancellingCheckout={cancellingCheckout}
                     />

@@ -29,7 +29,7 @@ import type {
   UpsertMerchantCartPayload,
 } from '../types/subscription'
 import type { PlanDetail } from '../types/subscription'
-import { apiDownloadBlob, apiRequest, ApiRequestError } from './client'
+import { apiDownloadBlob, apiRequest, ApiRequestError, GatewayCallResult } from './client'
 
 export async function listMerchantPlans(): Promise<MerchantPlanListResponse> {
   const { body } = await apiRequest<MerchantPlanListResponse>(
@@ -40,12 +40,13 @@ export async function listMerchantPlans(): Promise<MerchantPlanListResponse> {
 
 export async function upsertMerchantCart(
   payload: UpsertMerchantCartPayload,
-): Promise<{ message: string }> {
-  const { body } = await apiRequest<{ message: string }>('/api/v1/merchant/cart/plan', {
+): Promise<GatewayCallResult<{ message: string }>> {
+  const { body, snapshot } = await apiRequest<{ message: string }>('/api/v1/merchant/cart/plan', {
     method: 'POST',
     body: JSON.stringify(payload),
   })
-  return body.data ?? { message: body.message ?? 'Merchant cart upserted successfully' }
+  const value = body.data ?? { message: body.message ?? 'Merchant cart upserted successfully' }
+  return new GatewayCallResult(value, snapshot)
 }
 
 export async function getMerchantCart(): Promise<MerchantCartPreview> {

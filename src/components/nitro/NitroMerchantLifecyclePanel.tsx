@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
+import Checkbox from '@mui/material/Checkbox'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
 import CircularProgress from '@mui/material/CircularProgress'
@@ -53,6 +54,7 @@ import {
   buildInitiatePurchasePayload,
   defaultBillingAddress,
   isBillingAddressComplete,
+  isZeroAmountPlanCheckout,
   requiresBillingAddressForCheckout,
 } from '../../utils/billingAddress'
 import { buildDefaultCartSelections } from '../../utils/cartBuilder'
@@ -91,6 +93,7 @@ export function NitroMerchantLifecyclePanel() {
   const [billingAddress, setBillingAddress] = useState<BillingAddress>(defaultBillingAddress)
   const [checkoutPopupBlocked, setCheckoutPopupBlocked] = useState(false)
   const [cancellingCheckout, setCancellingCheckout] = useState(false)
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
 
   const activePlans = useMemo(
     () => plans.filter((plan) => plan.status === PlanStatus.ACTIVE),
@@ -206,15 +209,18 @@ export function NitroMerchantLifecyclePanel() {
         isTrial: cartPreview.isTrial,
         subscriptionAction: cartPreview.subscriptionAction,
       })
+      const zeroCheckout = isZeroAmountPlanCheckout(cartPreview)
       const result = await purchasePlanCart(
         buildInitiatePurchasePayload(
           requiresBilling ? billingAddress : undefined,
           requiresBilling,
+          zeroCheckout ? { agreedToTerms } : undefined,
         ),
       )
       setPurchaseResult(result)
       const opened = handlePurchaseCheckoutResult(result)
-      setCheckoutPopupBlocked(Boolean(result.checkoutUrl) && !opened)
+      const redirectUrl = result.checkoutUrl ?? result.setupUrl
+      setCheckoutPopupBlocked(Boolean(redirectUrl) && !opened)
       setActiveSubscription(null)
       setLastCompletedStep('purchase')
     } catch (error) {
@@ -318,11 +324,20 @@ export function NitroMerchantLifecyclePanel() {
       subscriptionAction: cartPreview.subscriptionAction,
     })
 
+  const isZeroCheckout =
+    cartPreview != null && isZeroAmountPlanCheckout(cartPreview)
+  const isZeroFulfilledImmediately =
+    Boolean(purchaseResult?.subscriptionId) &&
+    !purchaseResult?.checkoutUrl &&
+    !purchaseResult?.setupUrl
+
   const canPurchase =
     Boolean(cartPreview) &&
     busyStep === null &&
-    (!requiresBillingForCart || isBillingAddressComplete(billingAddress))
-  const canConfirm = Boolean(purchaseResult?.paymentHandoff) && busyStep === null
+    (!requiresBillingForCart || isBillingAddressComplete(billingAddress)) &&
+    (!isZeroCheckout || agreedToTerms)
+  const canConfirm =
+    Boolean(purchaseResult?.paymentHandoff && purchaseResult?.checkoutUrl) && busyStep === null
   const isTrialCheckout = cartPreview?.isTrial === true
 
   return (
@@ -413,7 +428,13 @@ export function NitroMerchantLifecyclePanel() {
                   loading={busyStep === 'purchase'}
                   disabled={!canPurchase}
                   icon={<PaymentIcon />}
-                  completed={lastCompletedStep === 'purchase' || Boolean(purchaseResult?.paymentHandoff) || (Boolean(purchaseResult) && isTrialCheckout)}
+                  completed={
+                    lastCompletedStep === 'purchase' ||
+                    Boolean(purchaseResult?.paymentHandoff) ||
+                    Boolean(purchaseResult?.setupUrl) ||
+                    isZeroFulfilledImmediately ||
+                    (Boolean(purchaseResult) && isTrialCheckout)
+                  }
                   onClick={() => void handlePurchase()}
                 />
                 <ArrowForwardIcon color="disabled" sx={{ display: { xs: 'none', lg: 'block' } }} />
@@ -441,6 +462,32 @@ export function NitroMerchantLifecyclePanel() {
                   Trial checkout does not require Redis payment confirmation. Use{' '}
                   <strong>View active</strong> after purchase.
                 </Alert>
+              )}
+
+              {isZeroFulfilledImmediately && (
+                <Alert severity="info">
+                  Zero-amount checkout completed with a saved card (no receipt). Use{' '}
+                  <strong>View active</strong> — skip Redis payment confirmation.
+                </Alert>
+              )}
+
+              {purchaseResult?.setupUrl && (
+                <Alert severity="info">
+                  Save-card setup is required. After Payment MS publishes the saved-card event,
+                  Subscription MS fulfills the pending $0 invoice automatically (no step 3).
+                </Alert>
+              )}
+
+              {isZeroCheckout && (
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={agreedToTerms}
+                      onChange={(_, checked) => setAgreedToTerms(checked)}
+                    />
+                  }
+                  label="Agree to terms (required for $0 checkout / save-card setup)"
+                />
               )}
 
               {cartPreview && (
@@ -500,6 +547,15 @@ export function NitroMerchantLifecyclePanel() {
                       )}
                       )
                     </>
+                  )}
+                  {purchaseResult.setupUrl && (
+                    <CheckoutSessionActions
+                      checkoutUrl={purchaseResult.setupUrl}
+                      openButtonLabel="Open save-card setup"
+                      popupBlocked={checkoutPopupBlocked}
+                      onCancelCheckout={() => void handleCancelCheckout()}
+                      cancellingCheckout={cancellingCheckout}
+                    />
                   )}
                   {purchaseResult.checkoutUrl && (
                     <CheckoutSessionActions

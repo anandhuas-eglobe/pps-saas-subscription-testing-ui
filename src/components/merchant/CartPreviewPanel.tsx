@@ -4,6 +4,8 @@ import AccordionSummary from '@mui/material/AccordionSummary'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
+import Checkbox from '@mui/material/Checkbox'
+import FormControlLabel from '@mui/material/FormControlLabel'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
 import Chip from '@mui/material/Chip'
@@ -29,6 +31,7 @@ import { SubscriptionAction } from '../../types/subscription'
 import {
   defaultBillingAddress,
   isBillingAddressComplete,
+  isZeroAmountPlanCheckout,
   requiresBillingAddressForCheckout,
 } from '../../utils/billingAddress'
 import { formatMoney } from '../../utils/planDisplay'
@@ -42,7 +45,10 @@ interface CartPreviewPanelProps {
   purchasing?: boolean
   purchaseResult?: MerchantPlanPurchaseResult | null
   checkoutPopupBlocked?: boolean
-  onConfirmPayment: (billingAddress?: BillingAddress) => void
+  onConfirmPayment: (options?: {
+    billingAddress?: BillingAddress
+    agreedToTerms?: boolean
+  }) => void
   onCancelCheckout?: () => void | Promise<void>
   cancellingCheckout?: boolean
 }
@@ -81,17 +87,20 @@ export function CartPreviewPanel({
     subscriptionAction: cart.subscriptionAction,
   })
   const [billingAddress, setBillingAddress] = useState<BillingAddress>(defaultBillingAddress)
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
+  const isZeroCheckout = isZeroAmountPlanCheckout(cart)
 
   const handleConfirm = () => {
-    if (requiresBillingAddress) {
-      onConfirmPayment(billingAddress)
-      return
-    }
-    onConfirmPayment()
+    onConfirmPayment({
+      ...(requiresBillingAddress ? { billingAddress } : {}),
+      ...(isZeroCheckout ? { agreedToTerms } : {}),
+    })
   }
 
   const canConfirm =
-    !purchasing && (!requiresBillingAddress || isBillingAddressComplete(billingAddress))
+    !purchasing &&
+    (!requiresBillingAddress || isBillingAddressComplete(billingAddress)) &&
+    (!isZeroCheckout || agreedToTerms)
 
   const isDowngrade = cart.subscriptionAction === SubscriptionAction.DOWNGRADE
 
@@ -238,6 +247,27 @@ export function CartPreviewPanel({
             </Alert>
           )}
 
+          {isZeroCheckout && (
+            <Alert severity="info">
+              $0 checkout skips hosted payment. With a saved card, the subscription activates
+              immediately (no receipt). Without a card, you receive a save-card{' '}
+              <code>setupUrl</code>; Subscription MS completes the plan after Payment MS publishes
+              the saved-card event.
+            </Alert>
+          )}
+
+          {isZeroCheckout && (
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={agreedToTerms}
+                  onChange={(_, checked) => setAgreedToTerms(checked)}
+                />
+              }
+              label="I agree to the terms and conditions (required to save a card for $0 checkout)"
+            />
+          )}
+
           <Button
             variant="contained"
             color="success"
@@ -282,6 +312,15 @@ export function CartPreviewPanel({
                     )}
                     ) · {purchaseResult.paymentHandoff.status}
                   </Typography>
+                )}
+                {purchaseResult.setupUrl && (
+                  <CheckoutSessionActions
+                    checkoutUrl={purchaseResult.setupUrl}
+                    openButtonLabel="Open save-card setup"
+                    popupBlocked={checkoutPopupBlocked}
+                    onCancelCheckout={onCancelCheckout}
+                    cancellingCheckout={cancellingCheckout}
+                  />
                 )}
                 {purchaseResult.checkoutUrl && (
                   <CheckoutSessionActions

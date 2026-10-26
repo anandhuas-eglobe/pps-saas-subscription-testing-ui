@@ -247,8 +247,10 @@ export function ListPlansPage() {
                     <MenuItem value="createdAt">Created date</MenuItem>
                     <MenuItem value="planName">Plan name</MenuItem>
                     <MenuItem value="status">Status</MenuItem>
-                    <MenuItem value="baseMonthlyPrice">Monthly price</MenuItem>
-                    <MenuItem value="baseYearlyPrice">Yearly price</MenuItem>
+                    <MenuItem value="baseMonthlyPrice">Base monthly price</MenuItem>
+                    <MenuItem value="baseYearlyPrice">Base yearly price</MenuItem>
+                    <MenuItem value="planMonthlyPrice">Plan monthly price</MenuItem>
+                    <MenuItem value="planYearlyPrice">Plan yearly price</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
@@ -305,6 +307,7 @@ export function ListPlansPage() {
                         <TableCell>Status</TableCell>
                         <TableCell>Plan monthly</TableCell>
                         <TableCell>Plan yearly</TableCell>
+                        <TableCell>Yearly savings</TableCell>
                         <TableCell>Trial</TableCell>
                         <TableCell align="right">Actions</TableCell>
                       </TableRow>
@@ -356,6 +359,20 @@ export function ListPlansPage() {
                             <Typography variant="caption" color="text.secondary">
                               base {plan.baseYearlyPrice}
                             </Typography>
+                          </TableCell>
+                          <TableCell>
+                            {plan.yearlySavingsPercent != null && plan.yearlySavingsAmount != null ? (
+                              <>
+                                <Typography variant="body2">
+                                  {plan.baseCurrency} {plan.yearlySavingsAmount}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {plan.yearlySavingsPercent}%
+                                </Typography>
+                              </>
+                            ) : (
+                              '—'
+                            )}
                           </TableCell>
                           <TableCell>
                             {plan.trial.enabled

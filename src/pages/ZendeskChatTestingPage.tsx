@@ -24,12 +24,6 @@ import {
   logoutZendeskMessenger,
 } from '../utils/zendeskMessenger'
 
-declare global {
-  interface Window {
-    zE?: (...args: unknown[]) => void
-  }
-}
-
 export function ZendeskChatTestingPage() {
   const { transaction, execute } = useApiTransaction()
   const [jwtResult, setJwtResult] = useState<ZendeskMessagingJwtResult | null>(null)
@@ -45,7 +39,11 @@ export function ZendeskChatTestingPage() {
     setError(null)
     setStatusMessage(null)
     try {
-      const result = await execute(() => fetchZendeskMessagingJwt())
+      const result = await execute(
+        {},
+        () => fetchZendeskMessagingJwt(),
+        'GET /api/v1/support/zendesk/messaging-jwt',
+      )
       setJwtResult(result)
       setStatusMessage('Messaging JWT fetched from merchant-support.')
     } catch (err) {
@@ -62,10 +60,10 @@ export function ZendeskChatTestingPage() {
     setStatusMessage(null)
     setLoginStatus('idle')
     try {
-      await execute(async () => {
+      await execute({}, async () => {
         await loginZendeskMessenger()
         return { message: 'zE messenger loginUser succeeded' }
-      })
+      }, 'zE messenger loginUser')
       setLoginStatus('ok')
       setStatusMessage('Zendesk Web Widget authenticated via loginUser.')
       try {
@@ -113,9 +111,9 @@ export function ZendeskChatTestingPage() {
       {error != null && (
         <ApiErrorAlert
           error={error}
-          fallbackMessage={
+          subtitle={
             error instanceof ApiRequestError
-              ? error.body.message ?? error.message
+              ? (error.body.message ?? error.message)
               : 'Zendesk messaging auth failed'
           }
         />
@@ -131,7 +129,11 @@ export function ZendeskChatTestingPage() {
               Permission required on the access token: <code>support.zendesk.messaging.jwt</code>.
               The widget also auto-logs in when you sign into this Test UI.
             </Typography>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} flexWrap="wrap">
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              spacing={1.5}
+              sx={{ flexWrap: 'wrap' }}
+            >
               <Button
                 variant="outlined"
                 startIcon={busy ? <CircularProgress size={16} /> : <RefreshIcon />}

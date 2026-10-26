@@ -25,6 +25,7 @@ export function ApiTransactionInspector({
     transaction != null &&
     (transaction.lastPayload !== undefined ||
       transaction.lastResponse != null ||
+      transaction.lastGatewaySnapshot != null ||
       transaction.lastError != null)
 
   if (!showLivePreview && (!showLogPanel || !hasLog)) {
@@ -48,6 +49,7 @@ export function ApiTransactionInspector({
             title={logTitle}
             payload={transaction?.lastPayload}
             response={transaction?.lastResponse ?? null}
+            gatewaySnapshot={transaction?.lastGatewaySnapshot ?? null}
             error={transaction?.lastError}
           />
         </Stack>
