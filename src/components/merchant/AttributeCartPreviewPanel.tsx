@@ -28,6 +28,8 @@ import { formatMoney } from '../../utils/planDisplay'
 import { BillingAddressFields } from './BillingAddressFields'
 import { SubscriptionActionChip } from './SubscriptionActionChip'
 import { CheckoutSessionActions } from '../payment/CheckoutSessionActions'
+import { NextRenewalDateField } from './NextRenewalDateField'
+import { MERCHANT_CART_GET_PATH } from '../../api/merchantCart'
 
 interface AttributeCartPreviewPanelProps {
   cart: MerchantAttributeCartPreview
@@ -56,12 +58,13 @@ export function AttributeCartPreviewPanel({
             <Box>
               <Typography variant="h6">Attribute cart preview</Typography>
               <Typography variant="body2" color="text.secondary">
-                GET /api/v1/merchant/cart/attribute
+                GET {MERCHANT_CART_GET_PATH} (attribute cart)
               </Typography>
             </Box>
           </Stack>
 
           <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
+            <Chip label={`Cart: ${cart.cartType}`} size="small" variant="outlined" />
             <SubscriptionActionChip action={cart.subscriptionAction} />
             {cart.isShortTermPurchase && (
               <Chip label="Short-term purchase" size="small" color="secondary" />
@@ -86,6 +89,8 @@ export function AttributeCartPreviewPanel({
               <strong>short_term_purchase_quantity</strong> on the usage row.
             </Alert>
           )}
+
+          <NextRenewalDateField nextRenewalDate={cart.nextRenewalDate} />
 
           <TableContainer>
             <Table size="small">

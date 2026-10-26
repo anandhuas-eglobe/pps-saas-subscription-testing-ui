@@ -121,7 +121,8 @@ export const operations: OperationLink[] = [
     description: 'Browse add-ons on your active plan, configure limits or trials, add to cart, and complete payment. Purchased add-ons appear on the active subscription page.',
     path: '/merchant/addons',
     icon: ExtensionIcon,
-    apiEndpoint: 'GET /api/v1/merchant/subscription/active-plan/addons · POST /api/v1/merchant/cart/addon',
+    apiEndpoint:
+      'GET /api/v1/merchant/cart · GET /api/v1/merchant/subscription/active-plan/addons · POST /api/v1/merchant/cart/addon',
     available: true,
   },
   {

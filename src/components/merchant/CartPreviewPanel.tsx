@@ -39,6 +39,8 @@ import { BillingAddressFields } from './BillingAddressFields'
 import { CartPricingPreviewDetails } from './CartPricingPreviewDetails'
 import { PlanCartPlanDetailsPanel } from './PlanCartPlanDetailsPanel'
 import { CheckoutSessionActions } from '../payment/CheckoutSessionActions'
+import { NextRenewalDateField } from './NextRenewalDateField'
+import { MERCHANT_CART_GET_PATH } from '../../api/merchantCart'
 
 interface CartPreviewPanelProps {
   cart: MerchantCartPreview
@@ -113,12 +115,13 @@ export function CartPreviewPanel({
             <Box>
               <Typography variant="h6">Cart preview</Typography>
               <Typography variant="body2" color="text.secondary">
-                Full response from GET /api/v1/merchant/cart/plan
+                Full response from GET {MERCHANT_CART_GET_PATH} (plan cart)
               </Typography>
             </Box>
           </Stack>
 
           <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
+            <Chip label={`Cart: ${cart.cartType}`} size="small" variant="outlined" />
             <Chip label={plan.planName} size="small" />
             <SubscriptionActionChip action={cart.subscriptionAction} />
             {cart.isTrial ? (
@@ -181,6 +184,9 @@ export function CartPreviewPanel({
               </Grid>
               <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                 <DetailField label="Subscription action" value={cart.subscriptionAction} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <NextRenewalDateField nextRenewalDate={cart.nextRenewalDate} />
               </Grid>
             </Grid>
           </Box>

@@ -22,6 +22,7 @@ import {
   getMerchantAddonCart,
   purchaseAddonCart,
   upsertAddonCart,
+  MERCHANT_CART_GET_PATH,
 } from '../api/merchant'
 import { ApiRequestError } from '../api/client'
 import { PageHeader } from '../components/layout/PageHeader'
@@ -298,7 +299,7 @@ export function MerchantAddonsPage() {
         () => upsertAddonCart(payload),
         'POST /api/v1/merchant/cart/addon',
       )
-      const preview = await getMerchantAddonCart()
+      const preview = await execute({}, () => getMerchantAddonCart(), `GET ${MERCHANT_CART_GET_PATH}`)
       setCartPreview(preview)
       setSnackbar({ open: true, message: result.message, severity: 'success' })
     } catch (error) {
@@ -362,7 +363,7 @@ export function MerchantAddonsPage() {
           eyebrow="Merchant add-ons"
           title="Purchase plan add-ons"
           description="Browse add-ons available on your active subscription plan, configure limits or trials, add to cart, and complete checkout. View purchased add-ons on the active subscription page."
-          apiEndpoint="GET /api/v1/merchant/cart/addon · GET /api/v1/merchant/subscription/active · POST /api/v1/merchant/cart/addon · POST /api/v1/merchant/subscription/addon/purchase"
+          apiEndpoint="GET /api/v1/merchant/cart · GET /api/v1/merchant/subscription/active · POST /api/v1/merchant/cart/addon · POST /api/v1/merchant/subscription/addon/purchase"
           backTo="/"
           backLabel="Back to home"
           actions={

@@ -20,6 +20,7 @@ import {
   getMerchantAttributeCart,
   purchaseAttributeCart,
   upsertAttributeCart,
+  MERCHANT_CART_GET_PATH,
 } from '../api/merchant'
 import { ApiRequestError } from '../api/client'
 import { PageHeader } from '../components/layout/PageHeader'
@@ -130,7 +131,7 @@ export function MerchantAttributeChangesPage() {
     ) => {
       try {
         const preview = trackTransaction
-          ? await execute({}, () => getMerchantAttributeCart(), 'GET /api/v1/merchant/cart/attribute')
+          ? await execute({}, () => getMerchantAttributeCart(), `GET ${MERCHANT_CART_GET_PATH}`)
           : await fetchExistingAttributeCart()
 
         if (!preview) {
@@ -285,7 +286,7 @@ export function MerchantAttributeChangesPage() {
         () => upsertAttributeCart(payload),
         'POST /api/v1/merchant/cart/attribute',
       )
-      const preview = await getMerchantAttributeCart()
+      const preview = await execute({}, () => getMerchantAttributeCart(), `GET ${MERCHANT_CART_GET_PATH}`)
       setCartPreview(preview)
       setIsShortTermPurchase(readShortTermPurchaseFromCart(preview))
       setDrafts((current) => applyAttributeCartPreviewToDrafts(current, preview))
@@ -349,7 +350,7 @@ export function MerchantAttributeChangesPage() {
           : result.message,
         severity: 'success',
       })
-      const preview = await getMerchantAttributeCart()
+      const preview = await execute({}, () => getMerchantAttributeCart(), `GET ${MERCHANT_CART_GET_PATH}`)
       setCartPreview(preview)
       setIsShortTermPurchase(readShortTermPurchaseFromCart(preview))
       setDrafts((current) => applyAttributeCartPreviewToDrafts(current, preview))
@@ -373,7 +374,7 @@ export function MerchantAttributeChangesPage() {
           eyebrow="Attribute changes"
           title="Upgrade or downgrade limits"
           description="View all included and add-on attributes on your subscribed plan, change limits, optionally mark upgrades as short-term purchases, upsert the attribute cart, and fetch pricing preview."
-          apiEndpoint="GET /api/v1/merchant/cart/attribute · POST /api/v1/merchant/cart/attribute · POST /api/v1/merchant/subscription/attribute/purchase · POST /api/v1/merchant/subscription/attribute/downgrade/schedule/cancel"
+          apiEndpoint="GET /api/v1/merchant/cart · POST /api/v1/merchant/cart/attribute · POST /api/v1/merchant/subscription/attribute/purchase · POST /api/v1/merchant/subscription/attribute/downgrade/schedule/cancel"
           backTo="/"
           backLabel="Back to home"
           actions={
