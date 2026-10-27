@@ -58,7 +58,7 @@ export function AttributeCartPreviewPanel({
             <Box>
               <Typography variant="h6">Attribute cart preview</Typography>
               <Typography variant="body2" color="text.secondary">
-                GET {MERCHANT_CART_GET_PATH} (attribute cart)
+                GET {MERCHANT_CART_GET_PATH} (cartType ATTRIBUTE)
               </Typography>
             </Box>
           </Stack>

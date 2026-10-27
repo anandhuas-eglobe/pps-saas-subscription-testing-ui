@@ -1,11 +1,11 @@
-import { ApiRequestError } from '../api/errors'
-import { getMerchantUnifiedCart } from '../api/merchant'
+import {
+  fetchMerchantCartPreviewForType,
+} from '../api/merchantCart'
 import type {
   CartFeatureSelection,
   MerchantAddonCartPreview,
   MerchantAttributeCartPreview,
   MerchantCartPreview,
-  MerchantUnifiedCartPreview,
   PlanDetail,
 } from '../types/subscription'
 import { BillingCycle, CartType } from '../types/subscription'
@@ -13,40 +13,16 @@ import type { AddonCatalogItem } from './addonBuilder'
 import type { AttributeChangeDraft } from './attributeChangeBuilder'
 import { buildDefaultCartSelections } from './cartBuilder'
 
-async function fetchUnifiedCartOrNull(): Promise<MerchantUnifiedCartPreview | null> {
-  try {
-    return await getMerchantUnifiedCart()
-  } catch (error) {
-    if (error instanceof ApiRequestError && error.status === 404) {
-      return null
-    }
-    throw error
-  }
-}
-
-async function fetchExistingCartByType(
-  expectedType: typeof CartType.PLAN | typeof CartType.ADDON | typeof CartType.ATTRIBUTE,
-): Promise<MerchantUnifiedCartPreview | null> {
-  const cart = await fetchUnifiedCartOrNull()
-  if (!cart || cart.cartType !== expectedType) {
-    return null
-  }
-  return cart
-}
-
 export async function fetchExistingPlanCart(): Promise<MerchantCartPreview | null> {
-  const cart = await fetchExistingCartByType(CartType.PLAN)
-  return cart && cart.cartType === CartType.PLAN ? cart : null
+  return fetchMerchantCartPreviewForType(CartType.PLAN)
 }
 
 export async function fetchExistingAddonCart(): Promise<MerchantAddonCartPreview | null> {
-  const cart = await fetchExistingCartByType(CartType.ADDON)
-  return cart && cart.cartType === CartType.ADDON ? cart : null
+  return fetchMerchantCartPreviewForType(CartType.ADDON)
 }
 
 export async function fetchExistingAttributeCart(): Promise<MerchantAttributeCartPreview | null> {
-  const cart = await fetchExistingCartByType(CartType.ATTRIBUTE)
-  return cart && cart.cartType === CartType.ATTRIBUTE ? cart : null
+  return fetchMerchantCartPreviewForType(CartType.ATTRIBUTE)
 }
 
 export function selectionsFromPlanCartPreview(cart: MerchantCartPreview): CartFeatureSelection[] {

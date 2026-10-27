@@ -74,7 +74,7 @@ export function AddonCartPreviewPanel({
             <Box>
               <Typography variant="h6">Add-on cart preview</Typography>
               <Typography variant="body2" color="text.secondary">
-                GET {MERCHANT_CART_GET_PATH} (add-on cart)
+                GET {MERCHANT_CART_GET_PATH} (cartType ADDON)
               </Typography>
             </Box>
           </Stack>

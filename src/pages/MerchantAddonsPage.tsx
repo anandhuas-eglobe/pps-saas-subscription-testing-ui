@@ -397,7 +397,7 @@ export function MerchantAddonsPage() {
           eyebrow="Merchant add-ons"
           title="Purchase plan add-ons"
           description="Browse catalog add-ons from the available-addons API, configure limits or trials, add to cart, and complete checkout. Computed prices reflect your purchased monthly order volume for order-volume-linked attributes."
-          apiEndpoint={`${AVAILABLE_ADDONS_PATH} · GET /api/v1/merchant/subscription/active · POST /api/v1/merchant/cart/addon · POST /api/v1/merchant/subscription/addon/purchase`}
+          apiEndpoint={`GET ${MERCHANT_CART_GET_PATH} · ${AVAILABLE_ADDONS_PATH} · GET /api/v1/merchant/subscription/active · POST /api/v1/merchant/cart/addon · POST /api/v1/merchant/subscription/addon/purchase`}
           backTo="/"
           backLabel="Back to home"
           actions={

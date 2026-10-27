@@ -18,10 +18,12 @@ import {
   cancelAttributeDowngradeSchedule,
   getActiveSubscription,
   getMerchantAttributeCart,
+  getMerchantUnifiedCart,
   purchaseAttributeCart,
   upsertAttributeCart,
   MERCHANT_CART_GET_PATH,
 } from '../api/merchant'
+import { CartType } from '../types/subscription'
 import { ApiRequestError } from '../api/client'
 import { PageHeader } from '../components/layout/PageHeader'
 import { AttributeCartPreviewPanel } from '../components/merchant/AttributeCartPreviewPanel'
@@ -131,7 +133,10 @@ export function MerchantAttributeChangesPage() {
     ) => {
       try {
         const preview = trackTransaction
-          ? await execute({}, () => getMerchantAttributeCart(), `GET ${MERCHANT_CART_GET_PATH}`)
+          ? await execute({}, async () => {
+              const cart = await getMerchantUnifiedCart()
+              return cart.cartType === CartType.ATTRIBUTE ? cart : null
+            }, `GET ${MERCHANT_CART_GET_PATH}`)
           : await fetchExistingAttributeCart()
 
         if (!preview) {

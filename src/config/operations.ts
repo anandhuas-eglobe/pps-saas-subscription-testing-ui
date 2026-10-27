@@ -71,7 +71,7 @@ export const operations: OperationLink[] = [
     path: '/merchant/plans',
     icon: StorefrontIcon,
     apiEndpoint:
-      'GET /plans · POST /plan/purchase ($0 → setupUrl or immediate fulfill) · POST /checkout/cancel',
+      'GET /api/v1/merchant/cart · GET /plans · POST /cart/plan · POST /plan/purchase · POST /checkout/cancel',
     available: true,
   },
   {
@@ -122,7 +122,7 @@ export const operations: OperationLink[] = [
     path: '/merchant/addons',
     icon: ExtensionIcon,
     apiEndpoint:
-      'GET /api/v1/merchant/subscription/available-addons · GET /api/v1/merchant/subscription/active · POST /api/v1/merchant/cart/addon',
+      'GET /api/v1/merchant/cart · GET /api/v1/merchant/subscription/available-addons · GET /api/v1/merchant/subscription/active · POST /api/v1/merchant/cart/addon',
     available: true,
   },
   {
@@ -130,7 +130,8 @@ export const operations: OperationLink[] = [
     description: 'View included and add-on attributes on your plan, change limits, upsert short-term attribute upgrades, preview pricing, and complete checkout.',
     path: '/merchant/attributes',
     icon: TuneIcon,
-    apiEndpoint: 'POST /api/v1/merchant/subscription/attribute/purchase',
+    apiEndpoint:
+      'GET /api/v1/merchant/cart · POST /api/v1/merchant/cart/attribute · POST /api/v1/merchant/subscription/attribute/purchase',
     available: true,
   },
   {

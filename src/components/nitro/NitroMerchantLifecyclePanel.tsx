@@ -121,16 +121,13 @@ export function NitroMerchantLifecyclePanel() {
 
       const existingCart = await fetchExistingPlanCart()
       if (existingCart) {
-        let plan = result.plans.find((item) => item.id === existingCart.planId)
-        if (!plan) {
-          plan = await getPlanById(existingCart.planId)
-          setPlans((current) =>
-            current.some((item) => item.id === plan!.id) ? current : [...current, plan!],
-          )
-        }
+        const planDetail = await getPlanById(existingCart.planId)
+        setPlans((current) =>
+          current.some((item) => item.id === planDetail.id) ? current : [...current, planDetail],
+        )
 
-        const formState = hydratePlanCartFormState(existingCart, plan)
-        setSelectedPlanId(plan.id)
+        const formState = hydratePlanCartFormState(existingCart, planDetail)
+        setSelectedPlanId(planDetail.id)
         setBillingCycle(formState.billingCycle)
         setUseTrial(formState.isTrial)
         setCartPreview(existingCart)
@@ -269,7 +266,7 @@ export function NitroMerchantLifecyclePanel() {
       await cancelMerchantCheckout()
       setPurchaseResult(null)
       setCheckoutPopupBlocked(false)
-      const preview = await getMerchantCart().catch(() => null)
+      const preview = await fetchExistingPlanCart()
       setCartPreview(preview)
     } catch (error) {
       setStepError(error)

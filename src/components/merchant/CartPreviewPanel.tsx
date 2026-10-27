@@ -115,7 +115,7 @@ export function CartPreviewPanel({
             <Box>
               <Typography variant="h6">Cart preview</Typography>
               <Typography variant="body2" color="text.secondary">
-                Full response from GET {MERCHANT_CART_GET_PATH} (plan cart)
+                Full response from GET {MERCHANT_CART_GET_PATH} (cartType PLAN)
               </Typography>
             </Box>
           </Stack>

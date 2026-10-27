@@ -356,7 +356,7 @@ export function MerchantPlansPage() {
       )
       setPurchaseResult(null)
       setCheckoutPopupBlocked(false)
-      const preview = await getMerchantCart().catch(() => null)
+      const preview = await fetchExistingPlanCart()
       setCartPreview(preview)
       setSnackbar({ open: true, message: result.message, severity: 'success' })
     } catch (error) {
@@ -374,7 +374,7 @@ export function MerchantPlansPage() {
   const handleCheckoutCancelled = async () => {
     setPurchaseResult(null)
     setCheckoutPopupBlocked(false)
-    const preview = await getMerchantCart().catch(() => null)
+    const preview = await fetchExistingPlanCart()
     setCartPreview(preview)
   }
 
