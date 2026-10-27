@@ -18,14 +18,13 @@ import ShoppingCartIcon from '@mui/icons-material/ShoppingCart'
 import StorefrontIcon from '@mui/icons-material/Storefront'
 import {
   getMerchantCart,
-  getActiveSubscription,
   listMerchantPlans,
   purchasePlanCart,
   upsertMerchantCart,
   cancelMerchantCheckout,
   MERCHANT_CART_GET_PATH,
 } from '../api/merchant'
-import { getPlanById, listPlans } from '../api/plans'
+import { getPlanById } from '../api/plans'
 import { ApiRequestError } from '../api/client'
 import { PageHeader } from '../components/layout/PageHeader'
 import { CartPreviewPanel } from '../components/merchant/CartPreviewPanel'
@@ -41,7 +40,7 @@ import type {
   MerchantPlanPurchaseResult,
   PlanDetail,
 } from '../types/subscription'
-import { BillingCycle, PlanStatus, PlanType } from '../types/subscription'
+import { BillingCycle } from '../types/subscription'
 import {
   getApiErrorSummary,
 } from '../utils/apiErrors'
@@ -65,13 +64,11 @@ import { handlePurchaseCheckoutResult } from '../utils/checkoutSession'
 const PLANS_PAGE_SIZE = 10
 
 export function MerchantPlansPage() {
-  const [plans, setPlans] = useState<PlanDetail[]>([])
+  const [merchantPlans, setMerchantPlans] = useState<PlanDetail[]>([])
   const [activePlanId, setActivePlanId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
-  const [total, setTotal] = useState(0)
 
   const [selectedPlan, setSelectedPlan] = useState<PlanDetail | null>(null)
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
@@ -97,17 +94,18 @@ export function MerchantPlansPage() {
 
   const { transaction, execute } = useApiTransaction()
 
-  const listQueryPayload = useMemo(
-    () => ({
-      page,
-      limit: PLANS_PAGE_SIZE,
-      planType: PlanType.PUBLIC,
-      status: PlanStatus.ACTIVE,
-      sortBy: 'baseMonthlyPrice',
-      sortOrder: 'asc' as const,
-    }),
-    [page],
-  )
+  const total = merchantPlans.length
+  const totalPages = Math.max(1, Math.ceil(total / PLANS_PAGE_SIZE))
+  const plans = useMemo(() => {
+    const start = (page - 1) * PLANS_PAGE_SIZE
+    return merchantPlans.slice(start, start + PLANS_PAGE_SIZE)
+  }, [merchantPlans, page])
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages)
+    }
+  }, [page, totalPages])
 
   const loadExistingPlanCart = useCallback(
     async (availablePlans: PlanDetail[]) => {
@@ -136,32 +134,15 @@ export function MerchantPlansPage() {
     setLoading(true)
     setLoadError(null)
     try {
-      const [listResult, activeSubscription, merchantPlansResult] = await Promise.all([
-        execute(listQueryPayload, () => listPlans(listQueryPayload), 'GET /api/v1/admin/plans'),
-        getActiveSubscription().catch(() => null),
-        page === 1
-          ? execute({}, () => listMerchantPlans(), 'GET /api/v1/merchant/subscription/plans')
-          : Promise.resolve(null),
-      ])
-
-      const planDetails = await Promise.all(listResult.plans.map((plan) => getPlanById(plan.id)))
-
-      if (page === 1 && merchantPlansResult) {
-        for (const merchantPlan of merchantPlansResult.plans) {
-          if (!planDetails.some((plan) => plan.id === merchantPlan.id)) {
-            planDetails.push(merchantPlan)
-          }
-        }
-      }
-
-      setPlans(planDetails)
-      setTotalPages(listResult.pagination.totalPages)
-      setTotal(listResult.pagination.total)
-      setActivePlanId(
-        activeSubscription?.subscription.planId ??
-          merchantPlansResult?.activePlanId ??
-          null,
+      const merchantPlansResult = await execute(
+        {},
+        () => listMerchantPlans(),
+        'GET /api/v1/merchant/subscription/plans',
       )
+
+      const planDetails: PlanDetail[] = merchantPlansResult.plans
+      setMerchantPlans(planDetails)
+      setActivePlanId(merchantPlansResult.activePlanId ?? null)
 
       await loadExistingPlanCart(planDetails)
     } catch (err) {
@@ -172,11 +153,11 @@ export function MerchantPlansPage() {
             ? err.message
             : 'Failed to load merchant plans'
       setLoadError(message)
-      setPlans([])
+      setMerchantPlans([])
     } finally {
       setLoading(false)
     }
-  }, [execute, listQueryPayload, loadExistingPlanCart, page])
+  }, [execute, loadExistingPlanCart])
 
   const livePayload = useMemo(() => {
     if (!selectedPlan) {
@@ -520,10 +501,8 @@ export function MerchantPlansPage() {
                   sx={{ alignItems: 'center', justifyContent: 'space-between' }}
                 >
                   <Typography variant="body2" color="text.secondary">
-                    Showing {plans.length} of {total} public active plans
-                    {page === 1 && plans.length > listQueryPayload.limit
-                      ? ' (includes merchant-only plans on page 1)'
-                      : ''}
+                    Showing {(page - 1) * PLANS_PAGE_SIZE + 1}–
+                    {Math.min(page * PLANS_PAGE_SIZE, total)} of {total} merchant plans
                   </Typography>
                   <Pagination
                     count={Math.max(totalPages, 1)}
@@ -606,8 +585,8 @@ export function MerchantPlansPage() {
         </Grid>
 
         <ApiTransactionInspector
-          livePayload={livePayload ?? listQueryPayload}
-          livePayloadTitle={livePayload ? 'Request preview' : 'List plans query'}
+          livePayload={livePayload ?? { note: 'GET /api/v1/merchant/subscription/plans (full list, paginated in UI)' }}
+          livePayloadTitle={livePayload ? 'Request preview' : 'Merchant plans listing'}
           transaction={transaction}
         />
       </Stack>
