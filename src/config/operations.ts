@@ -122,7 +122,7 @@ export const operations: OperationLink[] = [
     path: '/merchant/addons',
     icon: ExtensionIcon,
     apiEndpoint:
-      'GET /api/v1/merchant/cart · GET /api/v1/merchant/subscription/active-plan/addons · POST /api/v1/merchant/cart/addon',
+      'GET /api/v1/merchant/subscription/available-addons · GET /api/v1/merchant/subscription/active · POST /api/v1/merchant/cart/addon',
     available: true,
   },
   {

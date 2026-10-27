@@ -608,6 +608,52 @@ export interface ActivePlanAddonsResponse {
   addons: ActivePlanAddonItem[]
 }
 
+/** Feature slice on GET /merchant/subscription/available-addons rows. */
+export interface AvailablePlanAddonFeature {
+  featureCode: string | null
+  featureName: string | null
+  description: string | null
+  iconUrl: string | null
+  featureConfig: PlanDetailFeatureConfig | null
+}
+
+/** Attribute slice on ATTRIBUTE available add-on rows. */
+export interface AvailablePlanAddonAttribute {
+  planFeatureAttributeId: string
+  featureAttributeId: string
+  parentFeatureAttributeId: string | null
+  attributeCode: string | null
+  attributeName: string | null
+  description: string | null
+  isMonthlyLimit: boolean
+  iconUrl: string | null
+  attributeConfig: PlanDetailAttributeConfig
+}
+
+/** One catalog ADDON row from GET /merchant/subscription/available-addons. */
+export interface AvailablePlanAddonItem {
+  planFeatureId: string
+  planFeatureAttributeId: string | null
+  featureId: string
+  featureType: FeatureTypeValue
+  addonName: string
+  addonCode: string
+  isPurchased: boolean
+  trial: MerchantTrialDetail
+  computedMonthlyPrice: number
+  computedYearlyPrice: number
+  feature: AvailablePlanAddonFeature
+  attribute: AvailablePlanAddonAttribute | null
+}
+
+export interface AvailablePlanAddonsResponse {
+  planId: string
+  planName: string
+  billingCycle: BillingCycleValue
+  monthlyOrderVolume: number | null
+  addons: AvailablePlanAddonItem[]
+}
+
 export interface AddonCatalogItemKey {
   planFeatureId: string
   planFeatureAttributeId?: string

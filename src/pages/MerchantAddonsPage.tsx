@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Alert from '@mui/material/Alert'
+import Avatar from '@mui/material/Avatar'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Card from '@mui/material/Card'
@@ -11,6 +12,8 @@ import Divider from '@mui/material/Divider'
 import Grid from '@mui/material/Grid'
 import Snackbar from '@mui/material/Snackbar'
 import Stack from '@mui/material/Stack'
+import ToggleButton from '@mui/material/ToggleButton'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import Typography from '@mui/material/Typography'
 import ExtensionIcon from '@mui/icons-material/Extension'
 import RefreshIcon from '@mui/icons-material/Refresh'
@@ -19,6 +22,7 @@ import VerifiedIcon from '@mui/icons-material/Verified'
 import { Link as RouterLink } from 'react-router-dom'
 import {
   getActiveSubscription,
+  getAvailablePlanAddons,
   getMerchantAddonCart,
   purchaseAddonCart,
   upsertAddonCart,
@@ -33,20 +37,23 @@ import { ApiTransactionInspector } from '../components/ApiTransactionInspector'
 import { useApiTransaction } from '../hooks/useApiTransaction'
 import type {
   ActiveSubscriptionResponse,
+  AvailablePlanAddonsResponse,
   BillingAddress,
+  BillingCycleValue,
   MerchantAddonCartPreview,
   MerchantAddonPurchaseResult,
 } from '../types/subscription'
-import { FeatureType } from '../types/subscription'
+import { BillingCycle, FeatureType } from '../types/subscription'
 import {
   extractApiErrors,
   getApiErrorSummary,
   getApiErrorTitle,
 } from '../utils/apiErrors'
 import {
+  addonPriceForBillingCycle,
   defaultAddonAttributeValue,
-  extractAddonCatalogItems,
   isAddonShortTermPurchaseEligible,
+  mapAvailablePlanAddonsToCatalogItems,
   validateAddonAttributeValue,
   type AddonCatalogItem,
 } from '../utils/addonBuilder'
@@ -63,8 +70,15 @@ import {
 
 import { handlePurchaseCheckoutResult } from '../utils/checkoutSession'
 
+type AddonPurchaseFilter = 'all' | 'available' | 'purchased'
+
+const AVAILABLE_ADDONS_PATH = 'GET /api/v1/merchant/subscription/available-addons'
+
 export function MerchantAddonsPage() {
   const [subscriptionData, setSubscriptionData] = useState<ActiveSubscriptionResponse | null>(null)
+  const [availableAddonsData, setAvailableAddonsData] =
+    useState<AvailablePlanAddonsResponse | null>(null)
+  const [purchaseFilter, setPurchaseFilter] = useState<AddonPurchaseFilter>('all')
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -93,8 +107,8 @@ export function MerchantAddonsPage() {
   const { transaction, execute } = useApiTransaction()
 
   const addonItems = useMemo(
-    () => (subscriptionData ? extractAddonCatalogItems(subscriptionData.plan) : []),
-    [subscriptionData],
+    () => (availableAddonsData ? mapAvailablePlanAddonsToCatalogItems(availableAddonsData) : []),
+    [availableAddonsData],
   )
 
   const selectedAddon = useMemo(
@@ -103,6 +117,11 @@ export function MerchantAddonsPage() {
   )
 
   const subscriptionIsTrial = subscriptionData?.subscription.isTrial ?? false
+  const currency = subscriptionData?.plan.baseCurrency ?? 'USD'
+  const billingCycle: BillingCycleValue =
+    availableAddonsData?.billingCycle ??
+    (subscriptionData?.subscription.billingCycle as BillingCycleValue | undefined) ??
+    BillingCycle.MONTHLY
 
   const defaultAddonTrialSelection = useCallback(
     (addon: AddonCatalogItem) => subscriptionIsTrial && addon.addonTrialEnabled,
@@ -169,15 +188,28 @@ export function MerchantAddonsPage() {
     setLoadError(null)
     setNotFound(false)
     setSubscriptionData(null)
+    setAvailableAddonsData(null)
+
+    const isPurchasedParam =
+      purchaseFilter === 'all'
+        ? undefined
+        : purchaseFilter === 'purchased'
 
     try {
-      const result = await execute(
-        {},
-        () => getActiveSubscription(),
-        'GET /api/v1/merchant/subscription/active',
-      )
-      setSubscriptionData(result)
-      const items = extractAddonCatalogItems(result.plan)
+      const [addonsResult, subResult] = await Promise.all([
+        execute(
+          isPurchasedParam === undefined ? {} : { isPurchased: isPurchasedParam },
+          () =>
+            getAvailablePlanAddons(
+              isPurchasedParam === undefined ? undefined : { isPurchased: isPurchasedParam },
+            ),
+          AVAILABLE_ADDONS_PATH,
+        ),
+        execute({}, () => getActiveSubscription(), 'GET /api/v1/merchant/subscription/active'),
+      ])
+      setAvailableAddonsData(addonsResult)
+      setSubscriptionData(subResult)
+      const items = mapAvailablePlanAddonsToCatalogItems(addonsResult)
       await loadExistingAddonCart(items)
     } catch (err) {
       if (err instanceof ApiRequestError && err.status === 404) {
@@ -190,12 +222,12 @@ export function MerchantAddonsPage() {
           ? err.body.message ?? err.message
           : err instanceof Error
             ? err.message
-            : 'Failed to load active subscription'
+            : 'Failed to load available add-ons'
       setLoadError(message)
     } finally {
       setLoading(false)
     }
-  }, [execute, loadExistingAddonCart])
+  }, [execute, loadExistingAddonCart, purchaseFilter])
 
   useEffect(() => {
     void loadSubscription()
@@ -356,14 +388,16 @@ export function MerchantAddonsPage() {
     }
   }
 
+  const cycleShortLabel = billingCycle === BillingCycle.YEARLY ? 'yr' : 'mo'
+
   return (
     <>
       <Stack spacing={3}>
         <PageHeader
           eyebrow="Merchant add-ons"
           title="Purchase plan add-ons"
-          description="Browse add-ons available on your active subscription plan, configure limits or trials, add to cart, and complete checkout. View purchased add-ons on the active subscription page."
-          apiEndpoint="GET /api/v1/merchant/cart · GET /api/v1/merchant/subscription/active · POST /api/v1/merchant/cart/addon · POST /api/v1/merchant/subscription/addon/purchase"
+          description="Browse catalog add-ons from the available-addons API, configure limits or trials, add to cart, and complete checkout. Computed prices reflect your purchased monthly order volume for order-volume-linked attributes."
+          apiEndpoint={`${AVAILABLE_ADDONS_PATH} · GET /api/v1/merchant/subscription/active · POST /api/v1/merchant/cart/addon · POST /api/v1/merchant/subscription/addon/purchase`}
           backTo="/"
           backLabel="Back to home"
           actions={
@@ -394,7 +428,7 @@ export function MerchantAddonsPage() {
           <Stack sx={{ py: 10, alignItems: 'center' }}>
             <CircularProgress />
             <Typography color="text.secondary" sx={{ mt: 2 }}>
-              Loading active subscription and add-ons...
+              Loading available add-ons and subscription context...
             </Typography>
           </Stack>
         )}
@@ -412,40 +446,72 @@ export function MerchantAddonsPage() {
           </Alert>
         )}
 
-        {!loading && !notFound && subscriptionData && (
+        {!loading && !notFound && subscriptionData && availableAddonsData && (
           <>
             <Alert severity="info" icon={<VerifiedIcon />}>
-              Subscribed to <strong>{subscriptionData.plan.planName}</strong> ·{' '}
-              {subscriptionData.subscription.billingCycle} ·{' '}
-              {subscriptionData.subscription.isTrial ? 'Plan trial' : 'Paid subscription'}
+              <Stack spacing={0.5}>
+                <Typography variant="body2">
+                  Subscribed to <strong>{availableAddonsData.planName}</strong> ·{' '}
+                  {billingCycle} billing ·{' '}
+                  {subscriptionData.subscription.isTrial ? 'Plan trial' : 'Paid subscription'}
+                </Typography>
+                {availableAddonsData.monthlyOrderVolume != null && (
+                  <Typography variant="body2" color="text.secondary">
+                    Purchased monthly order volume:{' '}
+                    <strong>{availableAddonsData.monthlyOrderVolume.toLocaleString()}</strong> — used
+                    for computed prices on order-volume-linked add-ons.
+                  </Typography>
+                )}
+              </Stack>
             </Alert>
 
             <Grid container spacing={3}>
               <Grid size={{ xs: 12, lg: selectedAddon ? 5 : 12 }}>
                 <Stack spacing={2}>
-                  <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                    <ExtensionIcon color="primary" />
-                    <Typography variant="h6">
-                      Available add-ons ({addonItems.length})
-                    </Typography>
+                  <Stack
+                    direction={{ xs: 'column', sm: 'row' }}
+                    spacing={1}
+                    sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between' }}
+                  >
+                    <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                      <ExtensionIcon color="primary" />
+                      <Typography variant="h6">
+                        Available add-ons ({addonItems.length})
+                      </Typography>
+                    </Stack>
+                    <ToggleButtonGroup
+                      exclusive
+                      size="small"
+                      value={purchaseFilter}
+                      onChange={(_event, value: AddonPurchaseFilter | null) => {
+                        if (value) {
+                          setPurchaseFilter(value)
+                        }
+                      }}
+                      aria-label="Filter add-ons by purchase status"
+                    >
+                      <ToggleButton value="all">All</ToggleButton>
+                      <ToggleButton value="available">Not purchased</ToggleButton>
+                      <ToggleButton value="purchased">Purchased</ToggleButton>
+                    </ToggleButtonGroup>
                   </Stack>
 
                   {addonItems.length === 0 ? (
                     <Alert severity="warning">
-                      No add-ons are configured on the current plan. Add ADDON features or attributes
-                      when creating the plan in the admin console.
+                      No add-ons match this filter on the current plan. Add ADDON features or
+                      attributes when creating the plan in the admin console, or change the filter.
                     </Alert>
                   ) : (
                     <Grid container spacing={2}>
                       {addonItems.map((addon) => {
                         const isSelected = addon.key === selectedAddonKey
-                        const priceLabel =
-                          addon.featureType === FeatureType.SIMPLE && addon.feature.featureConfig
-                            ? formatMoney(
-                                subscriptionData.plan.baseCurrency,
-                                addon.feature.featureConfig.planFeaturePriceMonthly,
-                              )
-                            : null
+                        const primaryPrice = addonPriceForBillingCycle(addon, billingCycle)
+                        const alternatePrice =
+                          billingCycle === BillingCycle.YEARLY
+                            ? addon.computedMonthlyPrice
+                            : addon.computedYearlyPrice
+                        const alternateCycle =
+                          billingCycle === BillingCycle.YEARLY ? 'mo' : 'yr'
 
                         return (
                           <Grid
@@ -458,42 +524,79 @@ export function MerchantAddonsPage() {
                                 boxShadow: isSelected
                                   ? '0 12px 32px rgba(79, 70, 229, 0.12)'
                                   : undefined,
+                                opacity: addon.isPurchased ? 0.92 : 1,
                               }}
                             >
                               <CardActionArea onClick={() => handleSelectAddon(addon)}>
                                 <CardContent>
                                   <Stack spacing={1.5}>
-                                    <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-                                      <Chip
-                                        label={
-                                          addon.featureType === FeatureType.SIMPLE
-                                            ? 'Simple add-on'
-                                            : 'Attribute add-on'
-                                        }
-                                        size="small"
-                                        variant="outlined"
-                                      />
-                                      {addon.addonTrialEnabled && (
-                                        <Chip
-                                          label={`${addon.addonTrialPeriod ?? '?'}d trial`}
-                                          size="small"
-                                          color="warning"
-                                          variant="outlined"
+                                    <Stack direction="row" spacing={1.5} sx={{ alignItems: 'flex-start' }}>
+                                      {addon.iconUrl ? (
+                                        <Avatar
+                                          src={addon.iconUrl}
+                                          alt=""
+                                          variant="rounded"
+                                          sx={{ width: 40, height: 40 }}
                                         />
+                                      ) : (
+                                        <Avatar variant="rounded" sx={{ width: 40, height: 40 }}>
+                                          <ExtensionIcon fontSize="small" />
+                                        </Avatar>
                                       )}
-                                      {isSelected && (
-                                        <Chip label="Selected" size="small" color="primary" />
-                                      )}
+                                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                                        <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', mb: 0.5 }}>
+                                          <Chip
+                                            label={
+                                              addon.featureType === FeatureType.SIMPLE
+                                                ? 'Simple add-on'
+                                                : 'Attribute add-on'
+                                            }
+                                            size="small"
+                                            variant="outlined"
+                                          />
+                                          {addon.orderVolumeLinked && (
+                                            <Chip
+                                              label="Order volume linked"
+                                              size="small"
+                                              color="info"
+                                              variant="outlined"
+                                            />
+                                          )}
+                                          {addon.isPurchased && (
+                                            <Chip label="Purchased" size="small" color="success" />
+                                          )}
+                                          {addon.inAddonTrial && (
+                                            <Chip label="In trial" size="small" color="warning" />
+                                          )}
+                                          {addon.addonTrialEnabled && !addon.isPurchased && (
+                                            <Chip
+                                              label={`${addon.addonTrialPeriod ?? '?'}d trial eligible`}
+                                              size="small"
+                                              color="warning"
+                                              variant="outlined"
+                                            />
+                                          )}
+                                          {isSelected && (
+                                            <Chip label="Selected" size="small" color="primary" />
+                                          )}
+                                        </Stack>
+                                        <Typography variant="h6">{addon.title}</Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                          {addon.subtitle}
+                                        </Typography>
+                                      </Box>
                                     </Stack>
-                                    <Typography variant="h6">{addon.title}</Typography>
-                                    <Typography variant="body2" color="text.secondary">
-                                      {addon.subtitle}
-                                    </Typography>
-                                    {priceLabel && (
-                                      <Typography variant="body2">
-                                        From {priceLabel} / mo
+                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                      {formatMoney(currency, primaryPrice)} / {cycleShortLabel}
+                                      <Typography
+                                        component="span"
+                                        variant="body2"
+                                        color="text.secondary"
+                                        sx={{ fontWeight: 400, ml: 1 }}
+                                      >
+                                        ({formatMoney(currency, alternatePrice)} / {alternateCycle})
                                       </Typography>
-                                    )}
+                                    </Typography>
                                   </Stack>
                                 </CardContent>
                               </CardActionArea>
@@ -513,7 +616,8 @@ export function MerchantAddonsPage() {
                       <CardContent>
                         <AddonCartConfigurator
                           addon={selectedAddon}
-                          currency={subscriptionData.plan.baseCurrency}
+                          currency={currency}
+                          billingCycle={billingCycle}
                           isAddonTrial={isAddonTrial}
                           isShortTermPurchase={isShortTermPurchase}
                           attributeValue={attributeValue}

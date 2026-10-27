@@ -1,6 +1,7 @@
 import type {
   ActivePlanAddonsResponse,
   ActiveSubscriptionResponse,
+  AvailablePlanAddonsResponse,
   CancelAddonSubscriptionResult,
   CancelAttributeDowngradeScheduleResult,
   CancelMessageResult,
@@ -89,6 +90,19 @@ export async function getActivePlanAddons(): Promise<ActivePlanAddonsResponse> {
   const { body } = await apiRequest<ActivePlanAddonsResponse>(
     '/api/v1/merchant/subscription/active-plan/addons',
   )
+  return body.data!
+}
+
+export async function getAvailablePlanAddons(params?: {
+  isPurchased?: boolean
+}): Promise<AvailablePlanAddonsResponse> {
+  const search = new URLSearchParams()
+  if (params?.isPurchased !== undefined) {
+    search.set('isPurchased', String(params.isPurchased))
+  }
+  const query = search.toString()
+  const path = `/api/v1/merchant/subscription/available-addons${query ? `?${query}` : ''}`
+  const { body } = await apiRequest<AvailablePlanAddonsResponse>(path)
   return body.data!
 }
 

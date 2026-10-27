@@ -10,8 +10,8 @@ import Switch from '@mui/material/Switch'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import ExtensionIcon from '@mui/icons-material/Extension'
-import type { PlanDetailFeatureAttribute } from '../../types/subscription'
-import { FeatureType, PriceType } from '../../types/subscription'
+import type { BillingCycleValue, PlanDetailFeatureAttribute } from '../../types/subscription'
+import { BillingCycle, FeatureType, PriceType } from '../../types/subscription'
 import type { AddonCatalogItem } from '../../utils/addonBuilder'
 import { isAddonShortTermPurchaseEligible } from '../../utils/addonBuilder'
 import { formatMoney } from '../../utils/planDisplay'
@@ -19,6 +19,7 @@ import { formatMoney } from '../../utils/planDisplay'
 interface AddonCartConfiguratorProps {
   addon: AddonCatalogItem
   currency: string
+  billingCycle: BillingCycleValue
   isAddonTrial: boolean
   isShortTermPurchase: boolean
   attributeValue: number
@@ -84,6 +85,7 @@ function AttributeValueField({
 export function AddonCartConfigurator({
   addon,
   currency,
+  billingCycle,
   isAddonTrial,
   isShortTermPurchase,
   attributeValue,
@@ -93,7 +95,6 @@ export function AddonCartConfigurator({
   onAttributeValueChange,
 }: AddonCartConfiguratorProps) {
   const isSimple = addon.featureType === FeatureType.SIMPLE
-  const config = isSimple ? addon.feature.featureConfig : addon.attribute?.attributeConfig
   const shortTermEligible = isAddonShortTermPurchaseEligible(addon)
 
   return (
@@ -167,26 +168,29 @@ export function AddonCartConfigurator({
           </Grid>
         )}
 
-        {isSimple && config && 'planFeaturePriceMonthly' in config && (
-          <>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <Typography variant="caption" color="text.secondary">
-                Monthly price
+        <Grid size={{ xs: 12 }}>
+          <Typography variant="caption" color="text.secondary">
+            Computed catalog price ({billingCycle === BillingCycle.YEARLY ? 'yearly' : 'monthly'}{' '}
+            cycle)
+          </Typography>
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            {formatMoney(
+              currency,
+              billingCycle === BillingCycle.YEARLY
+                ? addon.computedYearlyPrice
+                : addon.computedMonthlyPrice,
+            )}
+            {addon.orderVolumeLinked && (
+              <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+                (includes order volume scaling)
               </Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                {formatMoney(currency, config.planFeaturePriceMonthly)}
-              </Typography>
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <Typography variant="caption" color="text.secondary">
-                Yearly price
-              </Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                {formatMoney(currency, config.planFeaturePriceYearly)}
-              </Typography>
-            </Grid>
-          </>
-        )}
+            )}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+            {formatMoney(currency, addon.computedMonthlyPrice)} / mo ·{' '}
+            {formatMoney(currency, addon.computedYearlyPrice)} / yr
+          </Typography>
+        </Grid>
 
         {!isSimple && addon.attribute && !isAddonTrial && (
           <Grid size={{ xs: 12 }}>
