@@ -11,7 +11,7 @@ import type {
 import { BillingCycle, CartType } from '../types/subscription'
 import type { AddonCatalogItem } from './addonBuilder'
 import type { AttributeChangeDraft } from './attributeChangeBuilder'
-import { buildDefaultCartSelections } from './cartBuilder'
+import { buildDefaultCartSelections, featuresForPlanCartUpsert } from './cartBuilder'
 
 export async function fetchExistingPlanCart(): Promise<MerchantCartPreview | null> {
   return fetchMerchantCartPreviewForType(CartType.PLAN)
@@ -54,7 +54,13 @@ export function hydratePlanCartFormState(
   return {
     billingCycle: cart.billingCycle ?? BillingCycle.MONTHLY,
     isTrial: cart.isTrial,
-    selections: cart.isTrial ? buildDefaultCartSelections(plan) : selectionsFromPlanCartPreview(cart),
+    selections: cart.isTrial
+      ? buildDefaultCartSelections(plan)
+      : featuresForPlanCartUpsert(
+          plan,
+          selectionsFromPlanCartPreview(cart),
+          cart.planDetails?.systemAddedEntities,
+        ),
   }
 }
 

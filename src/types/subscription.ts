@@ -416,6 +416,12 @@ export interface PlanCartSystemAddedEntity {
   reason: string
 }
 
+/** Sent on plan cart POST to keep a subset of system-added entities (opt-out). */
+export interface PlanCartSystemAddedEntityPreference {
+  id: string
+  type: 'PLAN_FEATURE' | 'PLAN_FEATURE_ATTRIBUTE'
+}
+
 export interface PlanCartAutoAlignedAttribute {
   attributeId: string
   previousSelectedCount: number
@@ -443,6 +449,8 @@ export interface UpsertMerchantCartPayload {
   isTrial?: boolean
   billingCycle?: BillingCycleValue
   features?: CartFeatureSelection[]
+  /** Omit to keep all system-added entities; send a subset to opt out (plan change). */
+  systemAddedEntities?: PlanCartSystemAddedEntityPreference[]
 }
 
 export interface CartPricingLine {

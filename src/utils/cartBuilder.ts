@@ -1,9 +1,14 @@
 import type {
   CartFeatureSelection,
+  MerchantCartPreview,
+  PlanCartPlanDetails,
+  PlanCartSystemAddedEntity,
   PlanDetail,
   PlanDetailFeature,
   PlanDetailFeatureAttribute,
+  UpsertMerchantCartPayload,
 } from '../types/subscription'
+import type { BillingCycleValue } from '../types/subscription'
 import { FeatureType, InclusionType, PriceType } from '../types/subscription'
 
 export function isIncludedPlanFeature(feature: PlanDetailFeature): boolean {
@@ -25,6 +30,175 @@ export function includedAttributesForFeature(
 
 export function includedPlanFeatures(plan: PlanDetail): PlanDetailFeature[] {
   return plan.features.filter(isIncludedPlanFeature)
+}
+
+/** Removes transition metadata the backend re-applies on upsert — not valid in POST `features`. */
+export function stripSystemAddedSelections(
+  selections: CartFeatureSelection[],
+  systemAddedEntities?: PlanCartSystemAddedEntity[],
+): CartFeatureSelection[] {
+  if (!systemAddedEntities?.length) {
+    return selections
+  }
+
+  const systemFeatureIds = new Set(
+    systemAddedEntities
+      .filter((entity) => entity.type === 'PLAN_FEATURE')
+      .map((entity) => entity.id),
+  )
+  const systemAttributeIds = new Set(
+    systemAddedEntities
+      .filter((entity) => entity.type === 'PLAN_FEATURE_ATTRIBUTE')
+      .map((entity) => entity.id),
+  )
+
+  return selections
+    .filter((selection) => !systemFeatureIds.has(selection.planFeatureId))
+    .map((selection) => ({
+      ...selection,
+      attributes: selection.attributes.filter(
+        (attribute) => !systemAttributeIds.has(attribute.planFeatureAttributeId),
+      ),
+    }))
+}
+
+/** Merchant-owned included feature rows only — what plan cart upsert expects. */
+export function systemAddedEntityKey(entity: {
+  id: string
+  type: PlanCartSystemAddedEntity['type']
+}): string {
+  return `${entity.type}:${entity.id}`
+}
+
+function findPlanFeatureAttribute(
+  plan: PlanDetail,
+  planFeatureAttributeId: string,
+): PlanDetail['features'][number]['attributes'][number] | undefined {
+  for (const feature of plan.features) {
+    const attribute = feature.attributes.find(
+      (row) => row.planFeatureAttributeId === planFeatureAttributeId,
+    )
+    if (attribute) {
+      return attribute
+    }
+  }
+  return undefined
+}
+
+/** Non-monthly LIMITED attributes with active usage cannot be opted out (matches backend). */
+export function canOptOutSystemAddedEntity(
+  entity: PlanCartSystemAddedEntity,
+  planDetails?: PlanCartPlanDetails,
+  plan?: PlanDetail,
+): boolean {
+  if (entity.type === 'PLAN_FEATURE') {
+    return true
+  }
+
+  const planAttribute = plan ? findPlanFeatureAttribute(plan, entity.id) : undefined
+  if (planAttribute?.isMonthlyLimit) {
+    return true
+  }
+
+  const warning = planDetails?.warningAttributes?.find(
+    (row) => row.attributeId === entity.id,
+  )
+  return !(warning && warning.usedCount > 0)
+}
+
+/** Fingerprint of plan cart form inputs that affect transition system-added candidates. */
+export function planCartFormContextKey(params: {
+  planId: string
+  billingCycle: BillingCycleValue
+  selections: CartFeatureSelection[]
+}): string {
+  return JSON.stringify({
+    planId: params.planId,
+    billingCycle: params.billingCycle,
+    selections: params.selections.map((selection) => ({
+      planFeatureId: selection.planFeatureId,
+      attributes: selection.attributes.map((attribute) => ({
+        planFeatureAttributeId: attribute.planFeatureAttributeId,
+        value: attribute.value,
+      })),
+    })),
+  })
+}
+
+export function buildPlanCartUpsertPayload(params: {
+  planId: string
+  billingCycle: BillingCycleValue
+  plan: PlanDetail
+  selections: CartFeatureSelection[]
+  cartPreview: MerchantCartPreview | null
+  /** When null, POST omits systemAddedEntities (server keeps all candidates). */
+  systemAddedSelection: Set<string> | null
+  /** Must match the form state when cartPreview was loaded, or opt-out is ignored. */
+  cartPreviewFormContextKey: string | null
+}): UpsertMerchantCartPayload {
+  const candidates =
+    params.cartPreview?.planId === params.planId
+      ? params.cartPreview.planDetails?.systemAddedEntities ?? []
+      : []
+
+  const includedOnly = featuresForPlanCartUpsert(
+    params.plan,
+    params.selections,
+    candidates,
+  )
+
+  const payload: UpsertMerchantCartPayload = {
+    planId: params.planId,
+    billingCycle: params.billingCycle,
+    features: includedOnly,
+  }
+
+  const formContextKey = planCartFormContextKey({
+    planId: params.planId,
+    billingCycle: params.billingCycle,
+    selections: params.selections,
+  })
+
+  const optOutContextValid =
+    params.cartPreviewFormContextKey !== null &&
+    params.cartPreviewFormContextKey === formContextKey
+
+  const effectiveSelection = optOutContextValid ? params.systemAddedSelection : null
+
+  if (candidates.length === 0 || effectiveSelection === null) {
+    return payload
+  }
+
+  const allKept = candidates.every((entity) =>
+    effectiveSelection.has(systemAddedEntityKey(entity)),
+  )
+  if (allKept) {
+    return payload
+  }
+
+  const kept = candidates.filter((entity) =>
+    effectiveSelection.has(systemAddedEntityKey(entity)),
+  )
+
+  // Opt-out via systemAddedEntities only — do not duplicate kept rows in `features`
+  // (that removes them from transition candidates and causes "Unknown system-added entity").
+  payload.systemAddedEntities = kept.map(({ id, type }) => ({ id, type }))
+
+  return payload
+}
+
+export function featuresForPlanCartUpsert(
+  plan: PlanDetail,
+  selections: CartFeatureSelection[],
+  systemAddedEntities?: PlanCartSystemAddedEntity[],
+): CartFeatureSelection[] {
+  const includedFeatureIds = new Set(
+    includedPlanFeatures(plan).map((feature) => feature.planFeatureId),
+  )
+
+  return stripSystemAddedSelections(selections, systemAddedEntities).filter((selection) =>
+    includedFeatureIds.has(selection.planFeatureId),
+  )
 }
 
 function defaultAttributeValue(attribute: PlanDetailFeatureAttribute): number {
@@ -137,12 +311,6 @@ export function getAttributeFromPlan(
 export function validateCartSelections(plan: PlanDetail, selections: CartFeatureSelection[]): string[] {
   const errors: string[] = []
   const includedFeatures = includedPlanFeatures(plan)
-
-  if (selections.length !== includedFeatures.length) {
-    errors.push(
-      `This plan requires ${includedFeatures.length} included feature row(s), but ${selections.length} were configured.`,
-    )
-  }
 
   for (const feature of includedFeatures) {
     const selection = selections.find((item) => item.planFeatureId === feature.planFeatureId)

@@ -87,8 +87,8 @@ export function PlanCartPlanDetailsPanel({ plan, planDetails }: PlanCartPlanDeta
         <Alert severity="info" icon={<PlaylistAddIcon />}>
           The system added {systemAddedEntities.length} feature
           {systemAddedEntities.length === 1 ? '' : 's'} or attribute
-          {systemAddedEntities.length === 1 ? '' : 's'} during plan transition to satisfy usage or
-          plan rules.
+          {systemAddedEntities.length === 1 ? '' : 's'} during plan transition. Use the opt-in/out
+          panel above the cart button to test removing items (when usage allows).
         </Alert>
       )}
 

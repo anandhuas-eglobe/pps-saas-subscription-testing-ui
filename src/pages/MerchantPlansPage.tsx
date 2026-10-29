@@ -28,6 +28,7 @@ import { getPlanById } from '../api/plans'
 import { ApiRequestError } from '../api/client'
 import { PageHeader } from '../components/layout/PageHeader'
 import { CartPreviewPanel } from '../components/merchant/CartPreviewPanel'
+import { SystemAddedEntitiesOptPanel } from '../components/merchant/SystemAddedEntitiesOptPanel'
 import { CancelMerchantCheckoutButton } from '../components/payment/CancelMerchantCheckoutButton'
 import { PlanCartConfigurator } from '../components/merchant/PlanCartConfigurator'
 import { ApiErrorAlert } from '../components/ApiErrorAlert'
@@ -50,6 +51,9 @@ import {
 } from '../utils/cartHydration'
 import {
   buildDefaultCartSelections,
+  buildPlanCartUpsertPayload,
+  featuresForPlanCartUpsert,
+  planCartFormContextKey,
   updateAttributeValue,
   validateCartSelections,
 } from '../utils/cartBuilder'
@@ -85,6 +89,10 @@ export function MerchantPlansPage() {
   const [purchaseResult, setPurchaseResult] = useState<MerchantPlanPurchaseResult | null>(null)
   const [checkoutPopupBlocked, setCheckoutPopupBlocked] = useState(false)
   const [cancellingCheckout, setCancellingCheckout] = useState(false)
+  /** null = omit systemAddedEntities on POST (keep all server candidates). */
+  const [systemAddedSelection, setSystemAddedSelection] = useState<Set<string> | null>(null)
+  /** Form fingerprint when cartPreview.systemAddedEntities was last loaded. */
+  const [cartPreviewFormContextKey, setCartPreviewFormContextKey] = useState<string | null>(null)
 
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
@@ -126,6 +134,14 @@ export function MerchantPlansPage() {
       setIsTrial(formState.isTrial)
       setSelections(formState.selections)
       setCartPreview(existingCart)
+      setSystemAddedSelection(null)
+      setCartPreviewFormContextKey(
+        planCartFormContextKey({
+          planId: plan.id,
+          billingCycle: formState.billingCycle,
+          selections: formState.selections,
+        }),
+      )
     },
     [],
   )
@@ -159,6 +175,39 @@ export function MerchantPlansPage() {
     }
   }, [execute, loadExistingPlanCart])
 
+  const merchantCartFeatures = useMemo(() => {
+    if (!selectedPlan || isTrial) {
+      return []
+    }
+    const systemAddedEntities =
+      cartPreview?.planId === selectedPlan.id
+        ? cartPreview.planDetails?.systemAddedEntities
+        : undefined
+    return featuresForPlanCartUpsert(selectedPlan, selections, systemAddedEntities)
+  }, [selectedPlan, isTrial, selections, cartPreview])
+
+  const planCartFormKey = useMemo(() => {
+    if (!selectedPlan || isTrial) {
+      return null
+    }
+    return planCartFormContextKey({
+      planId: selectedPlan.id,
+      billingCycle,
+      selections,
+    })
+  }, [selectedPlan, isTrial, billingCycle, selections])
+
+  const systemAddedOptOutStale =
+    cartPreviewFormContextKey !== null &&
+    planCartFormKey !== null &&
+    cartPreviewFormContextKey !== planCartFormKey
+
+  useEffect(() => {
+    if (systemAddedOptOutStale) {
+      setSystemAddedSelection(null)
+    }
+  }, [systemAddedOptOutStale])
+
   const livePayload = useMemo(() => {
     if (!selectedPlan) {
       return undefined
@@ -166,12 +215,24 @@ export function MerchantPlansPage() {
     if (isTrial) {
       return { planId: selectedPlan.id, isTrial: true }
     }
-    return {
+    return buildPlanCartUpsertPayload({
       planId: selectedPlan.id,
       billingCycle,
-      features: selections,
-    }
-  }, [selectedPlan, isTrial, billingCycle, selections])
+      plan: selectedPlan,
+      selections,
+      cartPreview,
+      systemAddedSelection,
+      cartPreviewFormContextKey,
+    })
+  }, [
+    selectedPlan,
+    isTrial,
+    billingCycle,
+    selections,
+    cartPreview,
+    systemAddedSelection,
+    cartPreviewFormContextKey,
+  ])
 
   useEffect(() => {
     void loadPlans()
@@ -184,6 +245,7 @@ export function MerchantPlansPage() {
     setClientValidationErrors([])
     setPurchaseError(null)
     setPurchaseResult(null)
+    setSystemAddedSelection(null)
 
     try {
       const existingCart = await fetchExistingPlanCart()
@@ -193,6 +255,14 @@ export function MerchantPlansPage() {
         setIsTrial(formState.isTrial)
         setSelections(formState.selections)
         setCartPreview(existingCart)
+        setSystemAddedSelection(null)
+        setCartPreviewFormContextKey(
+          planCartFormContextKey({
+            planId: plan.id,
+            billingCycle: formState.billingCycle,
+            selections: formState.selections,
+          }),
+        )
         return
       }
     } catch {
@@ -203,6 +273,7 @@ export function MerchantPlansPage() {
     setIsTrial(false)
     setSelections(buildDefaultCartSelections(plan))
     setCartPreview(null)
+    setCartPreviewFormContextKey(null)
   }
 
   const handleAttributeValueChange = (planFeatureAttributeId: string, value: number) => {
@@ -220,7 +291,7 @@ export function MerchantPlansPage() {
     }
 
     if (!isTrial) {
-      const validationErrors = validateCartSelections(selectedPlan, selections)
+      const validationErrors = validateCartSelections(selectedPlan, merchantCartFeatures)
       if (validationErrors.length > 0) {
         setClientValidationErrors(validationErrors)
         setSnackbar({
@@ -241,11 +312,15 @@ export function MerchantPlansPage() {
     try {
       const payload = isTrial
         ? { planId: selectedPlan.id, isTrial: true }
-        : {
+        : buildPlanCartUpsertPayload({
             planId: selectedPlan.id,
             billingCycle,
-            features: selections,
-          }
+            plan: selectedPlan,
+            selections,
+            cartPreview,
+            systemAddedSelection,
+            cartPreviewFormContextKey,
+          })
 
       const result = await execute(
         payload,
@@ -254,6 +329,14 @@ export function MerchantPlansPage() {
       )
       const preview = await execute({}, () => getMerchantCart(), `GET ${MERCHANT_CART_GET_PATH}`)
       setCartPreview(preview)
+      setSystemAddedSelection(null)
+      setCartPreviewFormContextKey(
+        planCartFormContextKey({
+          planId: selectedPlan.id,
+          billingCycle,
+          selections,
+        }),
+      )
       setSnackbar({ open: true, message: result.message, severity: 'success' })
     } catch (error) {
       setSubmitError(error)
@@ -527,6 +610,20 @@ export function MerchantPlansPage() {
                   onTrialChange={setIsTrial}
                   onAttributeValueChange={handleAttributeValueChange}
                 />
+
+                {cartPreview &&
+                  cartPreview.planId === selectedPlan.id &&
+                  cartPreview.planDetails?.systemAddedEntities &&
+                  cartPreview.planDetails.systemAddedEntities.length > 0 &&
+                  !isTrial && (
+                    <SystemAddedEntitiesOptPanel
+                      plan={selectedPlan}
+                      planDetails={cartPreview.planDetails}
+                      selection={systemAddedSelection}
+                      onSelectionChange={setSystemAddedSelection}
+                      optOutStale={systemAddedOptOutStale}
+                    />
+                  )}
 
                 {clientValidationErrors.length > 0 && (
                   <Alert severity="error">
