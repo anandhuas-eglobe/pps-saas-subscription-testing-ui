@@ -154,7 +154,15 @@ export function LoginPage() {
     setSubmitting(true)
 
     try {
-      await login(email, password, rememberMe)
+      const outcome = await login(email, password, rememberMe)
+
+      if (outcome.status === 'passwordChangeRequired') {
+        navigate(
+          `/change-password?token=${encodeURIComponent(outcome.accessToken)}`,
+          { replace: true },
+        )
+        return
+      }
 
       if (saveOnLogin) {
         const saved = upsertSavedCredential({
@@ -288,15 +296,20 @@ export function LoginPage() {
             fullWidth
           />
 
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={rememberMe}
-                onChange={(event) => setRememberMe(event.target.checked)}
-              />
-            }
-            label="Remember me"
-          />
+          <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={rememberMe}
+                  onChange={(event) => setRememberMe(event.target.checked)}
+                />
+              }
+              label="Remember me"
+            />
+            <Link component={RouterLink} to="/forgot-password" variant="body2">
+              Forgot password?
+            </Link>
+          </Stack>
 
           <Divider />
 

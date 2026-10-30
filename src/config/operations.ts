@@ -20,6 +20,7 @@ import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive'
 import CreditCardIcon from '@mui/icons-material/CreditCard'
 import PersonAddOutlinedIcon from '@mui/icons-material/PersonAddOutlined'
 import SupportAgentIcon from '@mui/icons-material/SupportAgent'
+import PasswordIcon from '@mui/icons-material/Password'
 import type { SvgIconComponent } from '@mui/icons-material'
 
 export interface OperationLink {
@@ -32,6 +33,15 @@ export interface OperationLink {
 }
 
 export const operations: OperationLink[] = [
+  {
+    title: 'Change password',
+    description:
+      'Update your IAM password while signed in — uses POST /api/v1/auth/change-password with your current password.',
+    path: '/account/change-password',
+    icon: PasswordIcon,
+    apiEndpoint: 'POST /api/v1/auth/change-password',
+    available: true,
+  },
   {
     title: 'Nitro Test',
     description: 'High-speed testing — one-click plan creation with required attributes, addons, and mixed feature pricing.',

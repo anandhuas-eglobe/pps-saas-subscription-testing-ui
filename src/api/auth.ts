@@ -133,3 +133,103 @@ export async function logoutWithIam(accessToken: string, tokenType = 'Bearer'): 
     // Local session clear still proceeds even if IAM logout fails.
   }
 }
+
+export interface VerifyResetTokenResult {
+  email: string
+  valid: boolean
+}
+
+export async function forgotPasswordWithIam(email: string): Promise<string> {
+  const { body } = await iamRequest<void>('/api/v1/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email: email.trim().toLowerCase() }),
+  })
+
+  return (
+    body.message ??
+    'Password reset instructions have been sent to your email. Check your inbox and spam folder.'
+  )
+}
+
+export async function verifyResetTokenWithIam(token: string): Promise<VerifyResetTokenResult> {
+  const { body } = await iamRequest<VerifyResetTokenResult>('/api/v1/auth/verify-reset-token', {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  })
+
+  const nested = body.data
+  if (nested?.email) {
+    return { email: nested.email, valid: nested.valid ?? true }
+  }
+
+  const flat = body as unknown as VerifyResetTokenResult
+  if (flat.email) {
+    return { email: flat.email, valid: flat.valid ?? true }
+  }
+
+  throw apiRequestErrorFromBody(
+    200,
+    {
+      success: false,
+      timestamp: new Date().toISOString(),
+      message: 'Reset token verification did not return an email address',
+      data: body,
+    },
+    `${getApiBaseUrl()}/api/v1/auth/verify-reset-token`,
+    'POST',
+  )
+}
+
+export async function resetPasswordWithIam(token: string, password: string): Promise<string> {
+  const { body } = await iamRequest<void>('/api/v1/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ token, password }),
+  })
+
+  return body.message ?? 'Password has been reset successfully. Sign in with your new password.'
+}
+
+export interface ChangePasswordResult {
+  message: string
+  accessToken?: string
+  refreshToken?: string
+  expiresIn?: number
+  tokenType?: string
+}
+
+export async function changePasswordWithIam(options: {
+  newPassword: string
+  currentPassword?: string
+  accessToken: string
+  tokenType?: string
+}): Promise<ChangePasswordResult> {
+  const payload: { newPassword: string; currentPassword?: string } = {
+    newPassword: options.newPassword,
+  }
+  if (options.currentPassword) {
+    payload.currentPassword = options.currentPassword
+  }
+
+  const tokenType = options.tokenType ?? 'Bearer'
+  const { body } = await iamRequest<{
+    passwordChangedAt?: string
+    accessToken?: string
+    refreshToken?: string
+    tokenType?: string
+    expiresIn?: number
+  }>('/api/v1/auth/change-password', {
+    method: 'POST',
+    headers: {
+      Authorization: `${tokenType} ${options.accessToken}`,
+    },
+    body: JSON.stringify(payload),
+  })
+
+  return {
+    message: body.message ?? 'Password changed successfully.',
+    accessToken: body.data?.accessToken,
+    refreshToken: body.data?.refreshToken,
+    expiresIn: body.data?.expiresIn,
+    tokenType: body.data?.tokenType,
+  }
+}

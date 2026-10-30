@@ -9,6 +9,26 @@ export function extractVerificationTokenFromUrl(verificationUrl: string): string
   }
 }
 
+export function extractPasswordResetTokenFromEmailVariables(
+  variables: Record<string, unknown> | undefined,
+): string | null {
+  if (!variables) {
+    return null
+  }
+
+  const resetToken = variables.resetToken
+  if (typeof resetToken === 'string' && resetToken.trim()) {
+    return resetToken.trim()
+  }
+
+  const resetUrl = variables.resetUrl
+  if (typeof resetUrl === 'string' && resetUrl.includes('token=')) {
+    return extractVerificationTokenFromUrl(resetUrl)
+  }
+
+  return null
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
     window.setTimeout(resolve, ms)
@@ -43,5 +63,37 @@ export async function waitForRegistrationVerificationToken(
 
   throw new Error(
     'Timed out waiting for the registration verification email in notification service logs.',
+  )
+}
+
+export async function waitForPasswordResetToken(
+  email: string,
+  options?: { maxAttempts?: number; intervalMs?: number },
+): Promise<string> {
+  const maxAttempts = options?.maxAttempts ?? 15
+  const intervalMs = options?.intervalMs ?? 2000
+  const normalizedEmail = email.trim().toLowerCase()
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const logs = await fetchEmailLogs({ toEmail: normalizedEmail, limit: 10, page: 1 })
+
+    const match = logs.data.find((event) =>
+      Boolean(extractPasswordResetTokenFromEmailVariables(event.variables)),
+    )
+
+    if (match) {
+      const token = extractPasswordResetTokenFromEmailVariables(match.variables)
+      if (token) {
+        return token
+      }
+    }
+
+    if (attempt < maxAttempts - 1) {
+      await sleep(intervalMs)
+    }
+  }
+
+  throw new Error(
+    'Timed out waiting for the password reset email in notification service logs.',
   )
 }

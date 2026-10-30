@@ -20,11 +20,15 @@ import {
 } from './tokenStorage'
 import { logoutZendeskMessenger } from '../utils/zendeskMessenger'
 
+export type LoginOutcome =
+  | { status: 'success' }
+  | { status: 'passwordChangeRequired'; accessToken: string; reason?: string }
+
 interface AuthContextValue {
   user: AuthUser | null
   isAuthenticated: boolean
   isReady: boolean
-  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<LoginOutcome>
   logout: () => Promise<void>
 }
 
@@ -90,9 +94,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (data.requiresPasswordChange) {
-      throw new Error(
-        data.reason ?? 'Password change is required before this account can use the test UI.',
-      )
+      if (!data.accessToken) {
+        throw new Error(
+          data.reason ?? 'Password change is required but no limited-scope token was returned.',
+        )
+      }
+      return {
+        status: 'passwordChangeRequired' as const,
+        accessToken: data.accessToken,
+        reason: data.reason,
+      }
     }
 
     if (!data.refreshToken) {
@@ -108,6 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
     setUser(data.user)
     setIsAuthenticated(true)
+    return { status: 'success' as const }
   }, [])
 
   const logout = useCallback(async () => {

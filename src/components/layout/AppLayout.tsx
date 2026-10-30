@@ -11,6 +11,7 @@ import SubscriptionsIcon from '@mui/icons-material/Subscriptions'
 import ScienceIcon from '@mui/icons-material/Science'
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
 import LogoutIcon from '@mui/icons-material/Logout'
+import PasswordIcon from '@mui/icons-material/Password'
 import { useTheme } from '@mui/material/styles'
 import { Link as RouterLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
@@ -186,6 +187,20 @@ export function AppLayout() {
                 display: { xs: 'none', md: 'flex' },
               }}
             />
+            <Button
+              size="small"
+              color="inherit"
+              component={RouterLink}
+              to="/account/change-password"
+              startIcon={<PasswordIcon />}
+              sx={{
+                bgcolor: 'rgba(255,255,255,0.08)',
+                display: { xs: 'none', lg: 'inline-flex' },
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.12)' },
+              }}
+            >
+              Password
+            </Button>
             <Button
               size="small"
               color="inherit"

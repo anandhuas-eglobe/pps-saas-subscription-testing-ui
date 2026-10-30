@@ -10,6 +10,9 @@ import { InvoiceDetailPage } from './pages/InvoiceDetailPage'
 import { InvoiceListPage } from './pages/InvoiceListPage'
 import { ListPlansPage } from './pages/ListPlansPage'
 import { LoginPage } from './pages/LoginPage'
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
+import { ResetPasswordPage } from './pages/ResetPasswordPage'
+import { ChangePasswordPage } from './pages/ChangePasswordPage'
 import { MerchantAddonsPage } from './pages/MerchantAddonsPage'
 import { MerchantAttributeChangesPage } from './pages/MerchantAttributeChangesPage'
 import { MerchantPlansPage } from './pages/MerchantPlansPage'
@@ -44,6 +47,18 @@ const router = createBrowserRouter([
     element: <LoginPage />,
   },
   {
+    path: '/forgot-password',
+    element: <ForgotPasswordPage />,
+  },
+  {
+    path: '/reset-password',
+    element: <ResetPasswordPage />,
+  },
+  {
+    path: '/change-password',
+    element: <ChangePasswordPage variant="public" />,
+  },
+  {
     path: '/settings',
     element: <SettingsPage />,
   },
@@ -76,6 +91,7 @@ const router = createBrowserRouter([
         ),
         children: [
           { index: true, element: <HomePage /> },
+          { path: 'account/change-password', element: <ChangePasswordPage variant="app" /> },
           { path: 'notifications', element: <NotificationsPage /> },
           { path: 'nitro-test', element: <NitroTestPage /> },
           { path: 'plans/create', element: <CreatePlanPage /> },
